@@ -333,6 +333,10 @@
           }
         }
       }
+    },
+    "theme": {
+      "type": "string",
+      "description": "Visual environment id (cosmetic). See src/render/themes.ts."
     }
   },
   "definitions": {

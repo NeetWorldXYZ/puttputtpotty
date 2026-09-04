@@ -39,6 +39,7 @@ export function validateHole(input: unknown): { ok: boolean; errors: string[]; h
   if (typeof h.id !== 'string' || !h.id) errors.push('id must be a non-empty string');
   if (typeof h.name !== 'string') errors.push('name must be a string');
   if (!isNum(h.par) || h.par < 1 || h.par > 9) errors.push('par must be a number 1..9');
+  if (h.theme !== undefined && typeof h.theme !== 'string') errors.push('theme must be a string');
 
   const b = h.bounds as Record<string, unknown> | undefined;
   if (!b || !isNum(b.x) || !isNum(b.y) || !isNum(b.w) || !isNum(b.h) || b.w <= 0 || b.h <= 0) {

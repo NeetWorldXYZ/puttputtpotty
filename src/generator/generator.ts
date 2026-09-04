@@ -11,6 +11,7 @@ import { ARCHETYPES, buildSkeleton, type Archetype, type ArchetypeParams, type L
 import { decorate, ensureObstacle, type Difficulty } from './decorate';
 import { unionWalls, distToWalls } from './geom';
 import { Rng } from './rng';
+import { THEMES } from '../render/themes';
 
 export interface GenerateOptions {
   seed: string;
@@ -87,6 +88,7 @@ function assemble(seed: string, attempt: number, arche: Archetype, difficulty: D
     version: 1,
     id: `gen-${seed}-${attempt}`,
     name: nameFor(arche, rng),
+    theme: rng.pick(THEMES).id,
     par: 3,
     bounds: { x: 0, y: 0, w: 30, h: Math.max(40, sk.height) },
     walls,
@@ -176,15 +178,24 @@ export interface CourseSlot {
   seed: string;
   archetype: Archetype;
   difficulty: Difficulty;
+  /** Environment; distinct across a course. */
+  theme: string;
 }
 
 /** The deterministic plan for a course: which archetype/difficulty/seed each hole uses. */
 export function courseSlots(seed: string, count = 9): CourseSlot[] {
   const rng = new Rng(`${seed}:course`);
   const order = rng.shuffle(ARCHETYPES);
+  const themes = rng.shuffle(THEMES.map((t) => t.id));
   const out: CourseSlot[] = [];
   for (let i = 0; i < count; i++) {
-    out.push({ index: i, seed: `${seed}:${i}`, archetype: order[i % order.length], difficulty: COURSE_DIFFICULTY[i % COURSE_DIFFICULTY.length] });
+    out.push({
+      index: i,
+      seed: `${seed}:${i}`,
+      archetype: order[i % order.length],
+      difficulty: COURSE_DIFFICULTY[i % COURSE_DIFFICULTY.length],
+      theme: themes[i % themes.length],
+    });
   }
   return out;
 }
@@ -203,6 +214,7 @@ export function generateCourse(seed: string, count = 9, params: PhysicsParams = 
 export function generateSlot(courseSeed: string, slot: CourseSlot, params: PhysicsParams = DEFAULT_PARAMS): GeneratedHole {
   const g = generateHole({ seed: slot.seed, archetype: slot.archetype, difficulty: slot.difficulty, params });
   g.hole.id = `${courseSeed}-${slot.index + 1}`;
+  g.hole.theme = slot.theme;
   return g;
 }
 

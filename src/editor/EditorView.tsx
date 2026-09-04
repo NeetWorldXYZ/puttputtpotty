@@ -27,6 +27,7 @@ import { ARCHETYPES, type Archetype } from '../generator/archetypes';
 import type { Difficulty } from '../generator/decorate';
 import type { GeneratedHole } from '../generator/generator';
 import { randomSeed } from '../game/courses';
+import { THEMES } from '../render/themes';
 import { COURSE } from '../holes';
 import { downloadJson, loadAutosave, saveAutosave } from './storage';
 
@@ -774,6 +775,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       cupRadius: cupRadius(DEFAULT_PARAMS),
       ball: { x: hole.tee.x, y: hole.tee.y },
       zoneLabels: true,
+      dpr,
       overlay: (c) => {
         // grid
         const b = hole.bounds;
@@ -1102,6 +1104,17 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         <div className="field">
           <label>name</label>
           <input value={hole.name} onChange={(e) => updateHole((h) => (h.name = e.target.value))} />
+        </div>
+        <div className="field">
+          <label>environment</label>
+          <select value={hole.theme ?? ''} onChange={(e) => updateHole((h) => (e.target.value ? (h.theme = e.target.value) : delete h.theme))}>
+            <option value="">(default)</option>
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field">
           <label>par</label>

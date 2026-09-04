@@ -9,6 +9,7 @@ import { fitCamera, fitScale, followCamera, type Camera } from '../render/camera
 import { useTuning } from './paramsStore';
 import { DevPanel } from './DevPanel';
 import { goToCourse, dailySeed } from './courses';
+import { themeById } from '../render/themes';
 
 interface Props {
   holes: Hole[];
@@ -34,7 +35,7 @@ interface Toast {
   until: number;
 }
 
-const HUD_TOP = 70;
+const HUD_TOP = 84;
 const HUD_BOTTOM = 48;
 const SIDE_PAD = 8;
 /** Below this many px per unit the whole-hole view is too small to read; switch to follow. */
@@ -292,6 +293,7 @@ export function PlayView({ holes, onExit, exitLabel, onOpenEditor, courseSeed }:
         aim,
         cupFlash: cupFlashRef.current,
         zoneLabels: prefs.showZoneLabels,
+        dpr,
       });
 
       if (follow) {
@@ -428,26 +430,25 @@ export function PlayView({ holes, onExit, exitLabel, onOpenEditor, courseSeed }:
       />
 
       <div className="hud">
-        <div>
+        <div className="left">
           <div className="name">
-            HOLE {holeIndex + 1}/{holes.length} · {hole.name}
+            HOLE {holeIndex + 1}/{holes.length} · PAR {par}
           </div>
-          <div className="big">PAR {par}</div>
+          <div className="title">{hole.name}</div>
+          <div className="env">{themeById(hole.theme).name}</div>
         </div>
         <div className="right">
-          <div className="name">
-            STROKES{hud.strokes >= STROKE_CAP ? ' · CAP' : ''} · COURSE{' '}
-            <span className={finishedRel < 0 ? 'score-under' : finishedRel > 0 ? 'score-over' : ''}>
-              {relPar(finishedRel)}
-            </span>
-          </div>
+          <div className="name">STROKES{hud.strokes >= STROKE_CAP ? ' · CAP' : ''}</div>
           <div className="big">
             {cur}
             {cur > par && (
-              <span style={{ fontSize: 15, marginLeft: 8 }} className="score-over">
+              <span style={{ fontSize: 15, marginLeft: 6 }} className="score-over">
                 {relPar(cur - par)}
               </span>
             )}
+          </div>
+          <div className="env" style={{ color: finishedRel < 0 ? 'var(--good)' : finishedRel > 0 ? 'var(--danger)' : '#c9d8ff' }}>
+            COURSE {relPar(finishedRel)}
           </div>
         </div>
       </div>

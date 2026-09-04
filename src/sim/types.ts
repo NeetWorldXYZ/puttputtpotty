@@ -193,6 +193,8 @@ export interface Hole {
   id: string;
   name: string;
   par: number;
+  /** Visual environment id (see src/render/themes.ts). Missing = default. Purely cosmetic. */
+  theme?: string;
   /** Playfield rectangle. Also acts as an outer wall so the ball can never escape. */
   bounds: Rect;
   walls: Wall[];

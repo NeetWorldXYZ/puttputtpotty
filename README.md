@@ -34,6 +34,30 @@ schema/         hole.schema.json (JSON Schema draft-07)
 tests/          determinism.test.ts, tunneling.test.ts
 ```
 
+## Look
+
+One art style everywhere: thick outlines, chunky shapes, bright
+gameplay objects that read at arm's length. Gameplay objects are drawn
+identically in every environment so a drain always looks like a drain:
+toilet cup, tee mat, ball, aim line, drain / water / pit / overflow
+hazards, gum patches, toilet-paper-roll bumpers, plunger posts, tunnels,
+blockers.
+
+Each hole has a `theme` (12 environments in `src/render/themes.ts`: gas
+station, luxury hotel, dive bar, airport, porta-potty, castle, spaceship,
+haunted, tropical, office, grandma's, stadium). A theme changes the floor,
+the pipe walls, the palette and the decorative props drawn *outside* the
+playable area, plus subtle floor decals inside. The generator gives every
+hole a theme and a 9-hole course never repeats one. The editor has an
+environment dropdown.
+
+Rendering (`src/render/`): the static picture of a hole (surround, props,
+floor, zones, obstacles, cup, walls) is painted once per hole and scale
+into an offscreen bitmap; only the ball, trail, aim and flashes draw per
+frame. `drawHole.ts` composes, `objects.ts` is the gameplay object art,
+`floors.ts` / `props.ts` the environment art, `region.ts` turns the wall
+list into a fill region.
+
 ## Playing
 
 - Drag anywhere on screen and release. Default is **pull back to shoot**

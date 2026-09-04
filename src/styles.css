@@ -8,6 +8,8 @@
   --accent: #ffd166;
   --good: #5be3a3;
   --danger: #ff5f7e;
+  --ink: #1f2a44;
+  --game-font: 'Fredoka', 'Trebuchet MS', system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -93,6 +95,7 @@ input[type='checkbox'] {
   display: flex;
   flex-direction: column;
   background: var(--page);
+  font-family: var(--game-font);
 }
 .play canvas {
   flex: 1;
@@ -106,24 +109,60 @@ input[type='checkbox'] {
   top: 0;
   left: 0;
   right: 0;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 8px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 8px;
   pointer-events: none;
   font-weight: 600;
   font-size: 15px;
-  line-height: 1.2;
+  line-height: 1.15;
+}
+.hud > div {
+  background: var(--ink);
+  border: 2px solid #ffffff;
+  border-radius: 14px;
+  padding: 6px 12px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  min-width: 0;
+}
+.hud .left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hud .right {
+  flex: 0 0 auto;
 }
 .hud .name {
-  color: var(--dim);
-  font-weight: 500;
-  font-size: 13px;
+  color: #c9d8ff;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hud .title {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud .env {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .hud .big {
   font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffffff;
 }
 .hud .right {
   text-align: right;
@@ -140,21 +179,25 @@ input[type='checkbox'] {
   right: 0;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
   text-align: center;
-  color: var(--dim);
+  color: #ffffff;
   font-size: 13px;
   pointer-events: none;
+  text-shadow: 0 1px 0 var(--ink), 0 0 6px rgba(0, 0, 0, 0.6);
 }
 .toast {
   position: absolute;
   left: 50%;
   top: 22%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid var(--line);
-  padding: 10px 16px;
-  border-radius: 10px;
+  background: var(--ink);
+  border: 2px solid #ffffff;
+  padding: 10px 18px;
+  border-radius: 14px;
   font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
   pointer-events: none;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
 }
 .toast.danger {
   border-color: var(--danger);
@@ -169,13 +212,14 @@ input[type='checkbox'] {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  width: 14px;
+  width: 16px;
   height: 42%;
-  border: 2px solid var(--text);
-  border-radius: 7px;
+  border: 2px solid #ffffff;
+  border-radius: 9px;
   overflow: hidden;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--ink);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
 }
 .power-meter .fill {
   position: absolute;
@@ -196,12 +240,14 @@ input[type='checkbox'] {
   background: rgba(7, 9, 10, 0.72);
 }
 .card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  background: var(--ink);
+  border: 3px solid #ffffff;
+  border-radius: 18px;
   padding: 22px 24px;
   min-width: 260px;
   text-align: center;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4);
+  font-family: var(--game-font);
 }
 .card h2 {
   margin: 0 0 6px;
@@ -247,15 +293,18 @@ input[type='checkbox'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 21, 23, 0.85);
+  background: var(--ink);
+  border: 2px solid #ffffff;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  color: #ffffff;
 }
 .corner-btn.tl {
   left: 12px;
-  top: calc(env(safe-area-inset-top, 0px) + 52px);
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
 }
 .corner-btn.tr {
   right: 12px;
-  top: calc(env(safe-area-inset-top, 0px) + 52px);
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
 }
 
 /* ---------- dev panel ---------- */
