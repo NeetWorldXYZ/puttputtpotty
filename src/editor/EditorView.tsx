@@ -21,6 +21,13 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera, screenToWorld, type Camera } from '../render/camera';
 import { PALETTE } from '../render/palette';
 import { PlayView } from '../game/PlayView';
+import { useTuning } from '../game/paramsStore';
+import type { SolveReport } from '../solver/solver';
+import { ARCHETYPES, type Archetype } from '../generator/archetypes';
+import type { Difficulty } from '../generator/decorate';
+import type { GeneratedHole } from '../generator/generator';
+import { randomSeed } from '../game/courses';
+import { THEMES } from '../render/themes';
 import { COURSE } from '../holes';
 import { downloadJson, loadAutosave, saveAutosave } from './storage';
 
@@ -34,7 +41,12 @@ type Tool =
   | 'hazard'
   | 'blockerRect'
   | 'blockerCircle'
-  | 'bumper';
+  | 'blockerPoly'
+  | 'bumper'
+  | 'pipe'
+  | 'windmill'
+  | 'gate'
+  | 'pendulum';
 
 const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'select', label: 'Select / move', key: 'V' },
@@ -46,8 +58,22 @@ const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'hazard', label: 'Hazard zone', key: 'H' },
   { id: 'blockerRect', label: 'Blocker (rect)', key: 'B' },
   { id: 'blockerCircle', label: 'Blocker (circle)', key: 'O' },
+  { id: 'blockerPoly', label: 'Blocker (polygon)', key: 'K' },
   { id: 'bumper', label: 'Bumper', key: 'U' },
+  { id: 'pipe', label: 'Pipe (entry → exit)', key: 'I' },
+  { id: 'windmill', label: 'Windmill', key: 'M' },
+  { id: 'gate', label: 'Sliding block', key: 'D' },
+  { id: 'pendulum', label: 'Pendulum', key: 'N' },
 ];
+
+/** Obstacle types the editor can assign to a placed shape. */
+const SOLID_TYPES = ['blocker', 'deadWall', 'curb'] as const;
+const CIRCLE_TYPES = ['blocker', 'bumper', 'post', 'deadWall', 'curb'] as const;
+
+function shapeAnchor(s: Obstacle['shape']): Point {
+  if (s.kind === 'polygon') return s.points[0];
+  return { x: s.x, y: s.y };
+}
 
 type Selection =
   | { kind: 'wall'; index: number }
@@ -64,7 +90,8 @@ type Handle =
   | { kind: 'zoneVertex'; zone: 'surface' | 'slope' | 'hazard'; index: number; vi: number }
   | { kind: 'tee' }
   | { kind: 'cup' }
-  | { kind: 'obstacle'; index: number };
+  | { kind: 'obstacle'; index: number }
+  | { kind: 'pipeExit'; index: number };
 
 type DragOp =
   | { kind: 'handles'; handles: Handle[]; startHole: Hole }
@@ -94,9 +121,11 @@ function handlePoint(h: Hole, hd: Handle): Point {
       return h.tee;
     case 'cup':
       return h.cup;
-    case 'obstacle': {
-      const s = h.obstacles[hd.index].shape;
-      return s.kind === 'rect' ? { x: s.x, y: s.y } : { x: s.x, y: s.y };
+    case 'obstacle':
+      return shapeAnchor(h.obstacles[hd.index].shape);
+    case 'pipeExit': {
+      const o = h.obstacles[hd.index];
+      return o.type === 'pipe' ? o.exit : { x: 0, y: 0 };
     }
   }
 }
@@ -116,7 +145,10 @@ function allHandles(h: Hole): Handle[] {
   (['surface', 'slope', 'hazard'] as const).forEach((zone) => {
     zonePolys(h, zone).forEach((poly, i) => poly.forEach((_, vi) => out.push({ kind: 'zoneVertex', zone, index: i, vi })));
   });
-  h.obstacles.forEach((_, i) => out.push({ kind: 'obstacle', index: i }));
+  h.obstacles.forEach((o, i) => {
+    out.push({ kind: 'obstacle', index: i });
+    if (o.type === 'pipe') out.push({ kind: 'pipeExit', index: i });
+  });
   return out;
 }
 
@@ -134,10 +166,21 @@ function moveHandle(h: Hole, hd: Handle, to: Point): void {
     case 'cup':
       h.cup = { x: to.x, y: to.y };
       break;
+    case 'pipeExit': {
+      const o = h.obstacles[hd.index];
+      if (o.type === 'pipe') o.exit = { x: to.x, y: to.y };
+      break;
+    }
     case 'obstacle': {
       const s = h.obstacles[hd.index].shape;
-      s.x = to.x;
-      s.y = to.y;
+      if (s.kind === 'polygon') {
+        const dx = to.x - s.points[0].x;
+        const dy = to.y - s.points[0].y;
+        s.points = s.points.map((q) => ({ x: q.x + dx, y: q.y + dy }));
+      } else {
+        s.x = to.x;
+        s.y = to.y;
+      }
       break;
     }
   }
@@ -186,6 +229,64 @@ export function EditorView({ onExit }: { onExit: () => void }) {
   const [jsonMsg, setJsonMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [status, setStatus] = useState('');
+  const tuning = useTuning();
+
+  // --- solver (runs in a worker so the UI stays responsive)
+  const [solving, setSolving] = useState(false);
+  const [report, setReport] = useState<SolveReport | null>(null);
+  const [reportHoleJson, setReportHoleJson] = useState('');
+  const workerRef = useRef<Worker | null>(null);
+  const solveIdRef = useRef(0);
+  useEffect(() => {
+    const w = new Worker(new URL('../solver/worker.ts', import.meta.url), { type: 'module' });
+    w.onmessage = (e: MessageEvent<{ id: number; report?: SolveReport; error?: string }>) => {
+      if (e.data.id !== solveIdRef.current) return;
+      setSolving(false);
+      if (e.data.report) setReport(e.data.report);
+      else setStatus(`solver error: ${e.data.error}`);
+    };
+    workerRef.current = w;
+    return () => w.terminate();
+  }, []);
+  const runSolver = useCallback(() => {
+    const w = workerRef.current;
+    if (!w) return;
+    const id = ++solveIdRef.current;
+    setSolving(true);
+    setReportHoleJson(JSON.stringify(holeRef.current));
+    w.postMessage({ kind: 'solve', id, hole: holeRef.current, params: tuning.paramsRef.current });
+  }, [tuning.paramsRef]);
+  const reportStale = report !== null && reportHoleJson !== JSON.stringify(hole);
+
+  // --- canvas + camera
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const sizeRef = useRef({ w: 800, h: 600, dpr: 1 });
+  const [cam, setCam] = useState<Camera>({ scale: 10, ox: 40, oy: 40 });
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  const dragRef = useRef<DragOp | null>(null);
+  const [, setTick] = useState(0);
+  const redraw = useCallback(() => setTick((t) => t + 1), []);
+  // Movers animate in the editor so their timing can be judged.
+  const [editorClock, setEditorClock] = useState(0);
+  useEffect(() => {
+    if (testing) return;
+    if (!hole.obstacles.some((o) => o.type === 'windmill' || o.type === 'slidingGate' || o.type === 'pendulum')) return;
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      setEditorClock((performance.now() - t0) / 1000);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [testing, hole]);
+
+  const fit = useCallback(() => {
+    const { w, h } = sizeRef.current;
+    setCam(fitCamera(holeRef.current.bounds, w, h, 40));
+  }, []);
 
   // --- undo/redo
   const undoRef = useRef<Hole[]>([]);
@@ -229,21 +330,47 @@ export function EditorView({ onExit }: { onExit: () => void }) {
     if (!jsonDirtyRef.current) setJsonText(JSON.stringify(hole, null, 2));
   }, [hole]);
 
-  // --- canvas + camera
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const sizeRef = useRef({ w: 800, h: 600, dpr: 1 });
-  const [cam, setCam] = useState<Camera>({ scale: 10, ox: 40, oy: 40 });
-  const camRef = useRef(cam);
-  camRef.current = cam;
-  const dragRef = useRef<DragOp | null>(null);
-  const [, setTick] = useState(0);
-  const redraw = useCallback(() => setTick((t) => t + 1), []);
+  // --- generator
+  const [genSeed, setGenSeed] = useState(() => randomSeed());
+  const [genArche, setGenArche] = useState<Archetype | 'any'>('any');
+  const [genDiff, setGenDiff] = useState<Difficulty | 'any'>('any');
+  const [generating, setGenerating] = useState(false);
+  const [genInfo, setGenInfo] = useState<string | null>(null);
+  const genIdRef = useRef(0);
+  const runGenerator = useCallback(() => {
+    const w = workerRef.current;
+    if (!w) return;
+    const id = 1_000_000 + ++genIdRef.current;
+    setGenerating(true);
+    const handler = (e: MessageEvent<{ id: number; generated?: GeneratedHole; error?: string }>) => {
+      if (e.data.id !== id) return;
+      w.removeEventListener('message', handler);
+      setGenerating(false);
+      if (e.data.generated) {
+        const g = e.data.generated;
+        commit(g.hole);
+        setSelection(null);
+        setDraft([]);
+        setReport(g.report);
+        setReportHoleJson(JSON.stringify(g.hole));
+        setGenInfo(`${g.archetype} · ${g.difficulty} · par ${g.hole.par} · ${g.attempts} attempt${g.attempts === 1 ? '' : 's'}${g.fallback ? ' · FALLBACK (undecorated)' : ''}`);
+        setTimeout(fit, 0);
+      } else setGenInfo(`error: ${e.data.error}`);
+    };
+    w.addEventListener('message', handler);
+    w.postMessage({
+      kind: 'generate',
+      id,
+      options: {
+        seed: genSeed,
+        archetype: genArche === 'any' ? undefined : genArche,
+        difficulty: genDiff === 'any' ? undefined : genDiff,
+        params: tuning.paramsRef.current,
+      },
+    });
+  }, [genSeed, genArche, genDiff, commit, fit, tuning.paramsRef]);
 
-  const fit = useCallback(() => {
-    const { w, h } = sizeRef.current;
-    setCam(fitCamera(holeRef.current.bounds, w, h, 40));
-  }, []);
+
 
   useEffect(() => {
     if (testing) return;
@@ -315,7 +442,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       const hit =
         s.kind === 'rect'
           ? p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h
-          : (p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= s.r * s.r;
+          : s.kind === 'circle'
+            ? (p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= s.r * s.r
+            : pointInPolygon(p.x, p.y, s.points);
       if (hit) return { kind: 'obstacle', index: i };
     }
     for (let i = h.hazards.length - 1; i >= 0; i--) if (pointInPolygon(p.x, p.y, h.hazards[i].polygon)) return { kind: 'hazard', index: i };
@@ -339,6 +468,14 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         for (let i = 0; i + 1 < pts.length; i++) h.walls.push({ a: pts[i], b: pts[i + 1] });
         if (close && pts.length >= 3) h.walls.push({ a: pts[pts.length - 1], b: pts[0] });
         commit(h);
+      } else if (tool === 'blockerPoly') {
+        if (pts.length < 3) {
+          setDraft([]);
+          return;
+        }
+        h.obstacles.push({ type: 'blocker', shape: { kind: 'polygon', points: pts } });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
       } else if (tool === 'surface' || tool === 'slope' || tool === 'hazard') {
         if (pts.length < 3) {
           setDraft([]);
@@ -469,6 +606,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           else if (hd.kind === 'cup') setSelection({ kind: 'cup' });
           else if (hd.kind === 'wallEnd') setSelection({ kind: 'wall', index: hd.index });
           else if (hd.kind === 'zoneVertex') setSelection({ kind: hd.zone, index: hd.index });
+          else if (hd.kind === 'pipeExit') setSelection({ kind: 'obstacle', index: hd.index });
           return;
         }
         const sel = pickSelection(raw);
@@ -481,8 +619,8 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           };
           // store the grab offset in the draft-free way: remember the raw grab point via closure below
           grabOffsetRef.current = (() => {
-            const s = holeRef.current.obstacles[sel.index].shape;
-            return { x: raw.x - s.x, y: raw.y - s.y };
+            const a = shapeAnchor(holeRef.current.obstacles[sel.index].shape);
+            return { x: raw.x - a.x, y: raw.y - a.y };
           })();
         } else grabOffsetRef.current = null;
         return;
@@ -490,7 +628,8 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       case 'wall':
       case 'surface':
       case 'slope':
-      case 'hazard': {
+      case 'hazard':
+      case 'blockerPoly': {
         if (draft.length >= 2) {
           const f = draft[0];
           const tol = pxToUnits(HANDLE_PX);
@@ -523,6 +662,42 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       case 'bumper':
         dragRef.current = { kind: 'circle', ax: p.x, ay: p.y, r: 0, bumper: tool === 'bumper' };
         return;
+      case 'windmill': {
+        const h = clone(holeRef.current);
+        h.obstacles.push({ type: 'windmill', shape: { kind: 'circle', x: p.x, y: p.y, r: 3 }, blades: 3, period: 4, phase: 0, direction: 1 });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
+      case 'pendulum': {
+        const h = clone(holeRef.current);
+        h.obstacles.push({ type: 'pendulum', shape: { kind: 'circle', x: p.x, y: p.y, r: 4 }, arc: 0.9, period: 3, phase: 0 });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
+      case 'gate':
+        dragRef.current = { kind: 'rect', ax: p.x, ay: p.y, cx: p.x, cy: p.y };
+        return;
+      case 'pipe': {
+        if (draft.length === 0) {
+          setDraft([p]);
+          return;
+        }
+        const entry = draft[0];
+        const h = clone(holeRef.current);
+        h.obstacles.push({
+          type: 'pipe',
+          shape: { kind: 'circle', x: entry.x, y: entry.y, r: 1.1 },
+          exit: p,
+          mode: 'redirect',
+          exitAngle: Math.round(Math.atan2(h.cup.y - p.y, h.cup.x - p.x) * 100) / 100,
+        });
+        commit(h);
+        setDraft([]);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
     }
   };
   const grabOffsetRef = useRef<Point | null>(null);
@@ -581,7 +756,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         const hh = Math.abs(d.cy - d.ay);
         if (w > 0 && hh > 0) {
           const h = clone(holeRef.current);
-          h.obstacles.push({ type: 'blocker', shape: { kind: 'rect', x, y, w, h: hh } });
+          if (tool === 'gate')
+            h.obstacles.push({ type: 'slidingGate', shape: { kind: 'rect', x, y, w, h: hh }, axis: w >= hh ? 'x' : 'y', amplitude: 3, period: 3, phase: 0, look: 'gate' });
+          else h.obstacles.push({ type: 'blocker', shape: { kind: 'rect', x, y, w, h: hh } });
           commit(h);
           setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
         }
@@ -637,6 +814,8 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       cupRadius: cupRadius(DEFAULT_PARAMS),
       ball: { x: hole.tee.x, y: hole.tee.y },
       zoneLabels: true,
+      dpr,
+      clock: editorClock,
       overlay: (c) => {
         // grid
         const b = hole.bounds;
@@ -682,9 +861,14 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           } else if (selection.kind === 'obstacle' && hole.obstacles[selection.index]) {
             const s = hole.obstacles[selection.index].shape;
             if (s.kind === 'rect') c.strokeRect(s.x * S + cam.ox - 2, s.y * S + cam.oy - 2, s.w * S + 4, s.h * S + 4);
-            else {
+            else if (s.kind === 'circle') {
               c.beginPath();
               c.arc(s.x * S + cam.ox, s.y * S + cam.oy, s.r * S + 2, 0, Math.PI * 2);
+              c.stroke();
+            } else {
+              c.beginPath();
+              s.points.forEach((q, i) => (i ? c.lineTo(q.x * S + cam.ox, q.y * S + cam.oy) : c.moveTo(q.x * S + cam.ox, q.y * S + cam.oy)));
+              c.closePath();
               c.stroke();
             }
           } else if (selection.kind === 'tee' || selection.kind === 'cup') {
@@ -701,6 +885,31 @@ export function EditorView({ onExit }: { onExit: () => void }) {
               c.stroke();
             }
           }
+        }
+
+        // solver's best run (numbered rest positions)
+        if (report && report.bestRun && !reportStale) {
+          const pts = [{ x: hole.tee.x, y: hole.tee.y }, ...report.bestRun.positions];
+          c.save();
+          c.strokeStyle = PALETTE.good;
+          c.lineWidth = 2;
+          c.setLineDash([6, 4]);
+          c.beginPath();
+          pts.forEach((q, i) => (i ? c.lineTo(q.x * S + cam.ox, q.y * S + cam.oy) : c.moveTo(q.x * S + cam.ox, q.y * S + cam.oy)));
+          c.stroke();
+          c.setLineDash([]);
+          c.font = '11px system-ui, sans-serif';
+          c.textAlign = 'center';
+          c.textBaseline = 'middle';
+          report.bestRun.positions.forEach((q, i) => {
+            c.fillStyle = PALETTE.good;
+            c.beginPath();
+            c.arc(q.x * S + cam.ox, q.y * S + cam.oy, 8, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = '#111';
+            c.fillText(String(i + 1), q.x * S + cam.ox, q.y * S + cam.oy);
+          });
+          c.restore();
         }
 
         // vertex handles (select tool)
@@ -841,9 +1050,11 @@ export function EditorView({ onExit }: { onExit: () => void }) {
 
   const draftHelp =
     draft.length > 0
-      ? tool === 'wall'
+      ? tool === 'pipe'
+        ? 'Pipe: click where the ball comes out · Esc cancels'
+        : tool === 'wall'
         ? `Wall: ${draft.length} pt · click first point or Enter/dbl-click to finish · Backspace removes last · Esc cancels`
-        : `Zone: ${draft.length} pt · click first point or Enter/dbl-click to close · Esc cancels`
+        : `${tool === 'blockerPoly' ? 'Blocker' : 'Zone'}: ${draft.length} pt · click first point or Enter/dbl-click to close · Esc cancels`
       : null;
 
   return (
@@ -852,6 +1063,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         <span className="title">Putt Putt Potty — editor</span>
         <button className="primary" onClick={() => setTesting(true)} disabled={!validation.ok}>
           ▶ Test play <kbd style={{ marginLeft: 6, opacity: 0.7 }}>P</kbd>
+        </button>
+        <button onClick={runSolver} disabled={!validation.ok || solving} title="Estimate par and check the hole is playable">
+          {solving ? 'Solving…' : '⌕ Solve'}
         </button>
         <button onClick={undo} title="Ctrl+Z">
           ↶ Undo
@@ -932,6 +1146,17 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           <input value={hole.name} onChange={(e) => updateHole((h) => (h.name = e.target.value))} />
         </div>
         <div className="field">
+          <label>environment</label>
+          <select value={hole.theme ?? ''} onChange={(e) => updateHole((h) => (e.target.value ? (h.theme = e.target.value) : delete h.theme))}>
+            <option value="">(default)</option>
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
           <label>par</label>
           <input
             type="number"
@@ -959,9 +1184,15 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           </div>
         </div>
 
-        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle') && (
+        {tool === 'pipe' && (
           <>
-            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' ? 'blocker' : tool} defaults</h4>
+            <h4>Pipe</h4>
+            <div style={{ fontSize: 12, color: 'var(--dim)' }}>Click the entry, then click where the ball comes out. Exit angle defaults to "toward the cup".</div>
+          </>
+        )}
+        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' || tool === 'windmill' || tool === 'gate' || tool === 'pendulum') && (
+          <>
+            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' ? 'blocker' : tool === 'gate' ? 'sliding block' : tool} defaults</h4>
             {tool === 'surface' && (
               <div className="field">
                 <label>surface</label>
@@ -1044,13 +1275,59 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                 </div>
               </>
             )}
-            {(tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'bumper') && (
+            {(tool === 'windmill' || tool === 'gate' || tool === 'pendulum') && (
               <div style={{ fontSize: 12, color: 'var(--dim)' }}>
-                Drag on the canvas to size it. Restitution is editable after placing (select it).
+                {tool === 'gate' ? 'Drag the block at its centre position; set axis and amplitude after.' : 'Click to place; period, phase and size are editable after.'}
+              </div>
+            )}
+            {(tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'bumper' || tool === 'blockerPoly') && (
+              <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+                {tool === 'blockerPoly' ? 'Click points to outline it.' : 'Drag on the canvas to size it.'} Type (blocker / dead
+                wall / curb / post) and restitution are editable after placing (select it).
               </div>
             )}
           </>
         )}
+
+        <h4>Generate</h4>
+        <div className="field">
+          <label>seed</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={genSeed} onChange={(e) => setGenSeed(e.target.value)} />
+            <button style={{ padding: '4px 8px' }} onClick={() => setGenSeed(randomSeed())} title="new seed">
+              ⟳
+            </button>
+          </div>
+        </div>
+        <div className="field">
+          <label>archetype</label>
+          <select value={genArche} onChange={(e) => setGenArche(e.target.value as Archetype | 'any')}>
+            <option value="any">any</option>
+            {ARCHETYPES.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>difficulty</label>
+          <select value={genDiff} onChange={(e) => setGenDiff(e.target.value as Difficulty | 'any')}>
+            <option value="any">any</option>
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+          </select>
+        </div>
+        <div className="btnrow">
+          <button className="primary" onClick={runGenerator} disabled={generating || !genSeed.trim()}>
+            {generating ? 'Generating…' : '✦ Generate hole'}
+          </button>
+        </div>
+        {genInfo && <div className="ok" style={{ color: genInfo.startsWith('error') ? 'var(--danger)' : 'var(--good)' }}>{genInfo}</div>}
+        <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 6 }}>
+          Replaces the current hole (undo to get it back). Same seed + settings = same hole.
+        </div>
 
         <h4>Selection</h4>
         {!selection && <div style={{ color: 'var(--dim)', fontSize: 12 }}>Nothing selected. Use the Select tool.</div>}
@@ -1164,6 +1441,26 @@ export function EditorView({ onExit }: { onExit: () => void }) {
             )}
             {selection.kind === 'obstacle' && hole.obstacles[selection.index] && (
               <>
+                {!['pipe', 'windmill', 'slidingGate', 'pendulum'].includes(hole.obstacles[selection.index].type) && (
+                <div className="field">
+                  <label>type</label>
+                  <select
+                    value={hole.obstacles[selection.index].type}
+                    onChange={(e) =>
+                      updateHole((h) => {
+                        const o = h.obstacles[selection.index] as { type: string };
+                        o.type = e.target.value;
+                      })
+                    }
+                  >
+                    {(hole.obstacles[selection.index].shape.kind === 'circle' ? CIRCLE_TYPES : SOLID_TYPES).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                )}
                 {hole.obstacles[selection.index].shape.kind === 'circle' && (
                   <div className="field">
                     <label>radius</label>
@@ -1210,7 +1507,120 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     </div>
                   </div>
                 )}
-                {(hole.obstacles[selection.index].type === 'blocker' || hole.obstacles[selection.index].type === 'bumper') && (
+                {(hole.obstacles[selection.index].type === 'windmill' || hole.obstacles[selection.index].type === 'slidingGate' || hole.obstacles[selection.index].type === 'pendulum') && (
+                  <>
+                    {(['period', 'phase'] as const).map((k) => (
+                      <div className="field" key={k}>
+                        <label>{k}{k === 'phase' ? ' (rad)' : ' (s)'}</label>
+                        <input
+                          type="number"
+                          step={k === 'phase' ? 0.1 : 0.25}
+                          min={k === 'period' ? 0.25 : undefined}
+                          value={(hole.obstacles[selection.index] as unknown as Record<string, number>)[k]}
+                          onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as unknown as Record<string, number>)[k] = parseFloat(e.target.value) || 0))}
+                        />
+                      </div>
+                    ))}
+                    {hole.obstacles[selection.index].type === 'windmill' && (
+                      <>
+                        <div className="field">
+                          <label>blades</label>
+                          <input type="number" min={1} max={8} value={(hole.obstacles[selection.index] as { blades: number }).blades} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { blades: number }).blades = Math.max(1, parseInt(e.target.value, 10) || 1)))} />
+                        </div>
+                        <div className="field">
+                          <label>direction</label>
+                          <select value={(hole.obstacles[selection.index] as { direction: number }).direction} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { direction: 1 | -1 }).direction = (parseInt(e.target.value, 10) as 1 | -1)))}>
+                            <option value={1}>clockwise</option>
+                            <option value={-1}>counter-clockwise</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {hole.obstacles[selection.index].type === 'slidingGate' && (
+                      <>
+                        <div className="field">
+                          <label>axis</label>
+                          <select value={(hole.obstacles[selection.index] as { axis: string }).axis} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { axis: 'x' | 'y' }).axis = e.target.value as 'x' | 'y'))}>
+                            <option value="x">x (left–right)</option>
+                            <option value="y">y (up–down)</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>amplitude</label>
+                          <input type="number" step={0.5} min={0} value={(hole.obstacles[selection.index] as { amplitude: number }).amplitude} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { amplitude: number }).amplitude = parseFloat(e.target.value) || 0))} />
+                        </div>
+                        <div className="field">
+                          <label>look</label>
+                          <select value={(hole.obstacles[selection.index] as { look?: string }).look ?? 'gate'} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { look?: string }).look = e.target.value))}>
+                            <option value="gate">gate</option>
+                            <option value="piston">piston</option>
+                            <option value="luggage">luggage (steady)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {hole.obstacles[selection.index].type === 'pendulum' && (
+                      <div className="field">
+                        <label>arc (rad)</label>
+                        <input type="number" step={0.1} min={0} value={(hole.obstacles[selection.index] as { arc: number }).arc} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { arc: number }).arc = parseFloat(e.target.value) || 0))} />
+                      </div>
+                    )}
+                  </>
+                )}
+                {hole.obstacles[selection.index].type === 'pipe' && (
+                  <>
+                    <div className="field">
+                      <label>mode</label>
+                      <select
+                        value={(hole.obstacles[selection.index] as { mode: string }).mode}
+                        onChange={(e) =>
+                          updateHole((h) => {
+                            const o = h.obstacles[selection.index];
+                            if (o.type === 'pipe') o.mode = e.target.value as 'keep' | 'redirect';
+                          })
+                        }
+                      >
+                        <option value="redirect">redirect (aim along exit angle)</option>
+                        <option value="keep">keep velocity</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>exit angle (°)</label>
+                      <input
+                        type="number"
+                        step={5}
+                        value={Math.round((((hole.obstacles[selection.index] as { exitAngle?: number }).exitAngle ?? 0) * 180) / Math.PI)}
+                        onChange={(e) =>
+                          updateHole((h) => {
+                            const o = h.obstacles[selection.index];
+                            if (o.type === 'pipe') o.exitAngle = ((parseFloat(e.target.value) || 0) * Math.PI) / 180;
+                          })
+                        }
+                      />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--dim)' }}>Drag the exit ring with the Select tool to move it.</div>
+                  </>
+                )}
+                {hole.obstacles[selection.index].type === 'curb' && (
+                  <div className="field">
+                    <label>jump speed</label>
+                    <input
+                      type="number"
+                      step={1}
+                      min={1}
+                      placeholder="global"
+                      value={(hole.obstacles[selection.index] as { jumpSpeed?: number }).jumpSpeed ?? ''}
+                      onChange={(e) =>
+                        updateHole((h) => {
+                          const o = h.obstacles[selection.index] as { jumpSpeed?: number };
+                          if (e.target.value === '') delete o.jumpSpeed;
+                          else o.jumpSpeed = parseFloat(e.target.value);
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {!['curb', 'pipe', 'windmill', 'slidingGate', 'pendulum'].includes(hole.obstacles[selection.index].type) && (
                   <div className="field">
                     <label>restitution</label>
                     <input
@@ -1261,6 +1671,39 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        <h4>Solver</h4>
+        {!report && (
+          <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+            Press <strong>Solve</strong> to estimate par, measure difficulty and check the section-9 rules. Uses the
+            physics values from the dev panel.
+          </div>
+        )}
+        {report && (
+          <div className="sel" style={{ opacity: reportStale ? 0.5 : 1 }}>
+            {reportStale && <div style={{ color: 'var(--accent)', fontSize: 11, marginBottom: 4 }}>hole changed — re-solve</div>}
+            <div style={{ fontWeight: 700, color: report.accepted ? 'var(--good)' : 'var(--danger)' }}>
+              {report.accepted ? 'ACCEPTED' : 'REJECTED'} · solver par {report.par ?? '–'}
+              {report.par !== null && report.par !== hole.par && (
+                <button
+                  style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }}
+                  onClick={() => updateHole((h) => (h.par = report.par as number))}
+                >
+                  set par {report.par}
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>
+              best {report.bestStrokes ?? '–'} · success {Math.round(report.successRate * 100)}% · ace{' '}
+              {(report.aceRate * 100).toFixed(1)}% · random plays find cup {Math.round(report.cupFindRate * 100)}% · hazard{' '}
+              {(report.hazardRate * 100).toFixed(0)}%
+              <br />
+              tee→cup {report.teeToCupDirect.toFixed(0)}u direct, {report.teeToCupPath < 0 ? 'no path' : report.teeToCupPath.toFixed(0) + 'u path'} ·
+              cup↔corner {report.cupNearestCorner.toFixed(1)}u · traps {report.trapsFound} · {report.timeMs.toFixed(0)}ms
+            </div>
+            {report.rejectReasons.length > 0 && <div className="errors">{report.rejectReasons.join('\n')}</div>}
           </div>
         )}
 

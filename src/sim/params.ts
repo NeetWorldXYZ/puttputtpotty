@@ -46,6 +46,8 @@ export interface PhysicsParams {
   // --- obstacles — from section 4 of the spec ---
   bumperRestitution: number;
   deadWallRestitution: number;
+  /** Ball faster than this passes over a curb; slower bounces off it. */
+  curbJumpSpeed: number;
 
   // --- lip-out feel — phase-1 choices ---
   /** Fraction of speed kept after a lip-out. */
@@ -56,7 +58,7 @@ export interface PhysicsParams {
 
 export const DEFAULT_PARAMS: PhysicsParams = {
   ballRadius: 0.5,
-  maxPuttVelocity: 60,
+  maxPuttVelocity: 75,
   powerCurveExponent: 1.6,
   baseFriction: 0.85,
   wallRestitution: 0.75,
@@ -73,6 +75,7 @@ export const DEFAULT_PARAMS: PhysicsParams = {
 
   bumperRestitution: 1.15,
   deadWallRestitution: 0.2,
+  curbJumpSpeed: 25,
 
   lipOutSpeedKeep: 0.82,
   lipOutDeflect: 0.6,
@@ -105,6 +108,7 @@ export const PARAM_META: ParamMeta[] = [
   { key: 'wallRestitution', label: 'Wall restitution', min: 0.1, max: 1.2, step: 0.01, group: 'Walls' },
   { key: 'bumperRestitution', label: 'Bumper restitution', min: 0.5, max: 2, step: 0.01, group: 'Walls' },
   { key: 'deadWallRestitution', label: 'Dead wall restitution', min: 0, max: 1, step: 0.01, group: 'Walls' },
+  { key: 'curbJumpSpeed', label: 'Curb jump speed', min: 5, max: 60, step: 0.5, group: 'Walls' },
 
   { key: 'cupCaptureSpeed', label: 'Cup capture speed', min: 1, max: 60, step: 0.5, group: 'Cup' },
   { key: 'cupRadiusMultiplier', label: 'Cup radius (× ball r)', min: 0.8, max: 3, step: 0.05, group: 'Cup' },

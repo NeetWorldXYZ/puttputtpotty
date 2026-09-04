@@ -29,10 +29,39 @@ src/sim/        simulation — zero imports from the UI layer
 src/render/     canvas renderer + camera (shared by game and editor)
 src/game/       play view, drag input, HUD, dev panel, params store
 src/editor/     level editor
+src/net/        Supabase client, API wrapper, OpenStreetMap bathrooms, geolocation
+src/game/MapScreen.tsx     nearby bathrooms + thrones (Leaflet)
+src/game/LocationPlay.tsx  one bathroom's hole, ranked or practice
+server/potty/   Supabase edge function (verifies runs by re-simulating them)
+server/entry.ts what gets bundled into server/potty/engine.js
 src/holes/      the shipped holes (JSON) + index.ts (play order)
 schema/         hole.schema.json (JSON Schema draft-07)
 tests/          determinism.test.ts, tunneling.test.ts
 ```
+
+## Look
+
+One art style everywhere: thick outlines, chunky shapes, bright
+gameplay objects that read at arm's length. Gameplay objects are drawn
+identically in every environment so a drain always looks like a drain:
+toilet cup, tee mat, ball, aim line, drain / water / pit / overflow
+hazards, gum patches, toilet-paper-roll bumpers, plunger posts, tunnels,
+blockers.
+
+Each hole has a `theme` (12 environments in `src/render/themes.ts`: gas
+station, luxury hotel, dive bar, airport, porta-potty, castle, spaceship,
+haunted, tropical, office, grandma's, stadium). A theme changes the floor,
+the pipe walls, the palette and the decorative props drawn *outside* the
+playable area, plus subtle floor decals inside. The generator gives every
+hole a theme and a 9-hole course never repeats one. The editor has an
+environment dropdown.
+
+Rendering (`src/render/`): the static picture of a hole (surround, props,
+floor, zones, obstacles, cup, walls) is painted once per hole and scale
+into an offscreen bitmap; only the ball, trail, aim and flashes draw per
+frame. `drawHole.ts` composes, `objects.ts` is the gameplay object art,
+`floors.ts` / `props.ts` the environment art, `region.ts` turns the wall
+list into a fill region.
 
 ## Playing
 
@@ -44,11 +73,19 @@ tests/          determinism.test.ts, tunneling.test.ts
   failing to sink in 8 scores par + 4.
 - Holes that fit the screen are shown whole; longer holes follow the ball
   with a minimap in the corner.
-- `⚙` opens the dev panel: every physics constant as a live slider,
-  input options (drag direction, drag distance, aim line length), hole
-  jump buttons, and a "copy strokes JSON" button that exports the current
-  hole's `{seed, strokes}` for replay.
+- `⚙` opens the dev panel: course switching (handmade / random / today's
+  daily), every physics constant as a live slider, input options (drag
+  direction, drag distance, aim line length), hole jump buttons, and a
+  "copy strokes JSON" button that exports the current hole's
+  `{seed, strokes}` for replay.
 - `✎` opens the editor.
+
+### Courses
+
+- `/` plays the three handmade holes.
+- `/?seed=anything` generates a 9-hole course from that seed (see
+  **Generator** below). Same seed, same course, on every device.
+- The daily course is just `/?seed=YYYY-MM-DD` (UTC date).
 
 ## Hole JSON format
 
@@ -99,12 +136,19 @@ Notes:
   `tests/tunneling.test.ts`.
 - **Surface zones** change friction (multipliers on base friction, all
   tunable in the dev panel). `sticky` stops the ball dead on entry.
-- **Obstacles.** Phase 1 simulates `blocker` (rect or circle, plain wall)
-  and `bumper` (circle, restitution 1.15 by default). The other obstacle
-  type names from the design doc (`gate`, `post`, `pipe`, `windmill`, ...)
-  are accepted by the schema so files written later still validate, but
-  the sim ignores them and the renderer draws them as a grey outline.
-  Their per-type settings go in a free-form `params` object.
+- **Obstacles.** Shapes are `rect`, `circle` or `polygon` (any outline).
+  Simulated types: `blocker` (plain wall island), `bumper` (circle,
+  restitution 1.15), `post` (circle, same physics as a blocker), `deadWall`
+  (restitution 0.2), `curb` (a low wall: the ball bounces off it below the
+  curb jump speed, 25 u/s by default, and passes over it when faster; keep
+  curbs thin), `pipe` (a circle entry; a ball whose centre enters is
+  carried to `exit` instantly, either keeping its velocity or, with
+  `mode: "redirect"`, keeping its speed along `exitAngle`; one-way). The
+  moving type names from the design doc (`windmill`, `gate`, ...) are
+  accepted by the schema so files written
+  later still validate, but the sim ignores them and the renderer draws
+  them as a grey outline. Their per-type settings go in a free-form
+  `params` object.
 - The full schema is in `schema/hole.schema.json`;
   `src/sim/validate.ts` is the runtime equivalent used by the editor's
   importer.
@@ -162,7 +206,7 @@ reading:
 
 - **Base friction 0.85** is implemented as a *damping coefficient per
   second* (`v *= 1 − 0.85·dt`). That gives a full-power shot on felt a
-  roll-out of ~70 units in ~5.6 s, which is the only interpretation that
+  roll-out of ~88 units in ~5.8 s, which is the only interpretation that
   lands inside the 8 s max sim time; "0.85 × per second" or a linear
   0.85 u/s² would take 30 s+. Slider: *Base friction (felt)*.
 - **Power curve "ease-out"** — the note next to it says eased gives finer
@@ -170,7 +214,7 @@ reading:
   small power). Default exponent 1.6; 1.0 is linear. Slider: *Power curve
   exponent*.
 
-Everything else is used literally: max velocity 60 u/s, wall restitution
+Max velocity is 75 u/s (spec said ~60; raised ~25% after play-testing felt short). Everything else is used literally: wall restitution
 0.75, rest threshold 0.5 u/s, cup capture 18 u/s, cup radius 1.2 × ball
 radius, slope 12 u/s² per grade.
 
@@ -220,12 +264,162 @@ Wheel zooms, Alt‑drag or middle‑drag pans.
 
 ## Hosting
 
-`/editor` is a real path. Vite's dev server serves it; on a static host
+`/editor` and `/map` are real paths. Vite's dev server serves it; on a static host
 without an SPA fallback use `/#/editor` instead, which the router also
 accepts.
 
+## Moving obstacles
+
+`windmill` (rotating blades), `slidingGate` (a block sliding along an
+axis, drawn as a gate, piston or airport luggage) and `pendulum` (a
+swinging plunger). All run on the simulation's **obstacle clock**
+(`state.clock`): `period` seconds per cycle and a `phase` offset, so the
+motion is identical for everyone. The clock advances with every physics
+step and, in the play view, in real time while the ball rests, so movers
+keep moving while you aim. **A stroke records the clock at launch** (`t`
+in the stroke), which is what keeps replays exact: the same hole, seed and
+strokes (with their launch times) reproduce the same result bit for bit.
+
+Collision against a mover is swept in the surface's frame and the
+surface velocity is added back after the bounce, so a blade smacks the
+ball in the direction it is turning. A ball that a blade sweeps into is
+pushed out and shoved along. The solver treats launch timing as part of
+the shot (random `t` within the longest period), so it finds timing lines
+and rejects holes a mover makes unfair. The generator places at most two
+timed obstacles per hole (per the design doc) and sizes them so a ball
+always fits past.
+
 ## Out of scope in this phase
 
-Backend, auth, database, GPS, generator, solver, moving obstacles,
-tiers, daily course, practice mode, leaderboards, thrones, seasons,
-accounts, notifications, sound, art.
+Backend, auth, database, GPS, elevation tiers, leaderboards, thrones,
+seasons, accounts, notifications.
+
+## Solver
+
+`src/solver/` plays a hole headlessly with seeded randomness and reports
+par, difficulty and the reject rules from section 9 of the design doc.
+Deterministic: same hole + physics + options → same report.
+
+```bash
+npm run solve                       # every hole in src/holes/
+npm run solve -- path/to/hole.json  # specific files
+```
+
+In the editor, **Solve** runs it in a web worker on the current hole and
+draws the best solution it found (numbered rest positions). "Set par"
+copies the solver's par into the hole.
+
+How it works:
+
+- A **distance field** rasterises the playfield at half-unit cells,
+  blocks anything within ball radius of a wall or obstacle, and walks
+  from the cup outward. This gives a route-aware "how far from the cup is
+  this spot", detects a cup that can't be reached and a hazard that every
+  route must cross, and gives the shot sampler a direction to aim.
+- **Random tee shots** (300, in a ±75° cone around the route direction):
+  ace rate and hazard rate.
+- **Random plays** (100 plays of up to 8 cone-random strokes, no search):
+  how often a clueless player finds the cup at all.
+- **Competent runs** (12 runs, best of 16 simulated options per stroke):
+  par = median strokes, rounded up, floored at 2.
+- **Strong runs** (4 runs, best of 40): best achievable strokes.
+- **Trap probe**: from sampled rest positions, if none of 24 spread shots
+  gets closer to the cup, it's a trap.
+
+Rejects: cup unreachable, every route crosses a hazard, cup < 2.5 units
+from a wall corner, unsolvable in 8, par > 5, ace rate > 40 %, random
+plays find the cup < 3 %, every solution takes a penalty, any trap.
+
+A solve takes 0.3–1.5 s per hole, which is fast enough for a generator
+to throw away candidates freely.
+
+## Generator
+
+`src/generator/` turns a seed into a solver-approved hole, or nine of
+them.
+
+```bash
+npm run generate                             # one hole per archetype
+npm run generate -- --seed abc --count 30 --out generated/
+npm run generate -- --course 2026-09-04      # a 9-hole course
+```
+
+In the editor, the **Generate** section builds a hole from a seed with
+an optional archetype and difficulty, loads it, and shows its solver
+report. In the game, `/?seed=...` plays a generated course and the dev
+panel has Random / Daily buttons.
+
+How a hole is built:
+
+1. **Archetype** (14): straight, L-bend, dogleg, S-curve, Z-fold, split
+   path, fork-and-merge, loop-around, chamber, funnel, bottleneck,
+   switchback, cross, ring. Each is a small function that lays out the
+   playable area as convex *cells* (rectangles, angled beams, trapezoids,
+   mitred corner joints) in a 30-unit-wide portrait playfield, plus tee,
+   cup, and any island the archetype needs. Length, corridor width,
+   turn direction, bend angle and island shape are rolled from the seed
+   within the ranges in the design doc.
+2. **Walls** are the boundary of the union of those cells
+   (`unionWalls`), so archetypes never have to place walls by hand.
+3. **Decoration**, by difficulty budget: surface zones (tile / shag /
+   wet / sand / small sticky patches), slope zones, hazards that never
+   cover more than ~55 % of a lane, chamfer triangles in corners, and
+   obstacles from a catalogue of composable pieces: post, post row, post
+   triangle, bumper, bumper pair, bar, dead bar, diamond, triangle,
+   hexagon, curb strip, gate, offset gate, pillar pair. Everything keeps
+   clear of the tee and cup.
+4. **Validation**: schema check, then the solver. A hole is accepted when
+   it passes every reject rule, has at least one real obstacle, its par
+   lands in the difficulty's range (easy 2–3, medium 3–4, hard 3–5) and
+   random tee shots don't ace it more than 12 % / 6 % / 3 % of the time.
+   Up to 6 decorated attempts (10 for hard); if none satisfies everything,
+   the hardest accepted candidate is used; undecorated fallbacks after
+   that, which still get one obstacle. `fallback` is reported so you can
+   see when an archetype is struggling.
+5. **Secret tunnels**: 10 % / 25 % / 35 % of holes get a pipe whose entry
+   is farther from the cup than its exit, aimed roughly at the cup.
+
+A **course** is 9 holes with the difficulty curve from the design doc
+(easy, easy, medium ×4, hard, hard, medium — hardest never last) and 9
+distinct archetypes, ~10–20 s to generate in the browser's worker.
+
+Adding variety is mostly adding to lists: a new obstacle in
+`decorate.ts`'s catalogue, a new archetype function in `archetypes.ts`
+(return cells + tee + cup + spine and the walls come for free).
+
+## Thrones (location play)
+
+Every public bathroom is a base. Its hole is generated once, server-side,
+from the bathroom's OpenStreetMap id (so everyone plays the same hole
+there), themed by what kind of place it is (gas station, bar, hotel,
+airport, stadium... standalone toilets get the absurd bathrooms). The
+course record holder for the current six-week season is the King of the
+Throne. To take it you have to be there:
+
+1. `/map` finds bathrooms near you (Overpass API, cached per ~500 m cell)
+   and overlays the current kings (`nearby_locations` RPC).
+2. Tap one for its hole preview, the king, and the distance.
+3. Within 50 m: **Check in**, wait 60 s ("warming the seat"), then
+   **Play for the throne**. Practice is always available and never ranked.
+4. The run is submitted as a stroke list. The server replays it with the
+   default physics (the client locks the same params for ranked play) and
+   the replayed score is the record. The client's score is never trusted.
+
+Server rules (`server/potty/index.ts`): GPS within 50 m (+ accuracy, max
+150 m), a check-in at that bathroom 60 s to 45 min old, one ranked run per
+bathroom per 4 h, no faster than 70 m/s between ranked runs, one attempt
+per hole per day on the daily course. The daily course is ranked the same
+way (`course_leaderboard` RPC on the scorecard).
+
+Setup:
+
+- Supabase project: Postgres + PostGIS (`locations`, `runs`, `checkins`,
+  `profiles`, `course_holes`, view `thrones`), edge function `potty`
+  (`supabase functions deploy potty`). Set `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_KEY` (the publishable key) to point at your own project.
+- Enable **Anonymous sign-ins** (Authentication -> Sign In / Providers).
+  Players get an anonymous account on first use and pick a display name.
+- The edge function imports the engine bundle from a pinned commit of this
+  repo. After changing anything under `src/sim`, `src/solver` or
+  `src/generator`, run `npm run build:engine`, commit, and bump the commit
+  hash in `server/potty/index.ts` before redeploying.
