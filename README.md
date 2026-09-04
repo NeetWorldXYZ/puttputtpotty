@@ -162,7 +162,7 @@ reading:
 
 - **Base friction 0.85** is implemented as a *damping coefficient per
   second* (`v *= 1 − 0.85·dt`). That gives a full-power shot on felt a
-  roll-out of ~70 units in ~5.6 s, which is the only interpretation that
+  roll-out of ~88 units in ~5.8 s, which is the only interpretation that
   lands inside the 8 s max sim time; "0.85 × per second" or a linear
   0.85 u/s² would take 30 s+. Slider: *Base friction (felt)*.
 - **Power curve "ease-out"** — the note next to it says eased gives finer
@@ -170,7 +170,7 @@ reading:
   small power). Default exponent 1.6; 1.0 is linear. Slider: *Power curve
   exponent*.
 
-Everything else is used literally: max velocity 60 u/s, wall restitution
+Max velocity is 75 u/s (spec said ~60; raised ~25% after play-testing felt short). Everything else is used literally: wall restitution
 0.75, rest threshold 0.5 u/s, cup capture 18 u/s, cup radius 1.2 × ball
 radius, slope 12 u/s² per grade.
 

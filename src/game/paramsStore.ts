@@ -26,9 +26,13 @@ export const DEFAULT_PREFS: UiPrefs = {
   aimLineLength: 10,
 };
 
-const PARAMS_KEY = 'ppp.params.v1';
-const PREFS_KEY = 'ppp.prefs.v1';
+const PARAMS_KEY = 'ppp.params.v2';
+const PREFS_KEY = 'ppp.prefs.v2';
 
+/**
+ * Only the keys that differ from the defaults are persisted, so a change to
+ * a default value in code reaches devices that never touched that slider.
+ */
 function load<T extends object>(key: string, defaults: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -37,7 +41,7 @@ function load<T extends object>(key: string, defaults: T): T {
     const out: T = { ...defaults };
     for (const k of Object.keys(defaults) as (keyof T)[]) {
       const v = parsed[k];
-      if (typeof v === typeof defaults[k]) out[k] = v as T[keyof T];
+      if (v !== undefined && typeof v === typeof defaults[k]) out[k] = v as T[keyof T];
     }
     return out;
   } catch {
@@ -45,9 +49,13 @@ function load<T extends object>(key: string, defaults: T): T {
   }
 }
 
-function save(key: string, value: unknown): void {
+function save<T extends object>(key: string, value: T, defaults: T): void {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const diff: Partial<T> = {};
+    for (const k of Object.keys(defaults) as (keyof T)[]) {
+      if (value[k] !== defaults[k]) diff[k] = value[k];
+    }
+    localStorage.setItem(key, JSON.stringify(diff));
   } catch {
     /* storage unavailable: tuning just won't persist */
   }
@@ -61,11 +69,11 @@ export function useTuning() {
 
   useEffect(() => {
     paramsRef.current = params;
-    save(PARAMS_KEY, params);
+    save(PARAMS_KEY, params, DEFAULT_PARAMS);
   }, [params]);
   useEffect(() => {
     prefsRef.current = prefs;
-    save(PREFS_KEY, prefs);
+    save(PREFS_KEY, prefs, DEFAULT_PREFS);
   }, [prefs]);
 
   const setParam = useCallback(<K extends keyof PhysicsParams>(k: K, v: PhysicsParams[K]) => {

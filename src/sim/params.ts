@@ -56,7 +56,7 @@ export interface PhysicsParams {
 
 export const DEFAULT_PARAMS: PhysicsParams = {
   ballRadius: 0.5,
-  maxPuttVelocity: 60,
+  maxPuttVelocity: 75,
   powerCurveExponent: 1.6,
   baseFriction: 0.85,
   wallRestitution: 0.75,
