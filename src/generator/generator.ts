@@ -34,10 +34,12 @@ export interface GeneratedHole {
 
 /** Cheaper solver settings for generation; the full solve is for the editor. */
 export const GENERATION_SOLVE: Partial<SolveOptions> = {
-  randomShots: 150,
-  randomPlays: 60,
-  runs: 8,
-  strongRuns: 2,
+  randomShots: 120,
+  randomPlays: 40,
+  runs: 6,
+  candidatesPerStroke: 14,
+  strongRuns: 1,
+  trapProbeShots: 16,
 };
 
 const PAR_RANGE: Record<Difficulty, [number, number]> = { easy: [2, 3], medium: [3, 4], hard: [3, 5] };
@@ -99,7 +101,7 @@ function quickReject(hole: Hole): string | null {
 
 export function generateHole(o: GenerateOptions): GeneratedHole {
   const params = o.params ?? DEFAULT_PARAMS;
-  const maxAttempts = o.maxAttempts ?? 10;
+  const maxAttempts = o.maxAttempts ?? 6;
   const solveOpts = { ...GENERATION_SOLVE, ...(o.solve ?? {}) };
   const root = new Rng(o.seed);
   const archetype = o.archetype ?? root.pick(ARCHETYPES);
@@ -147,18 +149,39 @@ export interface GeneratedCourse {
   holes: GeneratedHole[];
 }
 
-export function generateCourse(seed: string, count = 9, params: PhysicsParams = DEFAULT_PARAMS, onProgress?: (i: number, g: GeneratedHole) => void): GeneratedCourse {
+export interface CourseSlot {
+  index: number;
+  seed: string;
+  archetype: Archetype;
+  difficulty: Difficulty;
+}
+
+/** The deterministic plan for a course: which archetype/difficulty/seed each hole uses. */
+export function courseSlots(seed: string, count = 9): CourseSlot[] {
   const rng = new Rng(`${seed}:course`);
   const order = rng.shuffle(ARCHETYPES);
-  const holes: GeneratedHole[] = [];
+  const out: CourseSlot[] = [];
   for (let i = 0; i < count; i++) {
-    const difficulty = COURSE_DIFFICULTY[i % COURSE_DIFFICULTY.length];
-    const g = generateHole({ seed: `${seed}:${i}`, archetype: order[i % order.length], difficulty, params });
-    g.hole.id = `${seed}-${i + 1}`;
+    out.push({ index: i, seed: `${seed}:${i}`, archetype: order[i % order.length], difficulty: COURSE_DIFFICULTY[i % COURSE_DIFFICULTY.length] });
+  }
+  return out;
+}
+
+export function generateCourse(seed: string, count = 9, params: PhysicsParams = DEFAULT_PARAMS, onProgress?: (i: number, g: GeneratedHole) => void): GeneratedCourse {
+  const holes: GeneratedHole[] = [];
+  for (const slot of courseSlots(seed, count)) {
+    const g = generateSlot(seed, slot, params);
     holes.push(g);
-    onProgress?.(i, g);
+    onProgress?.(slot.index, g);
   }
   return { seed, holes };
+}
+
+/** Generate one hole of a course. Used by generateCourse and by the parallel worker pool. */
+export function generateSlot(courseSeed: string, slot: CourseSlot, params: PhysicsParams = DEFAULT_PARAMS): GeneratedHole {
+  const g = generateHole({ seed: slot.seed, archetype: slot.archetype, difficulty: slot.difficulty, params });
+  g.hole.id = `${courseSeed}-${slot.index + 1}`;
+  return g;
 }
 
 /** Today's daily seed (UTC). */

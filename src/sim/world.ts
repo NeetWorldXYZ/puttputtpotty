@@ -18,6 +18,11 @@ export interface SegmentCollider {
   restitution: number | null;
   /** Curbs only: speed above which the ball passes over. null = global. */
   jumpSpeed: number | null;
+  /** Bounding box, for broadphase culling. */
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
 
 export interface CircleCollider {
@@ -27,6 +32,10 @@ export interface CircleCollider {
   kind: ColliderKind;
   restitution: number | null;
   jumpSpeed: number | null;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
 
 export interface ZoneAABB {
@@ -67,6 +76,26 @@ export interface World {
   hazards: CompiledHazard[];
 }
 
+function seg(ax: number, ay: number, bx: number, by: number, kind: ColliderKind, restitution: number | null, jumpSpeed: number | null): SegmentCollider {
+  return {
+    ax,
+    ay,
+    bx,
+    by,
+    kind,
+    restitution,
+    jumpSpeed,
+    minX: Math.min(ax, bx),
+    minY: Math.min(ay, by),
+    maxX: Math.max(ax, bx),
+    maxY: Math.max(ay, by),
+  };
+}
+
+function circ(x: number, y: number, r: number, kind: ColliderKind, restitution: number | null, jumpSpeed: number | null): CircleCollider {
+  return { x, y, r, kind, restitution, jumpSpeed, minX: x - r, minY: y - r, maxX: x + r, maxY: y + r };
+}
+
 function rectSegments(
   x: number,
   y: number,
@@ -77,10 +106,10 @@ function rectSegments(
   jumpSpeed: number | null = null,
 ): SegmentCollider[] {
   return [
-    { ax: x, ay: y, bx: x + w, by: y, kind, restitution, jumpSpeed },
-    { ax: x + w, ay: y, bx: x + w, by: y + h, kind, restitution, jumpSpeed },
-    { ax: x + w, ay: y + h, bx: x, by: y + h, kind, restitution, jumpSpeed },
-    { ax: x, ay: y + h, bx: x, by: y, kind, restitution, jumpSpeed },
+    seg(x, y, x + w, y, kind, restitution, jumpSpeed),
+    seg(x + w, y, x + w, y + h, kind, restitution, jumpSpeed),
+    seg(x + w, y + h, x, y + h, kind, restitution, jumpSpeed),
+    seg(x, y + h, x, y, kind, restitution, jumpSpeed),
   ];
 }
 
@@ -89,7 +118,7 @@ function polygonSegments(pts: Polygon, kind: ColliderKind, restitution: number |
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i];
     const b = pts[(i + 1) % pts.length];
-    out.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, kind, restitution, jumpSpeed });
+    out.push(seg(a.x, a.y, b.x, b.y, kind, restitution, jumpSpeed));
   }
   return out;
 }
@@ -103,7 +132,7 @@ function addShape(
   jumpSpeed: number | null = null,
 ): void {
   if (shape.kind === 'rect') segments.push(...rectSegments(shape.x, shape.y, shape.w, shape.h, kind, restitution, jumpSpeed));
-  else if (shape.kind === 'circle') circles.push({ x: shape.x, y: shape.y, r: shape.r, kind, restitution, jumpSpeed });
+  else if (shape.kind === 'circle') circles.push(circ(shape.x, shape.y, shape.r, kind, restitution, jumpSpeed));
   else if (shape.points.length >= 2) segments.push(...polygonSegments(shape.points, kind, restitution, jumpSpeed));
 }
 
@@ -116,15 +145,7 @@ export function compileHole(hole: Hole): World {
   segments.push(...rectSegments(b.x, b.y, b.w, b.h, 'bounds', null));
 
   for (const w of hole.walls) {
-    segments.push({
-      ax: w.a.x,
-      ay: w.a.y,
-      bx: w.b.x,
-      by: w.b.y,
-      kind: 'wall',
-      restitution: w.restitution ?? null,
-      jumpSpeed: null,
-    });
+    segments.push(seg(w.a.x, w.a.y, w.b.x, w.b.y, 'wall', w.restitution ?? null, null));
   }
 
   for (const o of hole.obstacles) {

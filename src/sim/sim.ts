@@ -233,7 +233,17 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
     hits.length = 0;
     const speedNow = len(b.vx, b.vy);
 
+    // Broadphase: swept AABB of the ball for this sub-move, padded by the skin.
+    const ex = b.x + b.vx * remaining;
+    const ey = b.y + b.vy * remaining;
+    const pad = r + SKIN * 2;
+    const sMinX = (b.x < ex ? b.x : ex) - pad;
+    const sMaxX = (b.x > ex ? b.x : ex) + pad;
+    const sMinY = (b.y < ey ? b.y : ey) - pad;
+    const sMaxY = (b.y > ey ? b.y : ey) + pad;
+
     for (const s of world.segments) {
+      if (s.maxX < sMinX || s.minX > sMaxX || s.maxY < sMinY || s.minY > sMaxY) continue;
       if (skipCollider(s, speedNow, p)) continue;
       const h = sweepCircleSegment(b.x, b.y, b.vx, b.vy, r, s.ax, s.ay, s.bx, s.by, remaining);
       if (!h) continue;
@@ -246,6 +256,7 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
       }
     }
     for (const c of world.circles) {
+      if (c.maxX < sMinX || c.minX > sMaxX || c.maxY < sMinY || c.minY > sMaxY) continue;
       if (skipCollider(c, speedNow, p)) continue;
       const h = sweepCirclePoint(b.x, b.y, b.vx, b.vy, r + c.r, c.x, c.y, remaining);
       if (!h) continue;
@@ -319,7 +330,12 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
 function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams): void {
   const speed = len(b.vx, b.vy);
   for (let pass = 0; pass < 2; pass++) {
+    const bMinX = b.x - r;
+    const bMaxX = b.x + r;
+    const bMinY = b.y - r;
+    const bMaxY = b.y + r;
     for (const s of world.segments) {
+      if (s.maxX < bMinX || s.minX > bMaxX || s.maxY < bMinY || s.minY > bMaxY) continue;
       if (skipCollider(s, speed, p)) continue;
       const c = closestPointOnSegment(b.x, b.y, s.ax, s.ay, s.bx, s.by);
       let dx = b.x - c.x;
@@ -343,6 +359,7 @@ function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams): vo
       b.y += dy * push;
     }
     for (const c of world.circles) {
+      if (c.maxX < bMinX || c.minX > bMaxX || c.maxY < bMinY || c.minY > bMaxY) continue;
       if (skipCollider(c, speed, p)) continue;
       let dx = b.x - c.x;
       let dy = b.y - c.y;
