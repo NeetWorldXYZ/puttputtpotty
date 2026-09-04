@@ -47,9 +47,10 @@ export const OBSTACLE_KINDS = [
 ] as const;
 export type ObstacleKind = (typeof OBSTACLE_KINDS)[number];
 
-const EASY_KINDS: ObstacleKind[] = ['post', 'bumper', 'diamond', 'curb'];
-const MEDIUM_KINDS: ObstacleKind[] = ['post', 'postRow', 'bumper', 'bumperPair', 'bar', 'diamond', 'triangle', 'hexagon', 'curb', 'gate'];
-const HARD_KINDS: ObstacleKind[] = OBSTACLE_KINDS.slice();
+const EASY_KINDS: ObstacleKind[] = ['post', 'bumper', 'diamond'];
+const MEDIUM_KINDS: ObstacleKind[] = ['post', 'postRow', 'bumper', 'bumperPair', 'bar', 'diamond', 'triangle', 'hexagon', 'gate'];
+// Curbs are in the catalogue but not generated yet: without a visual cue a curb reads as a wall.
+const HARD_KINDS: ObstacleKind[] = OBSTACLE_KINDS.filter((k) => k !== 'curb');
 
 function dist(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y);

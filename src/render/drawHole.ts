@@ -184,8 +184,8 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
       lw = Math.max(2, S * 0.28);
     } else if (t === 'curb') {
       fill = PALETTE.curb;
-      stroke = PALETTE.curbEdge;
-      lw = Math.max(1, S * 0.08);
+      stroke = PALETTE.accent;
+      lw = Math.max(1, S * 0.1);
     } else if (!implemented) {
       fill = 'transparent';
       stroke = PALETTE.textDim;
@@ -194,7 +194,7 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
     ctx.strokeStyle = stroke;
     ctx.lineWidth = lw;
     ctx.save();
-    if (t === 'curb') ctx.setLineDash([S * 0.35, S * 0.25]);
+    if (t === 'curb') ctx.setLineDash([S * 0.2, S * 0.4]);
     if (s.kind === 'rect') {
       ctx.fillRect(s.x * S + cam.ox, s.y * S + cam.oy, s.w * S, s.h * S);
       ctx.strokeRect(s.x * S + cam.ox, s.y * S + cam.oy, s.w * S, s.h * S);
