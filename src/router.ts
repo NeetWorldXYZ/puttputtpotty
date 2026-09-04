@@ -1,12 +1,13 @@
 /**
- * Minimal path router: `/` (title), `/?course=handmade`, `/?seed=xyz` and
- * `/editor`. Uses history.pushState so the URLs are real paths; `#/editor`
- * also works on static hosts without an SPA fallback.
+ * Minimal path router: `/` (title), `/?course=handmade`, `/?seed=xyz`,
+ * `/?loc=osm:node:1&mode=throne` (a bathroom's hole), `/map` and `/editor`.
+ * Uses history.pushState so the URLs are real paths; `#/editor` and `#/map`
+ * also work on static hosts without an SPA fallback.
  */
 
 import { useEffect, useState } from 'react';
 
-export type Route = 'play' | 'editor';
+export type Route = 'play' | 'editor' | 'map';
 
 export interface Location {
   route: Route;
@@ -14,26 +15,44 @@ export interface Location {
   seed: string | null;
   /** Named course ('handmade'), or null. */
   course: string | null;
+  /** Bathroom (location) id for a single-hole location play, or null. */
+  loc: string | null;
+  /** 'throne' submits the run for the throne; anything else is practice. */
+  mode: string | null;
+}
+
+export interface NavigateOptions {
+  seed?: string | null;
+  course?: string | null;
+  loc?: string | null;
+  mode?: string | null;
+  /** Replace the history entry instead of pushing one. */
+  replace?: boolean;
 }
 
 function read(): Location {
   const p = window.location.pathname.replace(/\/+$/, '');
-  const h = window.location.hash;
-  const route: Route = p.endsWith('/editor') || h === '#/editor' || h === '#editor' ? 'editor' : 'play';
+  const h = window.location.hash.replace(/^#\/?/, '');
+  const route: Route = p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : 'play';
   const q = new URLSearchParams(window.location.search);
-  const seed = q.get('seed');
-  const course = q.get('course');
-  return { route, seed: seed && seed.trim() ? seed.trim() : null, course: course && course.trim() ? course.trim() : null };
+  const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
+  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')) };
 }
 
-export function navigate(route: Route, seed: string | null = null, course: string | null = null): void {
+export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
-  const path = route === 'editor' ? `${base}/editor` : `${base}/`;
+  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : `${base}/`;
   const q = new URLSearchParams();
-  if (seed) q.set('seed', seed);
-  if (course) q.set('course', course);
+  const s = extra.seed ?? seed;
+  const c = extra.course ?? course;
+  if (s) q.set('seed', s);
+  if (c) q.set('course', c);
+  if (extra.loc) q.set('loc', extra.loc);
+  if (extra.mode) q.set('mode', extra.mode);
   const qs = q.toString();
-  window.history.pushState(null, '', path + (qs ? `?${qs}` : ''));
+  const url = path + (qs ? `?${qs}` : '');
+  if (extra.replace) window.history.replaceState(null, '', url);
+  else window.history.pushState(null, '', url);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

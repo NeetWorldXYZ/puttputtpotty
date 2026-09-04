@@ -7,6 +7,7 @@ import type { Hole } from '../sim/types';
 import { dailySeed, getBest, goToCourse } from './courses';
 import { isMuted, setMuted, unlockAudio } from './sound';
 import { THEMES } from '../render/themes';
+import { navigate } from '../router';
 
 interface Props {
   onOpenEditor: () => void;
@@ -73,7 +74,17 @@ export function TitleScreen({ onOpenEditor }: Props) {
         </div>
         <div className="tagline">Mini golf in the world&apos;s worst bathrooms</div>
         <div className="menu">
-          <button className="menu-btn primary" onClick={() => go('daily')}>
+          <button
+            className="menu-btn primary"
+            onClick={() => {
+              unlockAudio();
+              navigate('map');
+            }}
+          >
+            <span>👑 Nearby thrones</span>
+            <small>real bathrooms near you · beat the record, become King of the Throne</small>
+          </button>
+          <button className="menu-btn" onClick={() => go('daily')}>
             <span>Daily course</span>
             <small>
               {daily}

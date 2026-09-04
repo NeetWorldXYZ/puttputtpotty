@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "solve": "vite-node scripts/solve.ts",
-    "generate": "vite-node scripts/generate.ts"
+    "generate": "vite-node scripts/generate.ts",
+    "build:engine": "esbuild server/entry.ts --bundle --format=esm --platform=neutral --target=es2022 --minify --outfile=server/potty/engine.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",

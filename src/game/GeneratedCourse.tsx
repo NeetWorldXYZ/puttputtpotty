@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { Hole } from '../sim/types';
 import { courseSlots, type GeneratedHole } from '../generator/generator';
-import { PlayView } from './PlayView';
+import { PlayView, type HoleDoneInfo } from './PlayView';
 import { useTuning } from './paramsStore';
-import { goToCourse } from './courses';
+import { dailySeed, goToCourse } from './courses';
+import { DEFAULT_PARAMS } from '../sim/params';
+import { api } from '../net/api';
+import { getSavedName } from '../net/supabase';
+import { DailyBoard } from './DailyBoard';
+import { NamePrompt } from './NamePrompt';
 
 interface Props {
   seed: string;
@@ -22,6 +27,10 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
   const [holes, setHoles] = useState<(Hole | null)[]>([]);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The daily is ranked: generated with default physics (the server replays with the same) and each hole is submitted.
+  const daily = seed === dailySeed();
+  const [askName, setAskName] = useState(daily && !getSavedName());
+  const [submitted, setSubmitted] = useState(0);
 
   useEffect(() => {
     const slots = courseSlots(seed, count);
@@ -34,7 +43,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     let next = 0;
     let finished = 0;
     const id = Date.now();
-    const params = tuning.paramsRef.current;
+    const params = daily ? DEFAULT_PARAMS : tuning.paramsRef.current;
 
     const feed = (w: Worker) => {
       if (next >= slots.length) return;
@@ -101,5 +110,28 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     );
   }
 
-  return <PlayView holes={holes as Hole[]} onOpenEditor={onOpenEditor} courseSeed={seed} />;
+  const onHoleDone = daily
+    ? (info: HoleDoneInfo) => {
+        api
+          .submitDaily(seed, info.holeIndex, info.strokes)
+          .then(() => setSubmitted((n) => n + 1))
+          .catch(() => {
+            /* one attempt per hole per day; a rejected duplicate is fine to ignore */
+          });
+      }
+    : undefined;
+
+  return (
+    <>
+      <PlayView
+        holes={holes as Hole[]}
+        onOpenEditor={onOpenEditor}
+        courseSeed={seed}
+        lockedParams={daily ? DEFAULT_PARAMS : undefined}
+        onHoleDone={onHoleDone}
+        scorecardExtra={daily ? <DailyBoard seed={seed} refreshKey={submitted} /> : undefined}
+      />
+      {askName && <NamePrompt title="Name for the leaderboard" sub="Today's course is ranked. Pick the name others will see." onDone={() => setAskName(false)} onCancel={() => setAskName(false)} />}
+    </>
+  );
 }

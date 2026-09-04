@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Hole, Stroke } from '../sim/types';
-import { FIXED_DT, cupRadius } from '../sim/params';
+import { FIXED_DT, cupRadius, type PhysicsParams } from '../sim/params';
 import { compileHole, type World } from '../sim/world';
 import { applyStroke, createSimState, holeScore, step, totalStrokes, type SimEvent, type SimState, STROKE_CAP } from '../sim/sim';
 import { seedFromString } from '../sim/rng';
@@ -23,6 +23,27 @@ interface Props {
   onOpenEditor?: () => void;
   /** Seed of a generated course (null = handmade). undefined = editor test play. */
   courseSeed?: string | null;
+  /**
+   * Ranked play: the sim runs with these params regardless of the dev panel,
+   * so the server's replay matches. Hides the dev panel.
+   */
+  lockedParams?: PhysicsParams;
+  /** Fires once when a hole ends (sunk or stroke cap), before the player taps onward. */
+  onHoleDone?: (info: HoleDoneInfo) => void;
+  /** Replaces the default hole-finished card body (buttons included). */
+  renderDoneCard?: (info: HoleDoneInfo, actions: { next: () => void; retry: () => void }) => ReactNode;
+  /** Extra content under the scorecard chips (leaderboards etc). */
+  scorecardExtra?: ReactNode;
+  /** Hides the retry button on ranked holes. */
+  noRetry?: boolean;
+}
+
+export interface HoleDoneInfo {
+  holeIndex: number;
+  hole: Hole;
+  strokes: Stroke[];
+  score: number;
+  sunk: boolean;
 }
 
 interface Drag {
@@ -61,9 +82,15 @@ function relPar(n: number): string {
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry }: Props) {
   const tuning = useTuning();
-  const { paramsRef, prefsRef } = tuning;
+  const { prefsRef } = tuning;
+  const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
+  lockedRef.current = lockedParams;
+  const paramsRef = useMemo(() => ({ get current() { return lockedRef.current ?? tuning.paramsRef.current; } }), [tuning.paramsRef]);
+  const onHoleDoneRef = useRef(onHoleDone);
+  onHoleDoneRef.current = onHoleDone;
+  const doneFiredRef = useRef(false);
 
   const [holeIndex, setHoleIndex] = useState(0);
   const [results, setResults] = useState<number[]>([]);
@@ -118,6 +145,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
       squashRef.current = { amt: 0, ang: 0 };
       sinkRef.current = null;
       introRef.current = { t: 0 };
+      doneFiredRef.current = false;
       setHud({ strokes: 0, done: false, sunk: false, strokeHistory: [] });
       setBanner({ key: Date.now(), title: `Hole ${idx + 1} · ${h.name}`, sub: `${themeById(h.theme).name} · Par ${h.par}` });
     },
@@ -127,6 +155,13 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
   useEffect(() => {
     resetHole(hole, holeIndex);
   }, [hole, holeIndex, resetHole]);
+
+  useEffect(() => {
+    if (!hud.done || doneFiredRef.current) return;
+    doneFiredRef.current = true;
+    const st = stateRef.current;
+    onHoleDoneRef.current?.({ holeIndex, hole, strokes: st.strokeHistory.slice(), score: holeScore(st, hole.par), sunk: st.sunk });
+  }, [hud.done, holeIndex, hole]);
 
   useEffect(() => {
     if (!banner) return;
@@ -619,9 +654,11 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
           ⌂
         </button>
       )}
-      <button className="corner-btn tr" onClick={() => setDevOpen((v) => !v)} title="Dev panel">
-        ⚙
-      </button>
+      {!lockedParams && (
+        <button className="corner-btn tr" onClick={() => setDevOpen((v) => !v)} title="Dev panel">
+          ⚙
+        </button>
+      )}
       <button className="corner-btn tr2" onClick={toggleMute} title={muted ? 'Sound off' : 'Sound on'}>
         {muted ? '🔇' : '🔊'}
       </button>
@@ -648,12 +685,18 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
             <div className="sub">
               {hud.sunk ? `${cur} stroke${cur === 1 ? '' : 's'}` : `${STROKE_CAP} strokes, scored ${thisScore}`} · par {par}
             </div>
-            <button className="primary" onClick={nextHole}>
-              {holeIndex + 1 < holes.length ? 'Next hole →' : 'See scorecard'}
-            </button>
-            {courseSeed === undefined && <button onClick={retryHole}>Retry hole</button>}
-            {courseSeed === null && <button onClick={retryHole}>Retry hole</button>}
-            {onExit && <button onClick={onExit}>{exitLabel ?? 'Back'}</button>}
+            {renderDoneCard ? (
+              renderDoneCard({ holeIndex, hole, strokes: hud.strokeHistory, score: thisScore, sunk: hud.sunk }, { next: nextHole, retry: retryHole })
+            ) : (
+              <>
+                <button className="primary" onClick={nextHole}>
+                  {holeIndex + 1 < holes.length ? 'Next hole →' : 'See scorecard'}
+                </button>
+                {!noRetry && courseSeed === undefined && <button onClick={retryHole}>Retry hole</button>}
+                {!noRetry && courseSeed === null && <button onClick={retryHole}>Retry hole</button>}
+                {onExit && <button onClick={onExit}>{exitLabel ?? 'Back'}</button>}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -684,6 +727,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
                 );
               })}
             </div>
+            {scorecardExtra}
             <button className="primary" onClick={share}>
               {shared ? 'Shared!' : 'Share score'}
             </button>
@@ -695,7 +739,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
         </div>
       )}
 
-      {devOpen && (
+      {devOpen && !lockedParams && (
         <DevPanel
           params={tuning.params}
           prefs={tuning.prefs}

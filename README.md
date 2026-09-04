@@ -29,6 +29,11 @@ src/sim/        simulation — zero imports from the UI layer
 src/render/     canvas renderer + camera (shared by game and editor)
 src/game/       play view, drag input, HUD, dev panel, params store
 src/editor/     level editor
+src/net/        Supabase client, API wrapper, OpenStreetMap bathrooms, geolocation
+src/game/MapScreen.tsx     nearby bathrooms + thrones (Leaflet)
+src/game/LocationPlay.tsx  one bathroom's hole, ranked or practice
+server/potty/   Supabase edge function (verifies runs by re-simulating them)
+server/entry.ts what gets bundled into server/potty/engine.js
 src/holes/      the shipped holes (JSON) + index.ts (play order)
 schema/         hole.schema.json (JSON Schema draft-07)
 tests/          determinism.test.ts, tunneling.test.ts
@@ -259,7 +264,7 @@ Wheel zooms, Alt‑drag or middle‑drag pans.
 
 ## Hosting
 
-`/editor` is a real path. Vite's dev server serves it; on a static host
+`/editor` and `/map` are real paths. Vite's dev server serves it; on a static host
 without an SPA fallback use `/#/editor` instead, which the router also
 accepts.
 
@@ -381,3 +386,40 @@ distinct archetypes, ~10–20 s to generate in the browser's worker.
 Adding variety is mostly adding to lists: a new obstacle in
 `decorate.ts`'s catalogue, a new archetype function in `archetypes.ts`
 (return cells + tee + cup + spine and the walls come for free).
+
+## Thrones (location play)
+
+Every public bathroom is a base. Its hole is generated once, server-side,
+from the bathroom's OpenStreetMap id (so everyone plays the same hole
+there), themed by what kind of place it is (gas station, bar, hotel,
+airport, stadium... standalone toilets get the absurd bathrooms). The
+course record holder for the current six-week season is the King of the
+Throne. To take it you have to be there:
+
+1. `/map` finds bathrooms near you (Overpass API, cached per ~500 m cell)
+   and overlays the current kings (`nearby_locations` RPC).
+2. Tap one for its hole preview, the king, and the distance.
+3. Within 50 m: **Check in**, wait 60 s ("warming the seat"), then
+   **Play for the throne**. Practice is always available and never ranked.
+4. The run is submitted as a stroke list. The server replays it with the
+   default physics (the client locks the same params for ranked play) and
+   the replayed score is the record. The client's score is never trusted.
+
+Server rules (`server/potty/index.ts`): GPS within 50 m (+ accuracy, max
+150 m), a check-in at that bathroom 60 s to 45 min old, one ranked run per
+bathroom per 4 h, no faster than 70 m/s between ranked runs, one attempt
+per hole per day on the daily course. The daily course is ranked the same
+way (`course_leaderboard` RPC on the scorecard).
+
+Setup:
+
+- Supabase project: Postgres + PostGIS (`locations`, `runs`, `checkins`,
+  `profiles`, `course_holes`, view `thrones`), edge function `potty`
+  (`supabase functions deploy potty`). Set `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_KEY` (the publishable key) to point at your own project.
+- Enable **Anonymous sign-ins** (Authentication -> Sign In / Providers).
+  Players get an anonymous account on first use and pick a display name.
+- The edge function imports the engine bundle from a pinned commit of this
+  repo. After changing anything under `src/sim`, `src/solver` or
+  `src/generator`, run `npm run build:engine`, commit, and bump the commit
+  hash in `server/potty/index.ts` before redeploying.
