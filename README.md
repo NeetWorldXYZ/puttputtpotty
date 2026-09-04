@@ -112,8 +112,11 @@ Notes:
   restitution 1.15), `post` (circle, same physics as a blocker), `deadWall`
   (restitution 0.2), `curb` (a low wall: the ball bounces off it below the
   curb jump speed, 25 u/s by default, and passes over it when faster; keep
-  curbs thin). The moving/complex type names from the design doc (`gate`,
-  `pipe`, `windmill`, ...) are accepted by the schema so files written
+  curbs thin), `pipe` (a circle entry; a ball whose centre enters is
+  carried to `exit` instantly, either keeping its velocity or, with
+  `mode: "redirect"`, keeping its speed along `exitAngle`; one-way). The
+  moving type names from the design doc (`windmill`, `gate`, ...) are
+  accepted by the schema so files written
   later still validate, but the sim ignores them and the renderer draws
   them as a grey outline. Their per-type settings go in a free-form
   `params` object.
@@ -317,10 +320,15 @@ How a hole is built:
    hexagon, curb strip, gate, offset gate, pillar pair. Everything keeps
    clear of the tee and cup.
 4. **Validation**: schema check, then the solver. A hole is accepted when
-   it passes every reject rule and its par lands in the difficulty's
-   range (easy 2–3, medium 3–4, hard 3–5). Up to 10 decorated attempts,
-   then undecorated fallbacks. `fallback` is reported so you can see when
-   an archetype is struggling.
+   it passes every reject rule, has at least one real obstacle, its par
+   lands in the difficulty's range (easy 2–3, medium 3–4, hard 3–5) and
+   random tee shots don't ace it more than 12 % / 6 % / 3 % of the time.
+   Up to 6 decorated attempts (10 for hard); if none satisfies everything,
+   the hardest accepted candidate is used; undecorated fallbacks after
+   that, which still get one obstacle. `fallback` is reported so you can
+   see when an archetype is struggling.
+5. **Secret tunnels**: 10 % / 25 % / 35 % of holes get a pipe whose entry
+   is farther from the cup than its exit, aimed roughly at the cup.
 
 A **course** is 9 holes with the difficulty curve from the design doc
 (easy, easy, medium ×4, hard, hard, medium — hardest never last) and 9

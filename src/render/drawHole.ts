@@ -164,8 +164,58 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
     if (o.zoneLabels) drawLabel(ctx, cam, h.polygon, `${h.type} +${h.penalty}`);
   }
 
+  // Pipes: entry (dark mouth with ring) and exit (ring with arrow), linked by a faint dotted line.
+  for (const ob of hole.obstacles) {
+    if (ob.type !== 'pipe') continue;
+    const s = ob.shape;
+    const ex = ob.exit.x * S + cam.ox;
+    const ey = ob.exit.y * S + cam.oy;
+    const cx = s.x * S + cam.ox;
+    const cy = s.y * S + cam.oy;
+    ctx.save();
+    ctx.setLineDash([2, 6]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(cx, cy, s.r * S, 0, Math.PI * 2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, S * 0.2);
+    ctx.strokeStyle = PALETTE.pipe;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, s.r * S * 0.55, 0, Math.PI * 2);
+    ctx.strokeStyle = PALETTE.pipe;
+    ctx.lineWidth = Math.max(1, S * 0.08);
+    ctx.stroke();
+    // exit
+    ctx.beginPath();
+    ctx.arc(ex, ey, Math.max(3, S * 0.7), 0, Math.PI * 2);
+    ctx.strokeStyle = PALETTE.pipe;
+    ctx.lineWidth = Math.max(2, S * 0.16);
+    ctx.stroke();
+    const a = ob.mode === 'redirect' ? (ob.exitAngle ?? 0) : Math.atan2(ey - cy, ex - cx);
+    const al = Math.max(6, S * 1.2);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + Math.cos(a) * al, ey + Math.sin(a) * al);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ex + Math.cos(a) * al, ey + Math.sin(a) * al);
+    ctx.lineTo(ex + Math.cos(a - 2.5) * al * 0.4 + Math.cos(a) * al * 0.6, ey + Math.sin(a - 2.5) * al * 0.4 + Math.sin(a) * al * 0.6);
+    ctx.moveTo(ex + Math.cos(a) * al, ey + Math.sin(a) * al);
+    ctx.lineTo(ex + Math.cos(a + 2.5) * al * 0.4 + Math.cos(a) * al * 0.6, ey + Math.sin(a + 2.5) * al * 0.4 + Math.sin(a) * al * 0.6);
+    ctx.stroke();
+  }
+
   // Obstacles.
   for (const ob of hole.obstacles) {
+    if (ob.type === 'pipe') continue;
     const s = ob.shape;
     const t = ob.type;
     const implemented = t === 'blocker' || t === 'bumper' || t === 'post' || t === 'deadWall' || t === 'curb';

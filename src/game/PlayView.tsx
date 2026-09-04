@@ -181,6 +181,12 @@ export function PlayView({ holes, onExit, exitLabel, onOpenEditor, courseSeed }:
             toastRef.current = { text: 'STUCK', kind: 'danger', until: now + 900 };
             settled = true;
             break;
+          case 'pipe':
+            toastRef.current = { text: 'WHOOSH', kind: 'accent', until: now + 700 };
+            // Break the trail so it doesn't draw a line across the jump.
+            lastTrailRef.current = [...lastTrailRef.current];
+            trailRef.current = [e.exitX, e.exitY];
+            break;
           case 'rest':
           case 'sunk':
             settled = true;

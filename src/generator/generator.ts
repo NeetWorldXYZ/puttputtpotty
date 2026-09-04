@@ -8,7 +8,7 @@ import { DEFAULT_PARAMS } from '../sim/params';
 import { validateHole } from '../sim/validate';
 import { solveHole, type SolveOptions, type SolveReport } from '../solver/solver';
 import { ARCHETYPES, buildSkeleton, type Archetype, type ArchetypeParams, type LengthClass, type WidthClass } from './archetypes';
-import { decorate, type Difficulty } from './decorate';
+import { decorate, ensureObstacle, type Difficulty } from './decorate';
 import { unionWalls, distToWalls } from './geom';
 import { Rng } from './rng';
 
@@ -43,6 +43,14 @@ export const GENERATION_SOLVE: Partial<SolveOptions> = {
 };
 
 const PAR_RANGE: Record<Difficulty, [number, number]> = { easy: [2, 3], medium: [3, 4], hard: [3, 5] };
+
+/** Aces should be hard but possible: random tee shots must not ace more often than this. */
+const MAX_ACE_RATE: Record<Difficulty, number> = { easy: 0.12, medium: 0.06, hard: 0.03 };
+
+/** Obstacles that count toward "every hole has an obstacle" (pipes are shortcuts, not obstacles). */
+function obstacleCount(hole: Hole): number {
+  return hole.obstacles.filter((o) => o.type !== 'pipe').length;
+}
 
 const ADJ = ['Porcelain', 'Leaky', 'Grimy', 'Golden', 'Clogged', 'Slippery', 'Royal', 'Rusty', 'Midnight', 'Marble', 'Squeaky', 'Foggy', 'Crooked', 'Long', 'Flushed'];
 const NOUN: Record<Archetype, string[]> = {
@@ -90,6 +98,7 @@ function assemble(seed: string, attempt: number, arche: Archetype, difficulty: D
     obstacles: [...sk.islands],
   };
   if (decorated) decorate(hole, sk, rng, difficulty);
+  else ensureObstacle(hole, sk, rng);
   return hole;
 }
 
@@ -99,9 +108,19 @@ function quickReject(hole: Hole): string | null {
   return null;
 }
 
+function difficultyOf(o: GenerateOptions): Difficulty | undefined {
+  return o.difficulty;
+}
+
+/** Prefer the candidate that is harder: higher par, then lower ace rate. */
+function harder(a: GeneratedHole, b: GeneratedHole): GeneratedHole {
+  if ((b.report.par ?? 0) !== (a.report.par ?? 0)) return (b.report.par ?? 0) > (a.report.par ?? 0) ? b : a;
+  return b.report.aceRate < a.report.aceRate ? b : a;
+}
+
 export function generateHole(o: GenerateOptions): GeneratedHole {
   const params = o.params ?? DEFAULT_PARAMS;
-  const maxAttempts = o.maxAttempts ?? 6;
+  const maxAttempts = o.maxAttempts ?? (difficultyOf(o) === 'hard' ? 10 : 6);
   const solveOpts = { ...GENERATION_SOLVE, ...(o.solve ?? {}) };
   const root = new Rng(o.seed);
   const archetype = o.archetype ?? root.pick(ARCHETYPES);
@@ -113,12 +132,15 @@ export function generateHole(o: GenerateOptions): GeneratedHole {
     const rng = root.fork(`attempt:${attempt}`);
     const hole = assemble(o.seed, attempt, archetype, difficulty, rng, true);
     if (!validateHole(hole).ok || quickReject(hole)) continue;
+    if (obstacleCount(hole) === 0) continue;
     const report = solveHole(hole, params, solveOpts);
     if (!report.accepted || report.par === null) continue;
     hole.par = report.par;
     const g: GeneratedHole = { hole, archetype, difficulty, report, attempts: attempt + 1, fallback: false };
-    if (report.par >= parLo && report.par <= parHi) return g;
-    if (!acceptedAny) acceptedAny = g;
+    const parOk = report.par >= parLo && report.par <= parHi;
+    const aceOk = report.aceRate <= MAX_ACE_RATE[difficulty];
+    if (parOk && aceOk) return g;
+    acceptedAny = acceptedAny ? harder(acceptedAny, g) : g;
   }
   if (acceptedAny) return acceptedAny;
 

@@ -68,3 +68,13 @@ describe('generator', () => {
     expect(ids.size).toBe(9);
   }, 120_000);
 });
+
+describe('generator difficulty', () => {
+  it('never produces a hole without an obstacle', () => {
+    for (let i = 0; i < 12; i++) {
+      const g = generateHole({ seed: `obs:${i}`, solve: FAST });
+      const real = g.hole.obstacles.filter((o) => o.type !== 'pipe');
+      expect(real.length, `${g.archetype} seed ${i}`).toBeGreaterThan(0);
+    }
+  });
+});

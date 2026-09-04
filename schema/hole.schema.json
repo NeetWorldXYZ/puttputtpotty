@@ -315,6 +315,21 @@
             "type": "number",
             "exclusiveMinimum": 0,
             "description": "curb only: speed above which the ball passes over"
+          },
+          "exit": {
+            "$ref": "#/definitions/point",
+            "description": "pipe only: where the ball comes out"
+          },
+          "mode": {
+            "enum": [
+              "keep",
+              "redirect"
+            ],
+            "description": "pipe only"
+          },
+          "exitAngle": {
+            "type": "number",
+            "description": "pipe (redirect) only: radians, y-down"
           }
         }
       }

@@ -106,8 +106,16 @@ export function buildDistanceField(world: World, ballRadius: number, cell = 0.5)
     distSafe: new Float32Array(n),
     distAny: new Float32Array(n),
   };
-  bfs(df, hole.cup.x, hole.cup.y, true, df.distSafe);
-  bfs(df, hole.cup.x, hole.cup.y, false, df.distAny);
+  // One-way portals: entering the pipe's entry gets you to its exit, so in the
+  // cup-outward walk, reaching the exit cell also reaches the entry cell.
+  const portals: [number, number][] = [];
+  for (const p of world.pipes) {
+    const exitIdx = nearestFree(df, p.exitX, p.exitY);
+    const entryIdx = nearestFree(df, p.x, p.y);
+    if (exitIdx >= 0 && entryIdx >= 0) portals.push([exitIdx, entryIdx]);
+  }
+  bfs(df, hole.cup.x, hole.cup.y, true, df.distSafe, portals);
+  bfs(df, hole.cup.x, hole.cup.y, false, df.distAny, portals);
   return df;
 }
 
@@ -142,7 +150,7 @@ function nearestFree(df: DistanceField, x: number, y: number): number {
   return -1;
 }
 
-function bfs(df: DistanceField, sx: number, sy: number, avoidHazards: boolean, out: Float32Array): void {
+function bfs(df: DistanceField, sx: number, sy: number, avoidHazards: boolean, out: Float32Array, portals: [number, number][] = []): void {
   out.fill(Infinity);
   const start = nearestFree(df, sx, sy);
   if (start < 0) return;
@@ -158,6 +166,12 @@ function bfs(df: DistanceField, sx: number, sy: number, avoidHazards: boolean, o
     const ci = cur % cols;
     const cj = (cur - ci) / cols;
     const d0 = out[cur];
+    for (const [from, to] of portals) {
+      if (from === cur && d0 + 1 < out[to] - 1e-6) {
+        out[to] = d0 + 1;
+        queue.push(to);
+      }
+    }
     for (let dj = -1; dj <= 1; dj++) {
       for (let di = -1; di <= 1; di++) {
         if (di === 0 && dj === 0) continue;

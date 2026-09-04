@@ -333,7 +333,15 @@ function funnel(rng: Rng, p: ArchetypeParams): Skeleton {
   const cell = trapezoid(XC, TOP, TOP + L, wTop, wBottom);
   const tee = { x: XC + rng.range(-wBottom / 4, wBottom / 4), y: TOP + L - 4 };
   const cup = { x: XC, y: TOP + 3.5 };
-  return finish({ archetype: 'funnel', cells: [cell], tee, cup, spine: [tee, cup], islands: [] });
+  // Decorate in three bands so the wide end is usable (a trapezoid's inner rect is bounded by its narrow end).
+  const bands: Polygon[] = [];
+  for (let i = 0; i < 3; i++) {
+    const y0 = TOP + (L * i) / 3;
+    const y1 = TOP + (L * (i + 1)) / 3;
+    const wAt = (y: number) => wTop + ((wBottom - wTop) * (y - TOP)) / L;
+    bands.push(trapezoid(XC, y0, y1, wAt(y0), wAt(y1)));
+  }
+  return finish({ archetype: 'funnel', cells: [cell], tee, cup, spine: [tee, cup], islands: [], decorable: bands });
 }
 
 function bottleneck(rng: Rng, p: ArchetypeParams): Skeleton {
@@ -353,7 +361,12 @@ function bottleneck(rng: Rng, p: ArchetypeParams): Skeleton {
     cup,
     spine: [tee, { x: XC, y: TOP + seg * 1.75 }, cup],
     islands: [],
-    decorable: [bottom, top],
+    decorable: [
+      trapezoid(XC, TOP + seg * 2, TOP + seg * 2.5, pinch, (pinch + wide) / 2),
+      trapezoid(XC, TOP + seg * 2.5, TOP + L, (pinch + wide) / 2, wide),
+      trapezoid(XC, TOP, TOP + seg * 0.75, wide, (pinch + wide) / 2),
+      trapezoid(XC, TOP + seg * 0.75, TOP + seg * 1.5, (pinch + wide) / 2, pinch),
+    ],
   });
 }
 

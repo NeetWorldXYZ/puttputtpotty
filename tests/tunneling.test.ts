@@ -221,3 +221,26 @@ describe('physics behaviours', () => {
     }
   });
 });
+
+describe('pipes', () => {
+  it('carries the ball from entry to exit and redirects it', () => {
+    const hole = thinWallHole();
+    hole.walls = [];
+    hole.obstacles = [
+      { type: 'pipe', shape: { kind: 'circle', x: 15, y: 40, r: 1.2 }, exit: { x: 5, y: 10 }, mode: 'redirect', exitAngle: 0 },
+    ];
+    const world = compileHole(hole);
+    const state = createSimState(hole, 1);
+    applyStroke(state, DEFAULT_PARAMS, { angle: -Math.PI / 2, power: 0.5 });
+    let piped = false;
+    for (let i = 0; i < 2000 && !piped; i++) {
+      step(state, world, DEFAULT_PARAMS);
+      if (state.events.some((e) => e.type === 'pipe')) piped = true;
+    }
+    expect(piped).toBe(true);
+    expect(state.ball.x).toBeCloseTo(5, 1);
+    expect(state.ball.y).toBeCloseTo(10, 1);
+    expect(state.ball.vx).toBeGreaterThan(0);
+    expect(Math.abs(state.ball.vy)).toBeLessThan(1e-9);
+  });
+});

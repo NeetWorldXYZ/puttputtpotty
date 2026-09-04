@@ -67,10 +67,23 @@ export interface CompiledHazard {
   source: Hazard;
 }
 
+export interface Pipe {
+  x: number;
+  y: number;
+  r: number;
+  exitX: number;
+  exitY: number;
+  mode: 'keep' | 'redirect';
+  /** Unit exit direction for redirect pipes. */
+  dx: number;
+  dy: number;
+}
+
 export interface World {
   hole: Hole;
   segments: SegmentCollider[];
   circles: CircleCollider[];
+  pipes: Pipe[];
   surfaceZones: CompiledSurfaceZone[];
   slopeZones: CompiledSlopeZone[];
   hazards: CompiledHazard[];
@@ -139,6 +152,7 @@ function addShape(
 export function compileHole(hole: Hole): World {
   const segments: SegmentCollider[] = [];
   const circles: CircleCollider[] = [];
+  const pipes: Pipe[] = [];
 
   // Bounds act as a safety wall so the ball can never leave the playfield.
   const b = hole.bounds;
@@ -165,6 +179,20 @@ export function compileHole(hole: Hole): World {
       case 'curb':
         addShape(segments, circles, o.shape, 'curb', null, o.jumpSpeed ?? null);
         break;
+      case 'pipe': {
+        const a = o.exitAngle ?? 0;
+        pipes.push({
+          x: o.shape.x,
+          y: o.shape.y,
+          r: o.shape.r,
+          exitX: o.exit.x,
+          exitY: o.exit.y,
+          mode: o.mode,
+          dx: Math.cos(a),
+          dy: Math.sin(a),
+        });
+        break;
+      }
       default:
         // Reserved for later phases; ignored by the simulation.
         break;
@@ -195,5 +223,5 @@ export function compileHole(hole: Hole): World {
     source: h,
   }));
 
-  return { hole, segments, circles, surfaceZones, slopeZones, hazards };
+  return { hole, segments, circles, pipes, surfaceZones, slopeZones, hazards };
 }

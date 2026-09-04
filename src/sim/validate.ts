@@ -111,8 +111,13 @@ export function validateHole(input: unknown): { ok: boolean; errors: string[]; h
       } else {
         errors.push(`obstacles[${i}]: unknown shape kind ${String(s.kind)}`);
       }
-      if ((oo.type === 'bumper' || oo.type === 'post') && s.kind !== 'circle')
+      if ((oo.type === 'bumper' || oo.type === 'post' || oo.type === 'pipe') && s.kind !== 'circle')
         errors.push(`obstacles[${i}]: ${oo.type}s must be circles`);
+      if (oo.type === 'pipe') {
+        if (!isPoint(oo.exit)) errors.push(`obstacles[${i}]: pipe needs an exit point`);
+        if (oo.mode !== 'keep' && oo.mode !== 'redirect') errors.push(`obstacles[${i}]: pipe mode must be keep or redirect`);
+        if (oo.mode === 'redirect' && !isNum(oo.exitAngle)) errors.push(`obstacles[${i}]: redirect pipe needs exitAngle`);
+      }
     });
 
   return errors.length === 0 ? { ok: true, errors, hole: input as Hole } : { ok: false, errors };

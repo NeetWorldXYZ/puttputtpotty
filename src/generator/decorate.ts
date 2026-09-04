@@ -22,10 +22,15 @@ interface Budget {
   chamferChance: number;
 }
 
-const BUDGETS: Record<Difficulty, Budget> = {
-  easy: { surfaces: [0, 1], slopes: [0, 1], maxGrade: 1, hazardChance: 0.15, hazards: [1, 1], obstacles: [0, 1], chamferChance: 0.3 },
-  medium: { surfaces: [0, 2], slopes: [0, 1], maxGrade: 2, hazardChance: 0.55, hazards: [1, 1], obstacles: [1, 2], chamferChance: 0.4 },
-  hard: { surfaces: [1, 3], slopes: [1, 2], maxGrade: 3, hazardChance: 0.85, hazards: [1, 2], obstacles: [2, 4], chamferChance: 0.5 },
+interface BudgetExt extends Budget {
+  pipeChance: number;
+}
+
+/** Every difficulty places at least one obstacle. */
+const BUDGETS: Record<Difficulty, BudgetExt> = {
+  easy: { surfaces: [0, 2], slopes: [0, 1], maxGrade: 1, hazardChance: 0.4, hazards: [1, 1], obstacles: [1, 2], chamferChance: 0.3, pipeChance: 0.1 },
+  medium: { surfaces: [1, 2], slopes: [0, 2], maxGrade: 2, hazardChance: 0.8, hazards: [1, 2], obstacles: [2, 3], chamferChance: 0.4, pipeChance: 0.25 },
+  hard: { surfaces: [1, 3], slopes: [1, 2], maxGrade: 3, hazardChance: 1, hazards: [1, 2], obstacles: [3, 5], chamferChance: 0.5, pipeChance: 0.35 },
 };
 
 /** The static obstacle catalogue the generator composes from. */
@@ -191,6 +196,50 @@ export function decorate(hole: Hole, sk: Skeleton, rng: Rng, difficulty: Difficu
     }
   }
 
+  ensureObstacle(hole, sk, rng, placed);
+
+  // --- secret tunnel: entry in a lane away from the cup, exit near the cup side of the route
+  if (rng.chance(budget.pipeChance) && lanes.length >= 1) {
+    for (let tries = 0; tries < 24; tries++) {
+      const from = pickLane();
+      const to = pickLane();
+      const r = 1.1;
+      const entry = {
+        x: from.inner.x + rng.range(r + 0.5, Math.max(r + 0.5, from.inner.w - r - 0.5)),
+        y: from.inner.y + rng.range(r + 0.5, Math.max(r + 0.5, from.inner.h - r - 0.5)),
+      };
+      const exit = {
+        x: to.inner.x + rng.range(1, Math.max(1, to.inner.w - 1)),
+        y: to.inner.y + rng.range(1, Math.max(1, to.inner.h - 1)),
+      };
+      // Entry must be farther from the cup than the exit, and the two far apart.
+      if (dist(entry, hole.cup) < dist(exit, hole.cup) + 4) continue;
+      if (dist(entry, exit) < 7) continue;
+      const foot = [
+        { x: entry.x - r, y: entry.y - r },
+        { x: entry.x + r, y: entry.y + r },
+      ];
+      if (!clearOf(foot, 3.5, 5)) continue;
+      const exitFoot = [
+        { x: exit.x - 0.8, y: exit.y - 0.8 },
+        { x: exit.x + 0.8, y: exit.y + 0.8 },
+      ];
+      if (!clearOf(exitFoot, 2.5, 3.5)) continue;
+      // Point the ball roughly toward the cup on exit.
+      const ang = Math.atan2(hole.cup.y - exit.y, hole.cup.x - exit.x) + rng.range(-0.5, 0.5);
+      hole.obstacles.push({
+        type: 'pipe',
+        shape: { kind: 'circle', x: round2(entry.x), y: round2(entry.y), r },
+        exit: { x: round2(exit.x), y: round2(exit.y) },
+        mode: 'redirect',
+        exitAngle: round2(ang),
+      });
+      accept(foot);
+      accept(exitFoot);
+      break;
+    }
+  }
+
   // --- chamfers: triangle blockers in outside corners of rect-ish cells
   if (rng.chance(budget.chamferChance)) {
     const cell = rng.pick(sk.cells);
@@ -209,6 +258,31 @@ export function decorate(hole: Hole, sk: Skeleton, rng: Rng, difficulty: Difficu
   }
 }
 
+/**
+ * Guarantee at least one real obstacle: small pieces, relaxed clearance,
+ * many tries. Used at the end of decoration and by the generator's
+ * undecorated fallback.
+ */
+export function ensureObstacle(hole: Hole, sk: Skeleton, rng: Rng, placed: Placed['bbox'][] = []): void {
+  if (hole.obstacles.some((o) => o.type !== 'pipe')) return;
+  const lanes = sk.decorable
+    .map((cell) => ({ cell, inner: innerRect(cell, 0.25) }))
+    .filter((l): l is { cell: Polygon; inner: { x: number; y: number; w: number; h: number } } => l.inner !== null && l.inner.w >= 2.5 && l.inner.h >= 2.5);
+  if (lanes.length === 0) return;
+  for (let tries = 0; tries < 40; tries++) {
+    const lane = rng.pick(lanes);
+    const kind: ObstacleKind = rng.pick(['post', 'bumper', 'diamond', 'post']);
+    const made = makeObstacle(kind, lane, rng);
+    if (!made) continue;
+    const bb = bboxOf(made.footprint);
+    if (bboxDist(bb, hole.tee) < 3 || bboxDist(bb, hole.cup) < 3) continue;
+    if (placed.some((o) => overlaps(o, bb))) continue;
+    hole.obstacles.push(...made.obstacles);
+    placed.push(bb);
+    return;
+  }
+}
+
 interface Made {
   obstacles: Obstacle[];
   walls?: Hole['walls'];
@@ -220,7 +294,7 @@ function makeObstacle(kind: ObstacleKind, lane: { cell: Polygon; inner: { x: num
   const tall = r.h >= r.w;
   const across = tall ? r.w : r.h; // lane width
   const along = tall ? r.h : r.w;
-  if (along < 6) return null;
+  if (along < 4) return null;
   // A point on the lane's centreline, `t` along it, offset `o` across it.
   const at = (t: number, o = 0): Point =>
     tall ? { x: r.x + r.w / 2 + o, y: r.y + t * r.h } : { x: r.x + t * r.w, y: r.y + r.h / 2 + o };

@@ -18,6 +18,7 @@ export const PALETTE = {
   deadWall: '#3a3f42',
   curb: 'rgba(238,242,244,0.18)',
   curbEdge: '#b7c2c8',
+  pipe: '#7fd6ff',
   bumper: '#ff6f3c',
   bumperEdge: '#ffd0bd',
   ball: '#ffffff',

@@ -148,11 +148,24 @@ export interface CurbObstacle {
   jumpSpeed?: number;
 }
 
+/**
+ * Pipe / tunnel: a ball whose centre enters the entry circle is carried to
+ * `exit` instantly. `mode` 'keep' preserves the velocity vector;
+ * 'redirect' keeps the speed but points it along `exitAngle` (radians,
+ * y-down). One-way.
+ */
+export interface PipeObstacle {
+  type: 'pipe';
+  shape: { kind: 'circle'; x: number; y: number; r: number };
+  exit: Point;
+  mode: 'keep' | 'redirect';
+  exitAngle?: number;
+}
+
 /** Reserved for later phases. Declared so the JSON format is forward compatible. */
 export interface FutureObstacle {
   type:
     | 'gate'
-    | 'pipe'
     | 'rail'
     | 'backboard'
     | 'windmill'
@@ -169,10 +182,10 @@ export interface FutureObstacle {
   params?: Record<string, number | string | boolean>;
 }
 
-export type Obstacle = BlockerObstacle | BumperObstacle | PostObstacle | DeadWallObstacle | CurbObstacle | FutureObstacle;
+export type Obstacle = BlockerObstacle | BumperObstacle | PostObstacle | DeadWallObstacle | CurbObstacle | PipeObstacle | FutureObstacle;
 
 /** Obstacle types the simulation actually collides with. */
-export const SIMULATED_OBSTACLE_TYPES: readonly string[] = ['blocker', 'bumper', 'post', 'deadWall', 'curb'] as const;
+export const SIMULATED_OBSTACLE_TYPES: readonly string[] = ['blocker', 'bumper', 'post', 'deadWall', 'curb', 'pipe'] as const;
 
 export interface Hole {
   /** Format version, bump on breaking changes. */

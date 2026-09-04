@@ -42,7 +42,8 @@ export type SimEvent =
   | { type: 'hazard'; x: number; y: number; hazardType: string; penalty: number }
   | { type: 'rest'; x: number; y: number }
   | { type: 'timeout'; x: number; y: number }
-  | { type: 'sticky'; x: number; y: number };
+  | { type: 'sticky'; x: number; y: number }
+  | { type: 'pipe'; x: number; y: number; exitX: number; exitY: number };
 
 export interface SimState {
   ball: Ball;
@@ -63,6 +64,8 @@ export interface SimState {
   lowSpeedTime: number;
   /** Seconds during which the cup is ignored (after a lip-out). */
   cupCooldown: number;
+  /** Seconds during which pipes are ignored (after coming out of one). */
+  pipeCooldown: number;
   /** mulberry32 state. */
   rng: number;
   /** Strokes taken so far, for replay. */
@@ -86,6 +89,7 @@ export function createSimState(hole: Hole, seed: number): SimState {
     totalTime: 0,
     lowSpeedTime: 0,
     cupCooldown: 0,
+    pipeCooldown: 0,
     rng: seed >>> 0,
     strokeHistory: [],
     events: [],
@@ -128,6 +132,7 @@ export function applyStroke(state: SimState, params: PhysicsParams, stroke: Stro
   state.strokeTime = 0;
   state.lowSpeedTime = 0;
   state.cupCooldown = 0;
+  state.pipeCooldown = 0;
   state.resting = false;
   state.strokeHistory.push({ angle: stroke.angle, power: stroke.power });
   state.events = [];
@@ -381,6 +386,34 @@ function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams): vo
 }
 
 // ---------------------------------------------------------------------------
+// Pipes: entering the entry circle carries the ball to the exit.
+
+function checkPipes(state: SimState, world: World, path: number[]): void {
+  if (world.pipes.length === 0 || state.pipeCooldown > 0) return;
+  const b = state.ball;
+  for (const pipe of world.pipes) {
+    const dx = b.x - pipe.x;
+    const dy = b.y - pipe.y;
+    if (dx * dx + dy * dy > pipe.r * pipe.r) continue;
+    const speed = len(b.vx, b.vy);
+    if (speed < EPS) continue;
+    state.events.push({ type: 'pipe', x: b.x, y: b.y, exitX: pipe.exitX, exitY: pipe.exitY });
+    b.x = pipe.exitX;
+    b.y = pipe.exitY;
+    if (pipe.mode === 'redirect') {
+      b.vx = pipe.dx * speed;
+      b.vy = pipe.dy * speed;
+    }
+    state.pipeCooldown = 0.5;
+    state.cupCooldown = 0;
+    // The swept path restarts at the exit so the cup/hazard checks don't span the jump.
+    path.length = 0;
+    path.push(b.x, b.y);
+    return;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Cup + hazards, tested against the swept path.
 
 function checkCup(state: SimState, world: World, p: PhysicsParams, path: number[]): void {
@@ -547,6 +580,11 @@ export function step(state: SimState, world: World, p: PhysicsParams): void {
     state.cupCooldown -= dt;
     if (state.cupCooldown < 0) state.cupCooldown = 0;
   }
+  if (state.pipeCooldown > 0) {
+    state.pipeCooldown -= dt;
+    if (state.pipeCooldown < 0) state.pipeCooldown = 0;
+  }
+  checkPipes(state, world, path);
 
   // 5. Cup, then hazards (a sunk ball can't also drain).
   checkCup(state, world, p, path);

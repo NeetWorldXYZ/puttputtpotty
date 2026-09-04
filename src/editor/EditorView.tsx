@@ -41,7 +41,8 @@ type Tool =
   | 'blockerRect'
   | 'blockerCircle'
   | 'blockerPoly'
-  | 'bumper';
+  | 'bumper'
+  | 'pipe';
 
 const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'select', label: 'Select / move', key: 'V' },
@@ -55,6 +56,7 @@ const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'blockerCircle', label: 'Blocker (circle)', key: 'O' },
   { id: 'blockerPoly', label: 'Blocker (polygon)', key: 'K' },
   { id: 'bumper', label: 'Bumper', key: 'U' },
+  { id: 'pipe', label: 'Pipe (entry → exit)', key: 'I' },
 ];
 
 /** Obstacle types the editor can assign to a placed shape. */
@@ -81,7 +83,8 @@ type Handle =
   | { kind: 'zoneVertex'; zone: 'surface' | 'slope' | 'hazard'; index: number; vi: number }
   | { kind: 'tee' }
   | { kind: 'cup' }
-  | { kind: 'obstacle'; index: number };
+  | { kind: 'obstacle'; index: number }
+  | { kind: 'pipeExit'; index: number };
 
 type DragOp =
   | { kind: 'handles'; handles: Handle[]; startHole: Hole }
@@ -113,6 +116,10 @@ function handlePoint(h: Hole, hd: Handle): Point {
       return h.cup;
     case 'obstacle':
       return shapeAnchor(h.obstacles[hd.index].shape);
+    case 'pipeExit': {
+      const o = h.obstacles[hd.index];
+      return o.type === 'pipe' ? o.exit : { x: 0, y: 0 };
+    }
   }
 }
 
@@ -131,7 +138,10 @@ function allHandles(h: Hole): Handle[] {
   (['surface', 'slope', 'hazard'] as const).forEach((zone) => {
     zonePolys(h, zone).forEach((poly, i) => poly.forEach((_, vi) => out.push({ kind: 'zoneVertex', zone, index: i, vi })));
   });
-  h.obstacles.forEach((_, i) => out.push({ kind: 'obstacle', index: i }));
+  h.obstacles.forEach((o, i) => {
+    out.push({ kind: 'obstacle', index: i });
+    if (o.type === 'pipe') out.push({ kind: 'pipeExit', index: i });
+  });
   return out;
 }
 
@@ -149,6 +159,11 @@ function moveHandle(h: Hole, hd: Handle, to: Point): void {
     case 'cup':
       h.cup = { x: to.x, y: to.y };
       break;
+    case 'pipeExit': {
+      const o = h.obstacles[hd.index];
+      if (o.type === 'pipe') o.exit = { x: to.x, y: to.y };
+      break;
+    }
     case 'obstacle': {
       const s = h.obstacles[hd.index].shape;
       if (s.kind === 'polygon') {
@@ -570,6 +585,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           else if (hd.kind === 'cup') setSelection({ kind: 'cup' });
           else if (hd.kind === 'wallEnd') setSelection({ kind: 'wall', index: hd.index });
           else if (hd.kind === 'zoneVertex') setSelection({ kind: hd.zone, index: hd.index });
+          else if (hd.kind === 'pipeExit') setSelection({ kind: 'obstacle', index: hd.index });
           return;
         }
         const sel = pickSelection(raw);
@@ -625,6 +641,25 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       case 'bumper':
         dragRef.current = { kind: 'circle', ax: p.x, ay: p.y, r: 0, bumper: tool === 'bumper' };
         return;
+      case 'pipe': {
+        if (draft.length === 0) {
+          setDraft([p]);
+          return;
+        }
+        const entry = draft[0];
+        const h = clone(holeRef.current);
+        h.obstacles.push({
+          type: 'pipe',
+          shape: { kind: 'circle', x: entry.x, y: entry.y, r: 1.1 },
+          exit: p,
+          mode: 'redirect',
+          exitAngle: Math.round(Math.atan2(h.cup.y - p.y, h.cup.x - p.x) * 100) / 100,
+        });
+        commit(h);
+        setDraft([]);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
     }
   };
   const grabOffsetRef = useRef<Point | null>(null);
@@ -973,7 +1008,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
 
   const draftHelp =
     draft.length > 0
-      ? tool === 'wall'
+      ? tool === 'pipe'
+        ? 'Pipe: click where the ball comes out · Esc cancels'
+        : tool === 'wall'
         ? `Wall: ${draft.length} pt · click first point or Enter/dbl-click to finish · Backspace removes last · Esc cancels`
         : `${tool === 'blockerPoly' ? 'Blocker' : 'Zone'}: ${draft.length} pt · click first point or Enter/dbl-click to close · Esc cancels`
       : null;
@@ -1094,6 +1131,12 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           </div>
         </div>
 
+        {tool === 'pipe' && (
+          <>
+            <h4>Pipe</h4>
+            <div style={{ fontSize: 12, color: 'var(--dim)' }}>Click the entry, then click where the ball comes out. Exit angle defaults to "toward the cup".</div>
+          </>
+        )}
         {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly') && (
           <>
             <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' ? 'blocker' : tool} defaults</h4>
@@ -1340,6 +1383,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
             )}
             {selection.kind === 'obstacle' && hole.obstacles[selection.index] && (
               <>
+                {hole.obstacles[selection.index].type !== 'pipe' && (
                 <div className="field">
                   <label>type</label>
                   <select
@@ -1358,6 +1402,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     ))}
                   </select>
                 </div>
+                )}
                 {hole.obstacles[selection.index].shape.kind === 'circle' && (
                   <div className="field">
                     <label>radius</label>
@@ -1404,6 +1449,40 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     </div>
                   </div>
                 )}
+                {hole.obstacles[selection.index].type === 'pipe' && (
+                  <>
+                    <div className="field">
+                      <label>mode</label>
+                      <select
+                        value={(hole.obstacles[selection.index] as { mode: string }).mode}
+                        onChange={(e) =>
+                          updateHole((h) => {
+                            const o = h.obstacles[selection.index];
+                            if (o.type === 'pipe') o.mode = e.target.value as 'keep' | 'redirect';
+                          })
+                        }
+                      >
+                        <option value="redirect">redirect (aim along exit angle)</option>
+                        <option value="keep">keep velocity</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>exit angle (°)</label>
+                      <input
+                        type="number"
+                        step={5}
+                        value={Math.round((((hole.obstacles[selection.index] as { exitAngle?: number }).exitAngle ?? 0) * 180) / Math.PI)}
+                        onChange={(e) =>
+                          updateHole((h) => {
+                            const o = h.obstacles[selection.index];
+                            if (o.type === 'pipe') o.exitAngle = ((parseFloat(e.target.value) || 0) * Math.PI) / 180;
+                          })
+                        }
+                      />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--dim)' }}>Drag the exit ring with the Select tool to move it.</div>
+                  </>
+                )}
                 {hole.obstacles[selection.index].type === 'curb' && (
                   <div className="field">
                     <label>jump speed</label>
@@ -1423,7 +1502,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     />
                   </div>
                 )}
-                {hole.obstacles[selection.index].type !== 'curb' && (
+                {hole.obstacles[selection.index].type !== 'curb' && hole.obstacles[selection.index].type !== 'pipe' && (
                   <div className="field">
                     <label>restitution</label>
                     <input
