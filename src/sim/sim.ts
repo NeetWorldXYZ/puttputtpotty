@@ -486,8 +486,10 @@ export function step(state: SimState, world: World, p: PhysicsParams): void {
 
   // 1. Zones under the ball centre.
   const surface = surfaceAt(world, b.x, b.y);
+  const prevSurface = state.surface;
   state.surface = surface;
-  if (surface === 'sticky') {
+  // Sticky stops the ball on entry only, so a ball resting on sticky can still be shot out of it.
+  if (surface === 'sticky' && prevSurface !== 'sticky') {
     settle(state, world, 'sticky');
     return;
   }

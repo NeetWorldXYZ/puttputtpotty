@@ -21,6 +21,8 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera, screenToWorld, type Camera } from '../render/camera';
 import { PALETTE } from '../render/palette';
 import { PlayView } from '../game/PlayView';
+import { useTuning } from '../game/paramsStore';
+import type { SolveReport } from '../solver/solver';
 import { COURSE } from '../holes';
 import { downloadJson, loadAutosave, saveAutosave } from './storage';
 
@@ -186,6 +188,34 @@ export function EditorView({ onExit }: { onExit: () => void }) {
   const [jsonMsg, setJsonMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   const [status, setStatus] = useState('');
+  const tuning = useTuning();
+
+  // --- solver (runs in a worker so the UI stays responsive)
+  const [solving, setSolving] = useState(false);
+  const [report, setReport] = useState<SolveReport | null>(null);
+  const [reportHoleJson, setReportHoleJson] = useState('');
+  const workerRef = useRef<Worker | null>(null);
+  const solveIdRef = useRef(0);
+  useEffect(() => {
+    const w = new Worker(new URL('../solver/worker.ts', import.meta.url), { type: 'module' });
+    w.onmessage = (e: MessageEvent<{ id: number; report?: SolveReport; error?: string }>) => {
+      if (e.data.id !== solveIdRef.current) return;
+      setSolving(false);
+      if (e.data.report) setReport(e.data.report);
+      else setStatus(`solver error: ${e.data.error}`);
+    };
+    workerRef.current = w;
+    return () => w.terminate();
+  }, []);
+  const runSolver = useCallback(() => {
+    const w = workerRef.current;
+    if (!w) return;
+    const id = ++solveIdRef.current;
+    setSolving(true);
+    setReportHoleJson(JSON.stringify(holeRef.current));
+    w.postMessage({ id, hole: holeRef.current, params: tuning.paramsRef.current });
+  }, [tuning.paramsRef]);
+  const reportStale = report !== null && reportHoleJson !== JSON.stringify(hole);
 
   // --- undo/redo
   const undoRef = useRef<Hole[]>([]);
@@ -703,6 +733,31 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           }
         }
 
+        // solver's best run (numbered rest positions)
+        if (report && report.bestRun && !reportStale) {
+          const pts = [{ x: hole.tee.x, y: hole.tee.y }, ...report.bestRun.positions];
+          c.save();
+          c.strokeStyle = PALETTE.good;
+          c.lineWidth = 2;
+          c.setLineDash([6, 4]);
+          c.beginPath();
+          pts.forEach((q, i) => (i ? c.lineTo(q.x * S + cam.ox, q.y * S + cam.oy) : c.moveTo(q.x * S + cam.ox, q.y * S + cam.oy)));
+          c.stroke();
+          c.setLineDash([]);
+          c.font = '11px system-ui, sans-serif';
+          c.textAlign = 'center';
+          c.textBaseline = 'middle';
+          report.bestRun.positions.forEach((q, i) => {
+            c.fillStyle = PALETTE.good;
+            c.beginPath();
+            c.arc(q.x * S + cam.ox, q.y * S + cam.oy, 8, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = '#111';
+            c.fillText(String(i + 1), q.x * S + cam.ox, q.y * S + cam.oy);
+          });
+          c.restore();
+        }
+
         // vertex handles (select tool)
         if (tool === 'select') {
           c.fillStyle = 'rgba(255,255,255,0.85)';
@@ -852,6 +907,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         <span className="title">Putt Putt Potty — editor</span>
         <button className="primary" onClick={() => setTesting(true)} disabled={!validation.ok}>
           ▶ Test play <kbd style={{ marginLeft: 6, opacity: 0.7 }}>P</kbd>
+        </button>
+        <button onClick={runSolver} disabled={!validation.ok || solving} title="Estimate par and check the hole is playable">
+          {solving ? 'Solving…' : '⌕ Solve'}
         </button>
         <button onClick={undo} title="Ctrl+Z">
           ↶ Undo
@@ -1261,6 +1319,39 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        <h4>Solver</h4>
+        {!report && (
+          <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+            Press <strong>Solve</strong> to estimate par, measure difficulty and check the section-9 rules. Uses the
+            physics values from the dev panel.
+          </div>
+        )}
+        {report && (
+          <div className="sel" style={{ opacity: reportStale ? 0.5 : 1 }}>
+            {reportStale && <div style={{ color: 'var(--accent)', fontSize: 11, marginBottom: 4 }}>hole changed — re-solve</div>}
+            <div style={{ fontWeight: 700, color: report.accepted ? 'var(--good)' : 'var(--danger)' }}>
+              {report.accepted ? 'ACCEPTED' : 'REJECTED'} · solver par {report.par ?? '–'}
+              {report.par !== null && report.par !== hole.par && (
+                <button
+                  style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }}
+                  onClick={() => updateHole((h) => (h.par = report.par as number))}
+                >
+                  set par {report.par}
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>
+              best {report.bestStrokes ?? '–'} · success {Math.round(report.successRate * 100)}% · ace{' '}
+              {(report.aceRate * 100).toFixed(1)}% · random plays find cup {Math.round(report.cupFindRate * 100)}% · hazard{' '}
+              {(report.hazardRate * 100).toFixed(0)}%
+              <br />
+              tee→cup {report.teeToCupDirect.toFixed(0)}u direct, {report.teeToCupPath < 0 ? 'no path' : report.teeToCupPath.toFixed(0) + 'u path'} ·
+              cup↔corner {report.cupNearestCorner.toFixed(1)}u · traps {report.trapsFound} · {report.timeMs.toFixed(0)}ms
+            </div>
+            {report.rejectReasons.length > 0 && <div className="errors">{report.rejectReasons.join('\n')}</div>}
           </div>
         )}
 

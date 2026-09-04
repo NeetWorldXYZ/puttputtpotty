@@ -229,3 +229,42 @@ accepts.
 Backend, auth, database, GPS, generator, solver, moving obstacles,
 tiers, daily course, practice mode, leaderboards, thrones, seasons,
 accounts, notifications, sound, art.
+
+## Solver
+
+`src/solver/` plays a hole headlessly with seeded randomness and reports
+par, difficulty and the reject rules from section 9 of the design doc.
+Deterministic: same hole + physics + options → same report.
+
+```bash
+npm run solve                       # every hole in src/holes/
+npm run solve -- path/to/hole.json  # specific files
+```
+
+In the editor, **Solve** runs it in a web worker on the current hole and
+draws the best solution it found (numbered rest positions). "Set par"
+copies the solver's par into the hole.
+
+How it works:
+
+- A **distance field** rasterises the playfield at half-unit cells,
+  blocks anything within ball radius of a wall or obstacle, and walks
+  from the cup outward. This gives a route-aware "how far from the cup is
+  this spot", detects a cup that can't be reached and a hazard that every
+  route must cross, and gives the shot sampler a direction to aim.
+- **Random tee shots** (300, in a ±75° cone around the route direction):
+  ace rate and hazard rate.
+- **Random plays** (100 plays of up to 8 cone-random strokes, no search):
+  how often a clueless player finds the cup at all.
+- **Competent runs** (12 runs, best of 16 simulated options per stroke):
+  par = median strokes, rounded up, floored at 2.
+- **Strong runs** (4 runs, best of 40): best achievable strokes.
+- **Trap probe**: from sampled rest positions, if none of 24 spread shots
+  gets closer to the cup, it's a trap.
+
+Rejects: cup unreachable, every route crosses a hazard, cup < 2.5 units
+from a wall corner, unsolvable in 8, par > 5, ace rate > 40 %, random
+plays find the cup < 3 %, every solution takes a penalty, any trap.
+
+A solve takes 0.3–1.5 s per hole, which is fast enough for a generator
+to throw away candidates freely.
