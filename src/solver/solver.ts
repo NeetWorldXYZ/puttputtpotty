@@ -106,16 +106,25 @@ function positionCost(ctx: Ctx, s: SimState): number {
   return (Number.isFinite(d) ? d : 1e6) + s.penalties * 40;
 }
 
+/** Launch clock for a stroke: random within the movers' longest period (timing is part of the shot). */
+function sampleT(ctx: Ctx, s: SimState): number | undefined {
+  if (ctx.world.maxPeriod <= 0) return undefined;
+  return s.clock + rand(ctx) * ctx.world.maxPeriod;
+}
+
 function sampleCandidate(ctx: Ctx, s: SimState, k: number, total: number): Stroke {
   // First 60%: aimed along the geodesic with noise. Rest: uniform.
   const aimed = k < total * 0.6 ? directionToCup(ctx.df, s.ball.x, s.ball.y, 3 + Math.floor(rand(ctx) * 6)) : null;
+  const t = sampleT(ctx, s);
   if (aimed) {
     const base = Math.atan2(aimed.y, aimed.x);
     const angle = base + (rand(ctx) - 0.5) * 0.9;
     const power = 0.15 + rand(ctx) * 0.85;
-    return { angle, power };
+    return t === undefined ? { angle, power } : { angle, power, t };
   }
-  return { angle: rand(ctx) * Math.PI * 2, power: 0.1 + rand(ctx) * 0.9 };
+  const angle = rand(ctx) * Math.PI * 2;
+  const power = 0.1 + rand(ctx) * 0.9;
+  return t === undefined ? { angle, power } : { angle, power, t };
 }
 
 function greedyRun(ctx: Ctx, hole: Hole, seed: number, candidates: number): SolveRun {
@@ -195,7 +204,7 @@ function isTrap(ctx: Ctx, hole: Hole, s: SimState, opts: SolveOptions): boolean 
   if (s.sunk || s.done) return false;
   const here = distanceToCup(ctx.df, s.ball.x, s.ball.y, false);
   for (let k = 0; k < opts.trapProbeShots; k++) {
-    const cand: Stroke = { angle: (k / opts.trapProbeShots) * Math.PI * 2, power: 0.3 + 0.7 * ((k * 7) % 5) / 4 };
+    const cand: Stroke = { angle: (k / opts.trapProbeShots) * Math.PI * 2, power: 0.3 + 0.7 * ((k * 7) % 5) / 4, t: s.clock + (k / opts.trapProbeShots) * ctx.world.maxPeriod };
     const next = shoot(ctx, s, cand);
     if (next.sunk) return false;
     if (next.penalties > s.penalties) continue; // hazard resets are not "escape"
@@ -238,7 +247,8 @@ export function solveHole(
   const restStates: SimState[] = [];
   for (let i = 0; i < opts.randomShots; i++) {
     const angle = teeAngle + (rand(ctx) * 2 - 1) * cone;
-    const s = shoot(ctx, start, { angle, power: 0.1 + rand(ctx) * 0.9 });
+    const t = sampleT(ctx, start);
+    const s = shoot(ctx, start, t === undefined ? { angle, power: 0.1 + rand(ctx) * 0.9 } : { angle, power: 0.1 + rand(ctx) * 0.9, t });
     if (s.sunk) aces++;
     if (s.penalties > 0) hazards++;
     else if (i % 10 === 0) restStates.push(s);
@@ -255,7 +265,8 @@ export function solveHole(
       const dir = directionToCup(df, s.ball.x, s.ball.y, 6);
       const base = dir ? Math.atan2(dir.y, dir.x) : 0;
       const angle = base + (rand(ctx) * 2 - 1) * (dir ? opts.randomCone : Math.PI);
-      s = shoot(ctx, s, { angle, power: 0.1 + rand(ctx) * 0.9 });
+      const t = sampleT(ctx, s);
+      s = shoot(ctx, s, t === undefined ? { angle, power: 0.1 + rand(ctx) * 0.9 } : { angle, power: 0.1 + rand(ctx) * 0.9, t });
     }
     if (s.sunk) found++;
   }

@@ -3,7 +3,8 @@
  * function can iterate cheaply. The world is immutable after compile.
  */
 
-import type { Hole, Polygon, SurfaceType, Hazard, SlopeZone, ObstacleShape } from './types';
+import type { Hole, Polygon, SurfaceType, Hazard, SlopeZone, ObstacleShape, MovingObstacle } from './types';
+import { isMoving } from './types';
 import { polygonBounds, compassVector } from './geometry';
 
 export type ColliderKind = 'wall' | 'bounds' | 'blocker' | 'bumper' | 'post' | 'deadWall' | 'curb';
@@ -79,11 +80,38 @@ export interface Pipe {
   dy: number;
 }
 
+/** A collider that moves: static geometry for a given clock value plus its surface motion. */
+export interface DynamicSegment extends SegmentCollider {
+  /** Translational velocity. */
+  vx: number;
+  vy: number;
+  /** Angular velocity (rad/s) about (cx, cy). */
+  omega: number;
+  cx: number;
+  cy: number;
+}
+
+export interface DynamicCircle extends CircleCollider {
+  vx: number;
+  vy: number;
+  omega: number;
+  cx: number;
+  cy: number;
+}
+
+export interface DynamicColliders {
+  segments: DynamicSegment[];
+  circles: DynamicCircle[];
+}
+
 export interface World {
   hole: Hole;
   segments: SegmentCollider[];
   circles: CircleCollider[];
   pipes: Pipe[];
+  moving: MovingObstacle[];
+  /** Longest period among moving obstacles (0 if none). */
+  maxPeriod: number;
   surfaceZones: CompiledSurfaceZone[];
   slopeZones: CompiledSlopeZone[];
   hazards: CompiledHazard[];
@@ -153,6 +181,7 @@ export function compileHole(hole: Hole): World {
   const segments: SegmentCollider[] = [];
   const circles: CircleCollider[] = [];
   const pipes: Pipe[] = [];
+  const moving: MovingObstacle[] = [];
 
   // Bounds act as a safety wall so the ball can never leave the playfield.
   const b = hole.bounds;
@@ -193,11 +222,17 @@ export function compileHole(hole: Hole): World {
         });
         break;
       }
+      case 'windmill':
+      case 'slidingGate':
+      case 'pendulum':
+        if (isMoving(o)) moving.push(o);
+        break;
       default:
         // Reserved for later phases; ignored by the simulation.
         break;
     }
   }
+  const maxPeriod = moving.reduce((m, o) => Math.max(m, o.period), 0);
 
   const surfaceZones: CompiledSurfaceZone[] = hole.surfaceZones.map((z) => ({
     polygon: z.polygon,
@@ -223,5 +258,95 @@ export function compileHole(hole: Hole): World {
     source: h,
   }));
 
-  return { hole, segments, circles, pipes, surfaceZones, slopeZones, hazards };
+  return { hole, segments, circles, pipes, moving, maxPeriod, surfaceZones, slopeZones, hazards };
+}
+
+// ---------------------------------------------------------------------------
+// Moving obstacles: geometry at a clock value. Only +,-,*,/ and sin/cos of
+// the clock are used; sin/cos are evaluated once per obstacle per step.
+
+const TWO_PI = 6.283185307179586;
+
+function dynSeg(ax: number, ay: number, bx: number, by: number, kind: ColliderKind, restitution: number | null, vx: number, vy: number, omega: number, cx: number, cy: number): DynamicSegment {
+  return { ...seg(ax, ay, bx, by, kind, restitution, null), vx, vy, omega, cx, cy };
+}
+
+/** Rotated rect (centre, half extents, angle) as four dynamic segments. */
+function rotRectSegments(out: DynamicSegment[], cx: number, cy: number, hl: number, hw: number, ang: number, ox: number, kind: ColliderKind, restitution: number | null, vx: number, vy: number, omega: number, pcx: number, pcy: number): void {
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  // local corners: along +-hl, across +-hw, offset so the rect starts at (ox,oy) along its axis
+  const pts = [
+    [ox, -hw],
+    [ox + hl * 2, -hw],
+    [ox + hl * 2, hw],
+    [ox, hw],
+  ].map(([lx, ly]) => [cx + lx * c - ly * s, cy + lx * s + ly * c]);
+  for (let i = 0; i < 4; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % 4];
+    out.push(dynSeg(a[0], a[1], b[0], b[1], kind, restitution, vx, vy, omega, pcx, pcy));
+  }
+}
+
+export function movingColliders(world: World, clock: number): DynamicColliders {
+  const segments: DynamicSegment[] = [];
+  const circles: DynamicCircle[] = [];
+  for (const o of world.moving) {
+    const rest = o.restitution ?? null;
+    if (o.type === 'windmill') {
+      const w = (o.direction * TWO_PI) / o.period;
+      const ang = o.phase + w * clock;
+      const bw = (o.bladeWidth ?? 0.7) / 2;
+      const s = o.shape;
+      for (let k = 0; k < o.blades; k++) {
+        const a = ang + (k * TWO_PI) / o.blades;
+        rotRectSegments(segments, s.x, s.y, s.r / 2, bw, a, 0, 'blocker', rest, 0, 0, w, s.x, s.y);
+      }
+      circles.push({ x: s.x, y: s.y, r: Math.max(0.4, bw * 1.3), kind: 'blocker', restitution: rest, jumpSpeed: null, minX: s.x - 1, minY: s.y - 1, maxX: s.x + 1, maxY: s.y + 1, vx: 0, vy: 0, omega: w, cx: s.x, cy: s.y });
+    } else if (o.type === 'slidingGate') {
+      const s = o.shape;
+      let off: number;
+      let vel: number;
+      if (o.look === 'luggage') {
+        // steady ping-pong (triangle wave)
+        const u = (((clock / o.period + o.phase / TWO_PI) % 1) + 1) % 1;
+        const tri = u < 0.5 ? u * 4 - 1 : 3 - u * 4;
+        off = o.amplitude * tri;
+        vel = ((u < 0.5 ? 4 : -4) * o.amplitude) / o.period;
+      } else {
+        const th = (TWO_PI * clock) / o.period + o.phase;
+        off = o.amplitude * Math.sin(th);
+        vel = ((o.amplitude * TWO_PI) / o.period) * Math.cos(th);
+      }
+      const dx = o.axis === 'x' ? off : 0;
+      const dy = o.axis === 'y' ? off : 0;
+      const vx = o.axis === 'x' ? vel : 0;
+      const vy = o.axis === 'y' ? vel : 0;
+      const x = s.x + dx;
+      const y = s.y + dy;
+      segments.push(dynSeg(x, y, x + s.w, y, 'blocker', rest, vx, vy, 0, 0, 0));
+      segments.push(dynSeg(x + s.w, y, x + s.w, y + s.h, 'blocker', rest, vx, vy, 0, 0, 0));
+      segments.push(dynSeg(x + s.w, y + s.h, x, y + s.h, 'blocker', rest, vx, vy, 0, 0, 0));
+      segments.push(dynSeg(x, y + s.h, x, y, 'blocker', rest, vx, vy, 0, 0, 0));
+    } else {
+      const s = o.shape;
+      const th = (TWO_PI * clock) / o.period + o.phase;
+      const theta = o.arc * Math.sin(th);
+      const omega = ((o.arc * TWO_PI) / o.period) * Math.cos(th);
+      // arm hangs toward +y at theta = 0
+      const ang = Math.PI / 2 + theta;
+      rotRectSegments(segments, s.x, s.y, s.r / 2, 0.22, ang, 0, 'blocker', rest, 0, 0, omega, s.x, s.y);
+      const bx = s.x + Math.cos(ang) * s.r;
+      const by = s.y + Math.sin(ang) * s.r;
+      const br = o.bobRadius ?? 0.9;
+      circles.push({ x: bx, y: by, r: br, kind: 'blocker', restitution: rest, jumpSpeed: null, minX: bx - br, minY: by - br, maxX: bx + br, maxY: by + br, vx: 0, vy: 0, omega, cx: s.x, cy: s.y });
+    }
+  }
+  return { segments, circles };
+}
+
+/** Surface velocity of a dynamic collider at a point. */
+export function surfaceVelocity(c: { vx: number; vy: number; omega: number; cx: number; cy: number }, px: number, py: number): { x: number; y: number } {
+  return { x: c.vx - c.omega * (py - c.cy), y: c.vy + c.omega * (px - c.cx) };
 }

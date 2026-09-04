@@ -203,17 +203,16 @@
             "enum": [
               "blocker",
               "bumper",
-              "deadWall",
-              "gate",
               "post",
-              "pipe",
-              "rail",
+              "deadWall",
               "curb",
-              "backboard",
+              "pipe",
               "windmill",
               "slidingGate",
               "pendulum",
-              "piston",
+              "gate",
+              "rail",
+              "backboard",
               "rotatingPlatform",
               "flipper",
               "whirlpool",
@@ -330,6 +329,56 @@
           "exitAngle": {
             "type": "number",
             "description": "pipe (redirect) only: radians, y-down"
+          },
+          "blades": {
+            "type": "number",
+            "description": "windmill: number of blades"
+          },
+          "period": {
+            "type": "number",
+            "description": "moving obstacles: seconds per cycle"
+          },
+          "phase": {
+            "type": "number",
+            "description": "moving obstacles: radians offset"
+          },
+          "amplitude": {
+            "type": "number",
+            "description": "slidingGate: travel from centre, units"
+          },
+          "arc": {
+            "type": "number",
+            "description": "pendulum: half swing width, radians"
+          },
+          "bladeWidth": {
+            "type": "number",
+            "description": "windmill"
+          },
+          "bobRadius": {
+            "type": "number",
+            "description": "pendulum"
+          },
+          "direction": {
+            "enum": [
+              1,
+              -1
+            ],
+            "description": "windmill: 1 clockwise, -1 counter-clockwise"
+          },
+          "axis": {
+            "enum": [
+              "x",
+              "y"
+            ],
+            "description": "slidingGate"
+          },
+          "look": {
+            "enum": [
+              "gate",
+              "piston",
+              "luggage"
+            ],
+            "description": "slidingGate: how it is drawn and moves (luggage is a steady ping-pong)"
           }
         }
       }

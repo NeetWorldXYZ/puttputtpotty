@@ -193,6 +193,12 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
           } else if (e.kind === 'deadWall') {
             fx.burst(e.x, e.y, { count: 6, color: '#9aa3ad', speed: 3, size: 0.2, life: 0.4 });
             sfx.dead();
+          } else if (e.kind === 'mover') {
+            fx.burst(e.x, e.y, { count: 9, kind: 'spark', color: ['#ffd166', '#ffffff'], speed: 10, size: 0.22, life: 0.3 });
+            fx.ring(e.x, e.y, '#ffd166', 0.8, 0.3);
+            fx.shake(4);
+            sfx.bumper();
+            buzz(20);
           } else if (strong) {
             fx.burst(e.x, e.y, { count: 6, kind: 'spark', color: '#ffffff', speed: 9, size: 0.2, life: 0.25, dir: Math.atan2(e.ny, e.nx), spread: 1.1 });
             fx.shake(Math.min(4, e.speed / 15));
@@ -335,6 +341,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
       } else {
         accRef.current = 0;
         prevBallRef.current = { x: s.ball.x, y: s.ball.y };
+        // Movers keep moving while you aim; the stroke records the clock at launch.
+        if (world.moving.length) s.clock += frame;
       }
 
       // --- effects timers
@@ -397,6 +405,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed }: Props) {
         zoneLabels: prefs.showZoneLabels,
         dpr,
         time: timeRef.current,
+        clock: s.clock,
         extra: (c) => {
           if (showBall) {
             if (sink && s.sunk) {

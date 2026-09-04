@@ -43,7 +43,10 @@ type Tool =
   | 'blockerCircle'
   | 'blockerPoly'
   | 'bumper'
-  | 'pipe';
+  | 'pipe'
+  | 'windmill'
+  | 'gate'
+  | 'pendulum';
 
 const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'select', label: 'Select / move', key: 'V' },
@@ -58,6 +61,9 @@ const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'blockerPoly', label: 'Blocker (polygon)', key: 'K' },
   { id: 'bumper', label: 'Bumper', key: 'U' },
   { id: 'pipe', label: 'Pipe (entry → exit)', key: 'I' },
+  { id: 'windmill', label: 'Windmill', key: 'M' },
+  { id: 'gate', label: 'Sliding block', key: 'D' },
+  { id: 'pendulum', label: 'Pendulum', key: 'N' },
 ];
 
 /** Obstacle types the editor can assign to a placed shape. */
@@ -262,6 +268,20 @@ export function EditorView({ onExit }: { onExit: () => void }) {
   const dragRef = useRef<DragOp | null>(null);
   const [, setTick] = useState(0);
   const redraw = useCallback(() => setTick((t) => t + 1), []);
+  // Movers animate in the editor so their timing can be judged.
+  const [editorClock, setEditorClock] = useState(0);
+  useEffect(() => {
+    if (testing) return;
+    if (!hole.obstacles.some((o) => o.type === 'windmill' || o.type === 'slidingGate' || o.type === 'pendulum')) return;
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      setEditorClock((performance.now() - t0) / 1000);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [testing, hole]);
 
   const fit = useCallback(() => {
     const { w, h } = sizeRef.current;
@@ -642,6 +662,23 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       case 'bumper':
         dragRef.current = { kind: 'circle', ax: p.x, ay: p.y, r: 0, bumper: tool === 'bumper' };
         return;
+      case 'windmill': {
+        const h = clone(holeRef.current);
+        h.obstacles.push({ type: 'windmill', shape: { kind: 'circle', x: p.x, y: p.y, r: 3 }, blades: 3, period: 4, phase: 0, direction: 1 });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
+      case 'pendulum': {
+        const h = clone(holeRef.current);
+        h.obstacles.push({ type: 'pendulum', shape: { kind: 'circle', x: p.x, y: p.y, r: 4 }, arc: 0.9, period: 3, phase: 0 });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
+        return;
+      }
+      case 'gate':
+        dragRef.current = { kind: 'rect', ax: p.x, ay: p.y, cx: p.x, cy: p.y };
+        return;
       case 'pipe': {
         if (draft.length === 0) {
           setDraft([p]);
@@ -719,7 +756,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         const hh = Math.abs(d.cy - d.ay);
         if (w > 0 && hh > 0) {
           const h = clone(holeRef.current);
-          h.obstacles.push({ type: 'blocker', shape: { kind: 'rect', x, y, w, h: hh } });
+          if (tool === 'gate')
+            h.obstacles.push({ type: 'slidingGate', shape: { kind: 'rect', x, y, w, h: hh }, axis: w >= hh ? 'x' : 'y', amplitude: 3, period: 3, phase: 0, look: 'gate' });
+          else h.obstacles.push({ type: 'blocker', shape: { kind: 'rect', x, y, w, h: hh } });
           commit(h);
           setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
         }
@@ -776,6 +815,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       ball: { x: hole.tee.x, y: hole.tee.y },
       zoneLabels: true,
       dpr,
+      clock: editorClock,
       overlay: (c) => {
         // grid
         const b = hole.bounds;
@@ -1150,9 +1190,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
             <div style={{ fontSize: 12, color: 'var(--dim)' }}>Click the entry, then click where the ball comes out. Exit angle defaults to "toward the cup".</div>
           </>
         )}
-        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly') && (
+        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' || tool === 'windmill' || tool === 'gate' || tool === 'pendulum') && (
           <>
-            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' ? 'blocker' : tool} defaults</h4>
+            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' ? 'blocker' : tool === 'gate' ? 'sliding block' : tool} defaults</h4>
             {tool === 'surface' && (
               <div className="field">
                 <label>surface</label>
@@ -1234,6 +1274,11 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                   </select>
                 </div>
               </>
+            )}
+            {(tool === 'windmill' || tool === 'gate' || tool === 'pendulum') && (
+              <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+                {tool === 'gate' ? 'Drag the block at its centre position; set axis and amplitude after.' : 'Click to place; period, phase and size are editable after.'}
+              </div>
             )}
             {(tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'bumper' || tool === 'blockerPoly') && (
               <div style={{ fontSize: 12, color: 'var(--dim)' }}>
@@ -1396,7 +1441,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
             )}
             {selection.kind === 'obstacle' && hole.obstacles[selection.index] && (
               <>
-                {hole.obstacles[selection.index].type !== 'pipe' && (
+                {!['pipe', 'windmill', 'slidingGate', 'pendulum'].includes(hole.obstacles[selection.index].type) && (
                 <div className="field">
                   <label>type</label>
                   <select
@@ -1462,6 +1507,66 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     </div>
                   </div>
                 )}
+                {(hole.obstacles[selection.index].type === 'windmill' || hole.obstacles[selection.index].type === 'slidingGate' || hole.obstacles[selection.index].type === 'pendulum') && (
+                  <>
+                    {(['period', 'phase'] as const).map((k) => (
+                      <div className="field" key={k}>
+                        <label>{k}{k === 'phase' ? ' (rad)' : ' (s)'}</label>
+                        <input
+                          type="number"
+                          step={k === 'phase' ? 0.1 : 0.25}
+                          min={k === 'period' ? 0.25 : undefined}
+                          value={(hole.obstacles[selection.index] as unknown as Record<string, number>)[k]}
+                          onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as unknown as Record<string, number>)[k] = parseFloat(e.target.value) || 0))}
+                        />
+                      </div>
+                    ))}
+                    {hole.obstacles[selection.index].type === 'windmill' && (
+                      <>
+                        <div className="field">
+                          <label>blades</label>
+                          <input type="number" min={1} max={8} value={(hole.obstacles[selection.index] as { blades: number }).blades} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { blades: number }).blades = Math.max(1, parseInt(e.target.value, 10) || 1)))} />
+                        </div>
+                        <div className="field">
+                          <label>direction</label>
+                          <select value={(hole.obstacles[selection.index] as { direction: number }).direction} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { direction: 1 | -1 }).direction = (parseInt(e.target.value, 10) as 1 | -1)))}>
+                            <option value={1}>clockwise</option>
+                            <option value={-1}>counter-clockwise</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {hole.obstacles[selection.index].type === 'slidingGate' && (
+                      <>
+                        <div className="field">
+                          <label>axis</label>
+                          <select value={(hole.obstacles[selection.index] as { axis: string }).axis} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { axis: 'x' | 'y' }).axis = e.target.value as 'x' | 'y'))}>
+                            <option value="x">x (left–right)</option>
+                            <option value="y">y (up–down)</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>amplitude</label>
+                          <input type="number" step={0.5} min={0} value={(hole.obstacles[selection.index] as { amplitude: number }).amplitude} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { amplitude: number }).amplitude = parseFloat(e.target.value) || 0))} />
+                        </div>
+                        <div className="field">
+                          <label>look</label>
+                          <select value={(hole.obstacles[selection.index] as { look?: string }).look ?? 'gate'} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { look?: string }).look = e.target.value))}>
+                            <option value="gate">gate</option>
+                            <option value="piston">piston</option>
+                            <option value="luggage">luggage (steady)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    {hole.obstacles[selection.index].type === 'pendulum' && (
+                      <div className="field">
+                        <label>arc (rad)</label>
+                        <input type="number" step={0.1} min={0} value={(hole.obstacles[selection.index] as { arc: number }).arc} onChange={(e) => updateHole((h) => ((h.obstacles[selection.index] as { arc: number }).arc = parseFloat(e.target.value) || 0))} />
+                      </div>
+                    )}
+                  </>
+                )}
                 {hole.obstacles[selection.index].type === 'pipe' && (
                   <>
                     <div className="field">
@@ -1515,7 +1620,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     />
                   </div>
                 )}
-                {hole.obstacles[selection.index].type !== 'curb' && hole.obstacles[selection.index].type !== 'pipe' && (
+                {!['curb', 'pipe', 'windmill', 'slidingGate', 'pendulum'].includes(hole.obstacles[selection.index].type) && (
                   <div className="field">
                     <label>restitution</label>
                     <input

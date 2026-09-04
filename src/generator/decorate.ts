@@ -24,13 +24,16 @@ interface Budget {
 
 interface BudgetExt extends Budget {
   pipeChance: number;
+  /** Chance of at least one moving obstacle, and the max count (never more than 2, per the design doc). */
+  moverChance: number;
+  movers: [number, number];
 }
 
 /** Every difficulty places at least one obstacle. */
 const BUDGETS: Record<Difficulty, BudgetExt> = {
-  easy: { surfaces: [0, 2], slopes: [0, 1], maxGrade: 1, hazardChance: 0.4, hazards: [1, 1], obstacles: [1, 2], chamferChance: 0.3, pipeChance: 0.1 },
-  medium: { surfaces: [1, 2], slopes: [0, 2], maxGrade: 2, hazardChance: 0.8, hazards: [1, 2], obstacles: [2, 3], chamferChance: 0.4, pipeChance: 0.25 },
-  hard: { surfaces: [1, 3], slopes: [1, 2], maxGrade: 3, hazardChance: 1, hazards: [1, 2], obstacles: [3, 5], chamferChance: 0.5, pipeChance: 0.35 },
+  easy: { surfaces: [0, 2], slopes: [0, 1], maxGrade: 1, hazardChance: 0.4, hazards: [1, 1], obstacles: [1, 2], chamferChance: 0.3, pipeChance: 0.1, moverChance: 0.25, movers: [1, 1] },
+  medium: { surfaces: [1, 2], slopes: [0, 2], maxGrade: 2, hazardChance: 0.8, hazards: [1, 2], obstacles: [2, 3], chamferChance: 0.4, pipeChance: 0.25, moverChance: 0.6, movers: [1, 1] },
+  hard: { surfaces: [1, 3], slopes: [1, 2], maxGrade: 3, hazardChance: 1, hazards: [1, 2], obstacles: [3, 5], chamferChance: 0.5, pipeChance: 0.35, moverChance: 0.85, movers: [1, 2] },
 };
 
 /** The static obstacle catalogue the generator composes from. */
@@ -89,7 +92,7 @@ function overlaps(a: Placed['bbox'], b: Placed['bbox'], pad = 0.5): boolean {
   return !(a.maxX + pad < b.minX || b.maxX + pad < a.minX || a.maxY + pad < b.minY || b.maxY + pad < a.minY);
 }
 
-export function decorate(hole: Hole, sk: Skeleton, rng: Rng, difficulty: Difficulty): void {
+export function decorate(hole: Hole, sk: Skeleton, rng: Rng, difficulty: Difficulty, themeId?: string): void {
   const budget = BUDGETS[difficulty];
   const placed: Placed['bbox'][] = [];
   const clearOf = (pts: Point[], teeGap = 4, cupGap = 3.5): boolean => {
@@ -174,6 +177,22 @@ export function decorate(hole: Hole, sk: Skeleton, rng: Rng, difficulty: Difficu
           resetTo: type === 'pit' ? 'tee' : type === 'overflow' ? 'entry' : 'lastSafe',
         });
         accept(poly);
+        break;
+      }
+    }
+  }
+
+  // --- moving obstacles (timed; at most two per hole)
+  if (rng.chance(budget.moverChance)) {
+    const n = rng.int(budget.movers[0], budget.movers[1]);
+    for (let i = 0; i < n; i++) {
+      for (let tries = 0; tries < 24; tries++) {
+        const lane = pickLane();
+        const made = makeMover(lane, rng, themeId);
+        if (!made) continue;
+        if (!clearOf(made.footprint, 4, 4)) continue;
+        hole.obstacles.push(...made.obstacles);
+        accept(made.footprint);
         break;
       }
     }
@@ -281,6 +300,75 @@ export function ensureObstacle(hole: Hole, sk: Skeleton, rng: Rng, placed: Place
     placed.push(bb);
     return;
   }
+}
+
+function makeMover(lane: { cell: Polygon; inner: { x: number; y: number; w: number; h: number } }, rng: Rng, themeId?: string): Made | null {
+  const r = lane.inner;
+  const tall = r.h >= r.w;
+  const across = tall ? r.w : r.h;
+  const along = tall ? r.h : r.w;
+  if (across < 6.5 || along < 5) return null;
+  const t = rng.range(0.3, 0.7);
+  const cx = tall ? r.x + r.w / 2 : r.x + t * r.w;
+  const cy = tall ? r.y + t * r.h : r.y + r.h / 2;
+  const kind = rng.pick(['windmill', 'windmill', 'windmill', 'gate', 'piston', 'pendulum', 'luggage'] as const);
+  const period = rng.range(2.5, 4.5);
+  const phase = rng.range(0, Math.PI * 2);
+  if (kind === 'windmill') {
+    const rad = Math.min(3.2, across / 2 - 1.6);
+    if (rad < 1.4) return null;
+    const blades = rng.pick([2, 3, 3, 4]);
+    return {
+      obstacles: [{ type: 'windmill', shape: { kind: 'circle', x: round2(cx), y: round2(cy), r: round2(rad) }, blades, period: round2(period), phase: round2(phase), direction: rng.sign() as 1 | -1 }],
+      footprint: [
+        { x: cx - rad, y: cy - rad },
+        { x: cx + rad, y: cy + rad },
+      ],
+    };
+  }
+  if (kind === 'pendulum') {
+    const arm = Math.min(5, across * 0.45);
+    if (arm < 2.5) return null;
+    // pivot at the lane's edge so the weight swings across the lane
+    const px = tall ? r.x + 0.4 : cx;
+    const py = tall ? cy : r.y + 0.4;
+    const ang = tall ? -Math.PI / 2 : 0; // arm direction handled by the sim (hangs +y); rotate lane
+    void ang;
+    if (!tall) {
+      return {
+        obstacles: [{ type: 'pendulum', shape: { kind: 'circle', x: round2(px), y: round2(py), r: round2(arm) }, arc: round2(rng.range(0.6, 1.1)), period: round2(period), phase: round2(phase) }],
+        footprint: [
+          { x: px - arm, y: py },
+          { x: px + arm, y: py + arm },
+        ],
+      };
+    }
+    // tall lanes: hang from the top of a short sub-rect instead
+    const py2 = r.y + t * r.h - arm * 0.6;
+    if (py2 < r.y + 0.5) return null;
+    return {
+      obstacles: [{ type: 'pendulum', shape: { kind: 'circle', x: round2(cx), y: round2(py2), r: round2(Math.min(arm, across / 2 - 1.2)) }, arc: round2(rng.range(0.7, 1.2)), period: round2(period), phase: round2(phase) }],
+      footprint: [
+        { x: cx - arm, y: py2 },
+        { x: cx + arm, y: py2 + arm },
+      ],
+    };
+  }
+  // Sliding block across the lane. Sized so a ball (diameter 1) always fits past it:
+  // gate/luggage keep >= 1.6 units on both sides, a piston keeps >= 0.55 * lane on its open side.
+  const look = kind === 'luggage' || themeId === 'airport' ? 'luggage' : kind === 'piston' ? 'piston' : 'gate';
+  const thick = look === 'luggage' ? 1.6 : 1.2;
+  const len = look === 'piston' ? across * 0.5 : Math.max(2, across * 0.3);
+  const amp = look === 'piston' ? across * 0.3 : (across - len) / 2 - 1.6;
+  if (amp < 0.8) return null;
+  const shape = tall
+    ? { kind: 'rect' as const, x: round2(cx - len / 2), y: round2(cy - thick / 2), w: round2(len), h: thick }
+    : { kind: 'rect' as const, x: round2(cx - thick / 2), y: round2(cy - len / 2), w: thick, h: round2(len) };
+  const axis = tall ? 'x' : 'y';
+  return {
+    obstacles: [{ type: 'slidingGate', shape, axis, amplitude: round2(amp), period: round2(look === 'luggage' ? period * 1.4 : period), phase: round2(phase), look }],
+    footprint: tall ? rect(r.x, cy - thick, r.w, thick * 2) : rect(cx - thick, r.y, thick * 2, r.h),
+  };
 }
 
 interface Made {

@@ -3,7 +3,7 @@
  * always reads as that hazard. World units.
  */
 
-import type { Hazard, Hole, Obstacle, Polygon, SlopeZone, SurfaceZone, Wall } from '../sim/types';
+import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, SurfaceZone, Wall } from '../sim/types';
 import { compassVector } from '../sim/geometry';
 import { OUTLINE, type Theme } from './themes';
 import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, polygonCentroid, roundRectPath, roundedPolygonPath, hashString } from './shapes';
@@ -693,6 +693,146 @@ export function drawWallGlow(ctx: CanvasRenderingContext2D, walls: Wall[], color
     ctx.lineTo(w.b.x, w.b.y);
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+const TWO_PI = Math.PI * 2;
+
+/** Moving obstacles at a clock value. Drawn per frame, on top of the static layer. */
+export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, clock: number): void {
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  if (o.type === 'windmill') {
+    const s = o.shape;
+    const ang = o.phase + ((o.direction * TWO_PI) / o.period) * clock;
+    const bw = o.bladeWidth ?? 0.7;
+    dropShadow(ctx, s.x, s.y, s.r * 0.9, s.r * 0.7);
+    for (let k = 0; k < o.blades; k++) {
+      const a = ang + (k * TWO_PI) / o.blades;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(a);
+      roundRectPath(ctx, 0, -bw / 2, s.r, bw, bw * 0.4);
+      chunky(ctx, k % 2 === 0 ? '#ff6f3c' : '#ffd166', 0.22);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      roundRectPath(ctx, s.r * 0.15, -bw / 2 + 0.12, s.r * 0.7, bw * 0.3, 0.1);
+      ctx.fill();
+      ctx.restore();
+    }
+    circle(ctx, s.x, s.y, Math.max(0.5, bw * 0.9));
+    chunky(ctx, '#eef2f5', 0.22);
+    circle(ctx, s.x, s.y, 0.18);
+    ctx.fillStyle = OUTLINE;
+    ctx.fill();
+  } else if (o.type === 'slidingGate') {
+    const s = o.shape;
+    let off: number;
+    if (o.look === 'luggage') {
+      const u = (((clock / o.period + o.phase / TWO_PI) % 1) + 1) % 1;
+      off = o.amplitude * (u < 0.5 ? u * 4 - 1 : 3 - u * 4);
+    } else off = o.amplitude * Math.sin((TWO_PI * clock) / o.period + o.phase);
+    const x = s.x + (o.axis === 'x' ? off : 0);
+    const y = s.y + (o.axis === 'y' ? off : 0);
+    // rail
+    ctx.save();
+    ctx.setLineDash([0.4, 0.4]);
+    ctx.strokeStyle = 'rgba(31,42,68,0.45)';
+    ctx.lineWidth = 0.16;
+    ctx.beginPath();
+    if (o.axis === 'x') {
+      ctx.moveTo(s.x - o.amplitude, s.y + s.h / 2);
+      ctx.lineTo(s.x + s.w + o.amplitude, s.y + s.h / 2);
+    } else {
+      ctx.moveTo(s.x + s.w / 2, s.y - o.amplitude);
+      ctx.lineTo(s.x + s.w / 2, s.y + s.h + o.amplitude);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = OUTLINE;
+    roundRectPath(ctx, x + 0.3, y + 0.9, s.w, s.h, 0.4);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(0, 0.5);
+    roundRectPath(ctx, x, y, s.w, s.h, 0.4);
+    chunky(ctx, o.look === 'luggage' ? '#8a2e3b' : COLORS.blockerShade, 0.22);
+    ctx.restore();
+    roundRectPath(ctx, x, y, s.w, s.h, 0.4);
+    if (o.look === 'luggage') {
+      chunky(ctx, '#e63946', 0.22);
+      // handle + strap
+      const hx = x + s.w / 2;
+      roundRectPath(ctx, hx - Math.min(1.2, s.w * 0.2), y - 0.5, Math.min(2.4, s.w * 0.4), 0.5, 0.2);
+      chunky(ctx, OUTLINE, 0.1);
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 0.12;
+      ctx.beginPath();
+      ctx.moveTo(x + s.w * 0.3, y);
+      ctx.lineTo(x + s.w * 0.3, y + s.h);
+      ctx.moveTo(x + s.w * 0.7, y);
+      ctx.lineTo(x + s.w * 0.7, y + s.h);
+      ctx.stroke();
+    } else if (o.look === 'piston') {
+      chunky(ctx, '#9fb0bd', 0.22);
+      ctx.fillStyle = '#ffd166';
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 0.14;
+      for (let k = 0.2; k < 1; k += 0.3) {
+        ctx.beginPath();
+        if (o.axis === 'x') {
+          ctx.moveTo(x + s.w * k, y + 0.2);
+          ctx.lineTo(x + s.w * k, y + s.h - 0.2);
+        } else {
+          ctx.moveTo(x + 0.2, y + s.h * k);
+          ctx.lineTo(x + s.w - 0.2, y + s.h * k);
+        }
+        ctx.stroke();
+      }
+    } else {
+      chunky(ctx, COLORS.blocker, 0.22);
+      ctx.fillStyle = '#ffd166';
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      for (let d = x - s.h; d < x + s.w; d += 1.4) {
+        ctx.moveTo(Math.max(x, d), y + Math.max(0, x - d));
+        ctx.lineTo(Math.min(x + s.w, d + s.h), y + s.h - Math.max(0, d + s.h - x - s.w));
+      }
+      ctx.stroke();
+    }
+  } else {
+    const s = o.shape;
+    const th = (TWO_PI * clock) / o.period + o.phase;
+    const theta = o.arc * Math.sin(th);
+    const ang = Math.PI / 2 + theta;
+    const bx = s.x + Math.cos(ang) * s.r;
+    const by = s.y + Math.sin(ang) * s.r;
+    const br = o.bobRadius ?? 0.9;
+    // pivot plate
+    circle(ctx, s.x, s.y, 0.55);
+    chunky(ctx, '#9fb0bd', 0.18);
+    // arm
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 0.74;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.strokeStyle = '#d9a066';
+    ctx.lineWidth = 0.42;
+    ctx.stroke();
+    // weight: a plunger head
+    dropShadow(ctx, bx, by, br, br * 0.8);
+    circle(ctx, bx, by, br);
+    chunky(ctx, COLORS.plunger, 0.22);
+    highlight(ctx, bx - br * 0.35, by - br * 0.35, br * 0.28, br * 0.2);
+    circle(ctx, s.x, s.y, 0.16);
+    ctx.fillStyle = OUTLINE;
+    ctx.fill();
+  }
   ctx.restore();
 }
 

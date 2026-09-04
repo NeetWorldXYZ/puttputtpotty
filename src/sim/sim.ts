@@ -13,7 +13,8 @@
 import type { Hole, Point, Stroke, SurfaceType } from './types';
 import type { PhysicsParams } from './params';
 import { FIXED_DT, cupRadius, powerToSpeed } from './params';
-import type { World, CircleCollider, SegmentCollider } from './world';
+import type { World, CircleCollider, SegmentCollider, DynamicColliders } from './world';
+import { movingColliders, surfaceVelocity } from './world';
 import {
   EPS,
   closestPointOnSegment,
@@ -66,6 +67,12 @@ export interface SimState {
   cupCooldown: number;
   /** Seconds during which pipes are ignored (after coming out of one). */
   pipeCooldown: number;
+  /**
+   * Obstacle clock, seconds. Advances with every step; the play view also
+   * advances it in real time while the ball rests so movers keep moving
+   * while you aim. A stroke records it at launch so replays match.
+   */
+  clock: number;
   /** mulberry32 state. */
   rng: number;
   /** Strokes taken so far, for replay. */
@@ -90,6 +97,7 @@ export function createSimState(hole: Hole, seed: number): SimState {
     lowSpeedTime: 0,
     cupCooldown: 0,
     pipeCooldown: 0,
+    clock: 0,
     rng: seed >>> 0,
     strokeHistory: [],
     events: [],
@@ -127,6 +135,7 @@ export function applyStroke(state: SimState, params: PhysicsParams, stroke: Stro
   if (speed <= 0) return false;
   state.ball.vx = Math.cos(stroke.angle) * speed;
   state.ball.vy = Math.sin(stroke.angle) * speed;
+  if (stroke.t !== undefined) state.clock = stroke.t;
   state.lastSafe = { x: state.ball.x, y: state.ball.y };
   state.strokes += 1;
   state.strokeTime = 0;
@@ -134,7 +143,7 @@ export function applyStroke(state: SimState, params: PhysicsParams, stroke: Stro
   state.cupCooldown = 0;
   state.pipeCooldown = 0;
   state.resting = false;
-  state.strokeHistory.push({ angle: stroke.angle, power: stroke.power });
+  state.strokeHistory.push(stroke.t !== undefined ? { angle: stroke.angle, power: stroke.power, t: stroke.t } : { angle: stroke.angle, power: stroke.power, t: state.clock });
   state.events = [];
   return true;
 }
@@ -215,7 +224,12 @@ interface HitAcc {
   ny: number;
   e: number;
   kind: string;
+  /** Surface velocity of the collider at the contact (0 for static). */
+  svx: number;
+  svy: number;
 }
+
+const NO_DYN: DynamicColliders = { segments: [], circles: [] };
 
 /**
  * Moves the ball for `dt` seconds with continuous collision detection.
@@ -223,7 +237,7 @@ interface HitAcc {
  * starting with the position before the move, so callers can test the
  * whole swept route against the cup and hazards.
  */
-function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, path: number[]): void {
+function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, path: number[], dyn: DynamicColliders): void {
   const b = state.ball;
   const r = p.ballRadius;
   let remaining = dt;
@@ -255,9 +269,9 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
       if (h.t < tMin - TOI_GROUP_EPS) {
         tMin = h.t;
         hits.length = 0;
-        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: s.kind });
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: s.kind, svx: 0, svy: 0 });
       } else if (h.t <= tMin + TOI_GROUP_EPS) {
-        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: s.kind });
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: s.kind, svx: 0, svy: 0 });
       }
     }
     for (const c of world.circles) {
@@ -268,9 +282,34 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
       if (h.t < tMin - TOI_GROUP_EPS) {
         tMin = h.t;
         hits.length = 0;
-        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: c.kind });
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: c.kind, svx: 0, svy: 0 });
       } else if (h.t <= tMin + TOI_GROUP_EPS) {
-        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: c.kind });
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: c.kind, svx: 0, svy: 0 });
+      }
+    }
+    // Moving colliders: swept in the ball's frame relative to the surface motion.
+    for (const s of dyn.segments) {
+      const sv = surfaceVelocity(s, b.x, b.y);
+      const h = sweepCircleSegment(b.x, b.y, b.vx - sv.x, b.vy - sv.y, r, s.ax, s.ay, s.bx, s.by, remaining);
+      if (!h) continue;
+      if (h.t < tMin - TOI_GROUP_EPS) {
+        tMin = h.t;
+        hits.length = 0;
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: 'mover', svx: sv.x, svy: sv.y });
+      } else if (h.t <= tMin + TOI_GROUP_EPS) {
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(s, p), kind: 'mover', svx: sv.x, svy: sv.y });
+      }
+    }
+    for (const c of dyn.circles) {
+      const sv = surfaceVelocity(c, b.x, b.y);
+      const h = sweepCirclePoint(b.x, b.y, b.vx - sv.x, b.vy - sv.y, r + c.r, c.x, c.y, remaining);
+      if (!h) continue;
+      if (h.t < tMin - TOI_GROUP_EPS) {
+        tMin = h.t;
+        hits.length = 0;
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: 'mover', svx: sv.x, svy: sv.y });
+      } else if (h.t <= tMin + TOI_GROUP_EPS) {
+        hits.push({ nx: h.nx, ny: h.ny, e: restitutionOf(c, p), kind: 'mover', svx: sv.x, svy: sv.y });
       }
     }
 
@@ -292,6 +331,8 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
     let ny = 0;
     let e = 0;
     let kind = hits[0].kind;
+    let svx = 0;
+    let svy = 0;
     for (const h of hits) {
       nx += h.nx;
       ny += h.ny;
@@ -299,6 +340,8 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
         e = h.e;
         kind = h.kind;
       }
+      svx += h.svx / hits.length;
+      svy += h.svy / hits.length;
     }
     const nl = len(nx, ny);
     if (nl < EPS) {
@@ -309,16 +352,19 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
       ny /= nl;
     }
 
-    const vn = b.vx * nx + b.vy * ny;
+    // Reflect in the surface's frame so a moving blade transfers its motion.
+    const rvx = b.vx - svx;
+    const rvy = b.vy - svy;
+    const vn = rvx * nx + rvy * ny;
     if (vn < 0) {
-      const speedBefore = len(b.vx, b.vy);
-      if (-vn < MIN_BOUNCE_SPEED) {
+      const speedBefore = len(rvx, rvy);
+      if (-vn < MIN_BOUNCE_SPEED && kind !== 'mover') {
         // Too slow to bounce: remove the normal component (slide).
         b.vx -= vn * nx;
         b.vy -= vn * ny;
       } else {
-        b.vx -= (1 + e) * vn * nx;
-        b.vy -= (1 + e) * vn * ny;
+        b.vx = rvx - (1 + e) * vn * nx + svx;
+        b.vy = rvy - (1 + e) * vn * ny + svy;
         state.events.push({ type: 'bounce', x: b.x, y: b.y, nx, ny, speed: speedBefore, kind });
       }
     }
@@ -328,12 +374,63 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
     path.push(b.x, b.y);
   }
 
-  resolveOverlaps(b, world, r, p);
+  resolveOverlaps(b, world, r, p, dyn);
 }
 
 /** Static push-out for any residual penetration (belt and braces). */
-function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams): void {
+function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams, dyn: DynamicColliders): void {
   const speed = len(b.vx, b.vy);
+  // Moving colliders can sweep into a slow ball between steps: push out and shove.
+  for (const s of dyn.segments) {
+    const c = closestPointOnSegment(b.x, b.y, s.ax, s.ay, s.bx, s.by);
+    let dx = b.x - c.x;
+    let dy = b.y - c.y;
+    const d = len(dx, dy);
+    if (d >= r - 1e-6) continue;
+    if (d < EPS) {
+      const sx = s.bx - s.ax;
+      const sy = s.by - s.ay;
+      const sl = len(sx, sy);
+      if (sl < EPS) continue;
+      dx = -sy / sl;
+      dy = sx / sl;
+    } else {
+      dx /= d;
+      dy /= d;
+    }
+    b.x += dx * (r - d + SKIN);
+    b.y += dy * (r - d + SKIN);
+    const sv = surfaceVelocity(s, b.x, b.y);
+    const svn = sv.x * dx + sv.y * dy;
+    const bn = b.vx * dx + b.vy * dy;
+    if (svn > bn) {
+      b.vx += (svn - bn) * dx;
+      b.vy += (svn - bn) * dy;
+    }
+  }
+  for (const c of dyn.circles) {
+    let dx = b.x - c.x;
+    let dy = b.y - c.y;
+    const d = len(dx, dy);
+    const min = r + c.r;
+    if (d >= min - 1e-6) continue;
+    if (d < EPS) {
+      dx = 1;
+      dy = 0;
+    } else {
+      dx /= d;
+      dy /= d;
+    }
+    b.x += dx * (min - d + SKIN);
+    b.y += dy * (min - d + SKIN);
+    const sv = surfaceVelocity(c, b.x, b.y);
+    const svn = sv.x * dx + sv.y * dy;
+    const bn = b.vx * dx + b.vy * dy;
+    if (svn > bn) {
+      b.vx += (svn - bn) * dx;
+      b.vy += (svn - bn) * dy;
+    }
+  }
   for (let pass = 0; pass < 2; pass++) {
     const bMinX = b.x - r;
     const bMaxX = b.x + r;
@@ -570,12 +667,14 @@ export function step(state: SimState, world: World, p: PhysicsParams): void {
   b.vx *= damp;
   b.vy *= damp;
 
-  // 4. Move with CCD.
+  // 4. Move with CCD (moving obstacles at this step's clock value).
   const path: number[] = [];
-  integrate(state, world, p, dt, path);
+  const dyn = world.moving.length ? movingColliders(world, state.clock) : NO_DYN;
+  integrate(state, world, p, dt, path, dyn);
 
   state.strokeTime += dt;
   state.totalTime += dt;
+  state.clock += dt;
   if (state.cupCooldown > 0) {
     state.cupCooldown -= dt;
     if (state.cupCooldown < 0) state.cupCooldown = 0;

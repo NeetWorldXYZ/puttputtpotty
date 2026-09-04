@@ -99,7 +99,7 @@ function assemble(seed: string, attempt: number, arche: Archetype, difficulty: D
     hazards: [],
     obstacles: [...sk.islands],
   };
-  if (decorated) decorate(hole, sk, rng, difficulty);
+  if (decorated) decorate(hole, sk, rng, difficulty, hole.theme);
   else ensureObstacle(hole, sk, rng);
   return hole;
 }

@@ -114,6 +114,29 @@ export function validateHole(input: unknown): { ok: boolean; errors: string[]; h
       }
       if ((oo.type === 'bumper' || oo.type === 'post' || oo.type === 'pipe') && s.kind !== 'circle')
         errors.push(`obstacles[${i}]: ${oo.type}s must be circles`);
+      const num = (k: string, min = -Infinity) => {
+        if (!isNum(oo[k]) || (oo[k] as number) < min) errors.push(`obstacles[${i}]: ${oo.type} needs numeric ${k}${min > -Infinity ? ` >= ${min}` : ''}`);
+      };
+      if (oo.type === 'windmill') {
+        if (s.kind !== 'circle') errors.push(`obstacles[${i}]: windmills must be circles`);
+        num('blades', 1);
+        num('period', 0.1);
+        num('phase');
+        if (oo.direction !== 1 && oo.direction !== -1) errors.push(`obstacles[${i}]: direction must be 1 or -1`);
+      }
+      if (oo.type === 'slidingGate') {
+        if (s.kind !== 'rect') errors.push(`obstacles[${i}]: sliding gates must be rects`);
+        if (oo.axis !== 'x' && oo.axis !== 'y') errors.push(`obstacles[${i}]: axis must be x or y`);
+        num('amplitude', 0);
+        num('period', 0.1);
+        num('phase');
+      }
+      if (oo.type === 'pendulum') {
+        if (s.kind !== 'circle') errors.push(`obstacles[${i}]: pendulums must be circles (pivot + arm length)`);
+        num('arc', 0);
+        num('period', 0.1);
+        num('phase');
+      }
       if (oo.type === 'pipe') {
         if (!isPoint(oo.exit)) errors.push(`obstacles[${i}]: pipe needs an exit point`);
         if (oo.mode !== 'keep' && oo.mode !== 'redirect') errors.push(`obstacles[${i}]: pipe mode must be keep or redirect`);

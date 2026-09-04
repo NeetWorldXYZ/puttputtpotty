@@ -6,6 +6,7 @@ import {
   createSimState,
   runUntilRest,
   step,
+  replay,
   type Hole,
   type PhysicsParams,
 } from '../src/sim';
@@ -242,5 +243,56 @@ describe('pipes', () => {
     expect(state.ball.y).toBeCloseTo(10, 1);
     expect(state.ball.vx).toBeGreaterThan(0);
     expect(Math.abs(state.ball.vy)).toBeLessThan(1e-9);
+  });
+});
+
+describe('moving obstacles', () => {
+  function windmillHole(): Hole {
+    const h = thinWallHole();
+    h.walls = [];
+    h.obstacles = [{ type: 'windmill', shape: { kind: 'circle', x: 15, y: 30, r: 4 }, blades: 2, period: 3, phase: 0, direction: 1 }];
+    return h;
+  }
+  it('the launch clock changes the outcome, and replays are exact', () => {
+    const hole = windmillHole();
+    const a1 = replay(hole, 1, [{ angle: -Math.PI / 2, power: 0.8, t: 0 }]);
+    const a2 = replay(hole, 1, [{ angle: -Math.PI / 2, power: 0.8, t: 0 }]);
+    const b = replay(hole, 1, [{ angle: -Math.PI / 2, power: 0.8, t: 0.75 }]);
+    expect(a1.state.ball).toEqual(a2.state.ball);
+    expect(Object.is(a1.state.ball.x, a2.state.ball.x)).toBe(true);
+    const moved = Math.hypot(a1.state.ball.x - b.state.ball.x, a1.state.ball.y - b.state.ball.y);
+    expect(moved).toBeGreaterThan(0.5);
+  });
+  it('a blade never traps the ball inside itself', () => {
+    const hole = windmillHole();
+    const world = compileHole(hole);
+    for (let k = 0; k < 12; k++) {
+      const s = createSimState(hole, k);
+      applyStroke(s, DEFAULT_PARAMS, { angle: -Math.PI / 2 + (k - 6) * 0.05, power: 0.3 + k * 0.05, t: k * 0.25 });
+      runUntilRest(s, world, DEFAULT_PARAMS);
+      // Rest position must be outside the hub and the ball must have stopped.
+      expect(Math.hypot(s.ball.x - 15, s.ball.y - 30)).toBeGreaterThan(0.8);
+      expect(s.resting).toBe(true);
+    }
+  });
+  it('sliding gates and pendulums simulate without leaving bounds', () => {
+    const hole = thinWallHole();
+    hole.walls = [];
+    hole.obstacles = [
+      { type: 'slidingGate', shape: { kind: 'rect', x: 11, y: 24, w: 8, h: 1.2 }, axis: 'x', amplitude: 5, period: 2.5, phase: 0, look: 'luggage' },
+      { type: 'pendulum', shape: { kind: 'circle', x: 15, y: 10, r: 6 }, arc: 1.0, period: 2, phase: 0.5 },
+    ];
+    const world = compileHole(hole);
+    for (let k = 0; k < 10; k++) {
+      const s = createSimState(hole, k);
+      applyStroke(s, DEFAULT_PARAMS, { angle: -Math.PI / 2 + (k - 5) * 0.08, power: 1, t: k * 0.3 });
+      while (!s.resting && !s.done) {
+        step(s, world, DEFAULT_PARAMS);
+        expect(s.ball.x).toBeGreaterThanOrEqual(0);
+        expect(s.ball.x).toBeLessThanOrEqual(30);
+        expect(s.ball.y).toBeGreaterThanOrEqual(0);
+        expect(s.ball.y).toBeLessThanOrEqual(60);
+      }
+    }
   });
 });

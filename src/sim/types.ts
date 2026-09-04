@@ -162,30 +162,82 @@ export interface PipeObstacle {
   exitAngle?: number;
 }
 
+/**
+ * Moving obstacles. All run on the simulation's obstacle clock: `period`
+ * seconds per cycle and `phase` (radians) so every player sees the same
+ * motion for the same clock value.
+ */
+
+/** Blades rotate about the centre; `shape.r` is the blade length. */
+export interface WindmillObstacle {
+  type: 'windmill';
+  shape: { kind: 'circle'; x: number; y: number; r: number };
+  blades: number;
+  period: number;
+  phase: number;
+  /** 1 = clockwise on screen (y-down), -1 = counter-clockwise. */
+  direction: 1 | -1;
+  bladeWidth?: number;
+  restitution?: number;
+}
+
+/**
+ * A block that slides back and forth along an axis: sinusoidal for
+ * 'gate' and 'piston', a steady ping-pong for 'luggage'. `shape` is the
+ * block at its centre position.
+ */
+export interface SlidingObstacle {
+  type: 'slidingGate';
+  shape: { kind: 'rect'; x: number; y: number; w: number; h: number };
+  axis: 'x' | 'y';
+  amplitude: number;
+  period: number;
+  phase: number;
+  look?: 'gate' | 'piston' | 'luggage';
+  restitution?: number;
+}
+
+/** An arm swinging from a pivot (`shape.x/y`), `shape.r` long, with a weight on the end. */
+export interface PendulumObstacle {
+  type: 'pendulum';
+  shape: { kind: 'circle'; x: number; y: number; r: number };
+  /** Half swing width, radians. */
+  arc: number;
+  period: number;
+  phase: number;
+  bobRadius?: number;
+  restitution?: number;
+}
+
+export type MovingObstacle = WindmillObstacle | SlidingObstacle | PendulumObstacle;
+
 /** Reserved for later phases. Declared so the JSON format is forward compatible. */
 export interface FutureObstacle {
-  type:
-    | 'gate'
-    | 'rail'
-    | 'backboard'
-    | 'windmill'
-    | 'slidingGate'
-    | 'pendulum'
-    | 'piston'
-    | 'rotatingPlatform'
-    | 'flipper'
-    | 'whirlpool'
-    | 'roller'
-    | 'plungerBumper';
+  type: 'gate' | 'rail' | 'backboard' | 'rotatingPlatform' | 'flipper' | 'whirlpool' | 'roller' | 'plungerBumper';
   shape: ObstacleShape;
   /** Free-form per-type parameters (period, phase, speed...). */
   params?: Record<string, number | string | boolean>;
 }
 
-export type Obstacle = BlockerObstacle | BumperObstacle | PostObstacle | DeadWallObstacle | CurbObstacle | PipeObstacle | FutureObstacle;
+export type Obstacle =
+  | BlockerObstacle
+  | BumperObstacle
+  | PostObstacle
+  | DeadWallObstacle
+  | CurbObstacle
+  | PipeObstacle
+  | WindmillObstacle
+  | SlidingObstacle
+  | PendulumObstacle
+  | FutureObstacle;
 
 /** Obstacle types the simulation actually collides with. */
-export const SIMULATED_OBSTACLE_TYPES: readonly string[] = ['blocker', 'bumper', 'post', 'deadWall', 'curb', 'pipe'] as const;
+export const SIMULATED_OBSTACLE_TYPES: readonly string[] = ['blocker', 'bumper', 'post', 'deadWall', 'curb', 'pipe', 'windmill', 'slidingGate', 'pendulum'] as const;
+export const MOVING_OBSTACLE_TYPES: readonly string[] = ['windmill', 'slidingGate', 'pendulum'] as const;
+
+export function isMoving(o: Obstacle): o is MovingObstacle {
+  return o.type === 'windmill' || o.type === 'slidingGate' || o.type === 'pendulum';
+}
 
 export interface Hole {
   /** Format version, bump on breaking changes. */
@@ -206,10 +258,15 @@ export interface Hole {
   obstacles: Obstacle[];
 }
 
-/** A stroke, as recorded for replay. Angle in radians (y-down), power in [0, 1]. */
+/**
+ * A stroke, as recorded for replay. Angle in radians (y-down), power in
+ * [0, 1]. `t` is the obstacle clock (seconds) at launch; omit it on holes
+ * without moving obstacles.
+ */
 export interface Stroke {
   angle: number;
   power: number;
+  t?: number;
 }
 
 export function emptyHole(id = 'untitled'): Hole {

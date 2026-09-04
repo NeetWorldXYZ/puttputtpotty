@@ -7,6 +7,7 @@
  */
 
 import type { Hole } from '../sim/types';
+import { isMoving } from '../sim/types';
 import type { Camera } from './camera';
 import { themeById, OUTLINE, type Theme } from './themes';
 import { drawFloor, drawSurround } from './floors';
@@ -18,6 +19,7 @@ import {
   drawBall,
   drawCup,
   drawHazard,
+  drawMover,
   drawObstacle,
   drawSlopeZone,
   drawSurfaceZone,
@@ -54,6 +56,8 @@ export interface DrawOptions {
   dpr?: number;
   /** Seconds, for animated environment bits. Omit for a still frame. */
   time?: number;
+  /** Obstacle clock for moving obstacles (defaults to `time`, else 0). */
+  clock?: number;
   /** Hide the static ball drawn by callers (e.g. during the sink animation). */
   extra?: (ctx: CanvasRenderingContext2D) => void;
 }
@@ -153,7 +157,9 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   ctx.restore();
 
   drawTee(ctx, hole.tee.x, hole.tee.y, ballR);
-  hole.obstacles.forEach((o, i) => drawObstacle(ctx, o, seed + 31 * i));
+  hole.obstacles.forEach((o, i) => {
+    if (!isMoving(o)) drawObstacle(ctx, o, seed + 31 * i);
+  });
   drawCup(ctx, hole.cup.x, hole.cup.y, cupR, 0);
   drawWalls(ctx, hole.walls, theme);
 
@@ -221,6 +227,8 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
   if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
+  const clock = o.clock ?? o.time ?? 0;
+  for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
   if (o.trail && o.trail.length >= 4) drawTrail(ctx, o.trail, 0.55, 0.22);
   if (o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);

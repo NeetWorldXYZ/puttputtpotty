@@ -263,11 +263,31 @@ Wheel zooms, Alt‑drag or middle‑drag pans.
 without an SPA fallback use `/#/editor` instead, which the router also
 accepts.
 
+## Moving obstacles
+
+`windmill` (rotating blades), `slidingGate` (a block sliding along an
+axis, drawn as a gate, piston or airport luggage) and `pendulum` (a
+swinging plunger). All run on the simulation's **obstacle clock**
+(`state.clock`): `period` seconds per cycle and a `phase` offset, so the
+motion is identical for everyone. The clock advances with every physics
+step and, in the play view, in real time while the ball rests, so movers
+keep moving while you aim. **A stroke records the clock at launch** (`t`
+in the stroke), which is what keeps replays exact: the same hole, seed and
+strokes (with their launch times) reproduce the same result bit for bit.
+
+Collision against a mover is swept in the surface's frame and the
+surface velocity is added back after the bounce, so a blade smacks the
+ball in the direction it is turning. A ball that a blade sweeps into is
+pushed out and shoved along. The solver treats launch timing as part of
+the shot (random `t` within the longest period), so it finds timing lines
+and rejects holes a mover makes unfair. The generator places at most two
+timed obstacles per hole (per the design doc) and sizes them so a ball
+always fits past.
+
 ## Out of scope in this phase
 
-Backend, auth, database, GPS, generator, solver, moving obstacles,
-tiers, daily course, practice mode, leaderboards, thrones, seasons,
-accounts, notifications, sound, art.
+Backend, auth, database, GPS, elevation tiers, leaderboards, thrones,
+seasons, accounts, notifications.
 
 ## Solver
 
