@@ -44,11 +44,19 @@ tests/          determinism.test.ts, tunneling.test.ts
   failing to sink in 8 scores par + 4.
 - Holes that fit the screen are shown whole; longer holes follow the ball
   with a minimap in the corner.
-- `⚙` opens the dev panel: every physics constant as a live slider,
-  input options (drag direction, drag distance, aim line length), hole
-  jump buttons, and a "copy strokes JSON" button that exports the current
-  hole's `{seed, strokes}` for replay.
+- `⚙` opens the dev panel: course switching (handmade / random / today's
+  daily), every physics constant as a live slider, input options (drag
+  direction, drag distance, aim line length), hole jump buttons, and a
+  "copy strokes JSON" button that exports the current hole's
+  `{seed, strokes}` for replay.
 - `✎` opens the editor.
+
+### Courses
+
+- `/` plays the three handmade holes.
+- `/?seed=anything` generates a 9-hole course from that seed (see
+  **Generator** below). Same seed, same course, on every device.
+- The daily course is just `/?seed=YYYY-MM-DD` (UTC date).
 
 ## Hole JSON format
 
@@ -99,12 +107,16 @@ Notes:
   `tests/tunneling.test.ts`.
 - **Surface zones** change friction (multipliers on base friction, all
   tunable in the dev panel). `sticky` stops the ball dead on entry.
-- **Obstacles.** Phase 1 simulates `blocker` (rect or circle, plain wall)
-  and `bumper` (circle, restitution 1.15 by default). The other obstacle
-  type names from the design doc (`gate`, `post`, `pipe`, `windmill`, ...)
-  are accepted by the schema so files written later still validate, but
-  the sim ignores them and the renderer draws them as a grey outline.
-  Their per-type settings go in a free-form `params` object.
+- **Obstacles.** Shapes are `rect`, `circle` or `polygon` (any outline).
+  Simulated types: `blocker` (plain wall island), `bumper` (circle,
+  restitution 1.15), `post` (circle, same physics as a blocker), `deadWall`
+  (restitution 0.2), `curb` (a low wall: the ball bounces off it below the
+  curb jump speed, 25 u/s by default, and passes over it when faster; keep
+  curbs thin). The moving/complex type names from the design doc (`gate`,
+  `pipe`, `windmill`, ...) are accepted by the schema so files written
+  later still validate, but the sim ignores them and the renderer draws
+  them as a grey outline. Their per-type settings go in a free-form
+  `params` object.
 - The full schema is in `schema/hole.schema.json`;
   `src/sim/validate.ts` is the runtime equivalent used by the editor's
   importer.
@@ -268,3 +280,52 @@ plays find the cup < 3 %, every solution takes a penalty, any trap.
 
 A solve takes 0.3–1.5 s per hole, which is fast enough for a generator
 to throw away candidates freely.
+
+## Generator
+
+`src/generator/` turns a seed into a solver-approved hole, or nine of
+them.
+
+```bash
+npm run generate                             # one hole per archetype
+npm run generate -- --seed abc --count 30 --out generated/
+npm run generate -- --course 2026-09-04      # a 9-hole course
+```
+
+In the editor, the **Generate** section builds a hole from a seed with
+an optional archetype and difficulty, loads it, and shows its solver
+report. In the game, `/?seed=...` plays a generated course and the dev
+panel has Random / Daily buttons.
+
+How a hole is built:
+
+1. **Archetype** (14): straight, L-bend, dogleg, S-curve, Z-fold, split
+   path, fork-and-merge, loop-around, chamber, funnel, bottleneck,
+   switchback, cross, ring. Each is a small function that lays out the
+   playable area as convex *cells* (rectangles, angled beams, trapezoids,
+   mitred corner joints) in a 30-unit-wide portrait playfield, plus tee,
+   cup, and any island the archetype needs. Length, corridor width,
+   turn direction, bend angle and island shape are rolled from the seed
+   within the ranges in the design doc.
+2. **Walls** are the boundary of the union of those cells
+   (`unionWalls`), so archetypes never have to place walls by hand.
+3. **Decoration**, by difficulty budget: surface zones (tile / shag /
+   wet / sand / small sticky patches), slope zones, hazards that never
+   cover more than ~55 % of a lane, chamfer triangles in corners, and
+   obstacles from a catalogue of composable pieces: post, post row, post
+   triangle, bumper, bumper pair, bar, dead bar, diamond, triangle,
+   hexagon, curb strip, gate, offset gate, pillar pair. Everything keeps
+   clear of the tee and cup.
+4. **Validation**: schema check, then the solver. A hole is accepted when
+   it passes every reject rule and its par lands in the difficulty's
+   range (easy 2–3, medium 3–4, hard 3–5). Up to 10 decorated attempts,
+   then undecorated fallbacks. `fallback` is reported so you can see when
+   an archetype is struggling.
+
+A **course** is 9 holes with the difficulty curve from the design doc
+(easy, easy, medium ×4, hard, hard, medium — hardest never last) and 9
+distinct archetypes, ~10–20 s to generate in the browser's worker.
+
+Adding variety is mostly adding to lists: a new obstacle in
+`decorate.ts`'s catalogue, a new archetype function in `archetypes.ts`
+(return cells + tee + cup + spine and the walls come for free).

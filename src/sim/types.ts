@@ -105,30 +105,55 @@ export interface Hazard {
  */
 export type ObstacleShape =
   | { kind: 'rect'; x: number; y: number; w: number; h: number }
-  | { kind: 'circle'; x: number; y: number; r: number };
+  | { kind: 'circle'; x: number; y: number; r: number }
+  | { kind: 'polygon'; points: Point[] };
 
+/** Plain wall island, any shape. */
 export interface BlockerObstacle {
   type: 'blocker';
   shape: ObstacleShape;
   restitution?: number;
 }
 
+/** High-restitution circle; adds energy. */
 export interface BumperObstacle {
   type: 'bumper';
-  /** Bumpers are always circular. */
   shape: { kind: 'circle'; x: number; y: number; r: number };
   restitution?: number;
+}
+
+/** Small circular obstacle, punishing to clip. Same physics as a circle blocker. */
+export interface PostObstacle {
+  type: 'post';
+  shape: { kind: 'circle'; x: number; y: number; r: number };
+  restitution?: number;
+}
+
+/** Absorbs almost all energy on contact. */
+export interface DeadWallObstacle {
+  type: 'deadWall';
+  shape: ObstacleShape;
+  restitution?: number;
+}
+
+/**
+ * Low wall: stops the ball when it is slower than the curb jump speed,
+ * fast shots pass straight over. Keep curbs thin (a strip < ball diameter)
+ * so the ball can never come to rest inside one.
+ */
+export interface CurbObstacle {
+  type: 'curb';
+  shape: ObstacleShape;
+  /** Overrides the global curb jump speed. */
+  jumpSpeed?: number;
 }
 
 /** Reserved for later phases. Declared so the JSON format is forward compatible. */
 export interface FutureObstacle {
   type:
-    | 'deadWall'
     | 'gate'
-    | 'post'
     | 'pipe'
     | 'rail'
-    | 'curb'
     | 'backboard'
     | 'windmill'
     | 'slidingGate'
@@ -144,7 +169,10 @@ export interface FutureObstacle {
   params?: Record<string, number | string | boolean>;
 }
 
-export type Obstacle = BlockerObstacle | BumperObstacle | FutureObstacle;
+export type Obstacle = BlockerObstacle | BumperObstacle | PostObstacle | DeadWallObstacle | CurbObstacle | FutureObstacle;
+
+/** Obstacle types the simulation actually collides with. */
+export const SIMULATED_OBSTACLE_TYPES: readonly string[] = ['blocker', 'bumper', 'post', 'deadWall', 'curb'] as const;
 
 export interface Hole {
   /** Format version, bump on breaking changes. */

@@ -2,7 +2,7 @@
   "version": 1,
   "id": "02-l-bend",
   "name": "The Elbow",
-  "par": 3,
+  "par": 2,
   "bounds": { "x": 0, "y": 0, "w": 30, "h": 60 },
   "walls": [
     { "a": { "x": 17, "y": 56 }, "b": { "x": 17, "y": 18 } },

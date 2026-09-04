@@ -8,6 +8,7 @@ import { drawHole, drawMinimap, type AimOverlay } from '../render/drawHole';
 import { fitCamera, fitScale, followCamera, type Camera } from '../render/camera';
 import { useTuning } from './paramsStore';
 import { DevPanel } from './DevPanel';
+import { goToCourse, dailySeed } from './courses';
 
 interface Props {
   holes: Hole[];
@@ -15,6 +16,8 @@ interface Props {
   onExit?: () => void;
   exitLabel?: string;
   onOpenEditor?: () => void;
+  /** Seed of a generated course (null/undefined = handmade). */
+  courseSeed?: string | null;
 }
 
 interface Drag {
@@ -57,7 +60,7 @@ function relPar(n: number): string {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
-export function PlayView({ holes, onExit, exitLabel, onOpenEditor }: Props) {
+export function PlayView({ holes, onExit, exitLabel, onOpenEditor, courseSeed }: Props) {
   const tuning = useTuning();
   const { paramsRef, prefsRef } = tuning;
 
@@ -510,6 +513,8 @@ export function PlayView({ holes, onExit, exitLabel, onOpenEditor }: Props) {
             <button className="primary" onClick={restartCourse}>
               Play again
             </button>
+            {!onExit && <button onClick={() => goToCourse('random')}>New random course</button>}
+            {!onExit && courseSeed !== dailySeed() && <button onClick={() => goToCourse('daily')}>Today's daily course</button>}
             {onExit && <button onClick={onExit}>{exitLabel ?? 'Back'}</button>}
           </div>
         </div>
@@ -528,6 +533,7 @@ export function PlayView({ holes, onExit, exitLabel, onOpenEditor }: Props) {
           onJumpToHole={jumpToHole}
           strokeHistory={hud.strokeHistory}
           seed={seed}
+          courseSeed={onExit ? undefined : (courseSeed ?? null)}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { DEFAULT_PARAMS, PARAM_META, type PhysicsParams } from '../sim/params';
 import type { Stroke } from '../sim/types';
 import type { UiPrefs } from './paramsStore';
+import { goToCourse, dailySeed } from './courses';
 
 interface Props {
   params: PhysicsParams;
@@ -14,6 +15,8 @@ interface Props {
   onJumpToHole: (i: number) => void;
   strokeHistory: Stroke[];
   seed: number;
+  /** undefined = hide course switching (editor test play); null = handmade course. */
+  courseSeed?: string | null;
 }
 
 export function DevPanel(p: Props) {
@@ -28,6 +31,22 @@ export function DevPanel(p: Props) {
         <strong>Dev panel</strong>
         <button onClick={p.onClose}>✕</button>
       </div>
+
+      {p.courseSeed !== undefined && (
+        <>
+          <h3>Course</h3>
+          <div className="note">{p.courseSeed ? `Generated · seed ${p.courseSeed}` : 'Handmade test holes'}</div>
+          <div className="actions" style={{ flexWrap: 'wrap' }}>
+            <button onClick={() => goToCourse('random')}>Random course</button>
+            <button onClick={() => goToCourse('daily')} disabled={p.courseSeed === dailySeed()}>
+              Daily {dailySeed()}
+            </button>
+            <button onClick={() => goToCourse('handmade')} disabled={p.courseSeed === null}>
+              Handmade
+            </button>
+          </div>
+        </>
+      )}
 
       <h3>Holes</h3>
       <div className="actions" style={{ flexWrap: 'wrap' }}>

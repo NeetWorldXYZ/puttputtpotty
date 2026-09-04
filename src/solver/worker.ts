@@ -2,20 +2,27 @@
 import type { Hole } from '../sim/types';
 import type { PhysicsParams } from '../sim/params';
 import { solveHole, type SolveOptions } from './solver';
+import { generateCourse, generateHole, type GenerateOptions } from '../generator/generator';
 
-export interface SolveRequest {
-  id: number;
-  hole: Hole;
-  params: PhysicsParams;
-  options?: Partial<SolveOptions>;
-}
+export type WorkerRequest =
+  | { kind: 'solve'; id: number; hole: Hole; params: PhysicsParams; options?: Partial<SolveOptions> }
+  | { kind: 'generate'; id: number; options: GenerateOptions }
+  | { kind: 'course'; id: number; seed: string; count?: number; params: PhysicsParams };
 
-self.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { id, hole, params, options } = e.data;
+const post = (m: unknown) => (self as unknown as Worker).postMessage(m);
+
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  const req = e.data;
   try {
-    const report = solveHole(hole, params, options);
-    (self as unknown as Worker).postMessage({ id, report });
+    if (req.kind === 'solve') {
+      post({ id: req.id, report: solveHole(req.hole, req.params, req.options) });
+    } else if (req.kind === 'generate') {
+      post({ id: req.id, generated: generateHole(req.options) });
+    } else {
+      const course = generateCourse(req.seed, req.count ?? 9, req.params, (i, g) => post({ id: req.id, progress: i + 1, hole: g.hole }));
+      post({ id: req.id, course });
+    }
   } catch (err) {
-    (self as unknown as Worker).postMessage({ id, error: (err as Error).message });
+    post({ id: req.id, error: (err as Error).message });
   }
 };

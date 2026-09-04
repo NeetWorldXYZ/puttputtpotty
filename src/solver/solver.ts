@@ -152,14 +152,37 @@ function greedyRun(ctx: Ctx, hole: Hole, seed: number, candidates: number): Solv
   };
 }
 
+/** Distance from the cup to the nearest real corner: a wall endpoint where the wall direction changes. */
 function nearestCornerDistance(hole: Hole): number {
-  let best = Infinity;
   const pts: { x: number; y: number }[] = [];
-  for (const w of hole.walls) pts.push(w.a, w.b);
+  const key = (p: { x: number; y: number }) => `${Math.round(p.x * 1000)},${Math.round(p.y * 1000)}`;
+  const touching = new Map<string, { x: number; y: number; dirs: { x: number; y: number }[] }>();
+  for (const w of hole.walls) {
+    const l = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y) || 1;
+    const d = { x: (w.b.x - w.a.x) / l, y: (w.b.y - w.a.y) / l };
+    for (const [p, dir] of [
+      [w.a, d],
+      [w.b, { x: -d.x, y: -d.y }],
+    ] as const) {
+      const k = key(p);
+      const e = touching.get(k) ?? { x: p.x, y: p.y, dirs: [] };
+      e.dirs.push(dir);
+      touching.set(k, e);
+    }
+  }
+  for (const e of touching.values()) {
+    if (e.dirs.length === 2) {
+      const dot = e.dirs[0].x * e.dirs[1].x + e.dirs[0].y * e.dirs[1].y;
+      if (dot < -0.999) continue; // straight continuation, not a corner
+    }
+    pts.push({ x: e.x, y: e.y });
+  }
   for (const o of hole.obstacles) {
     const s = o.shape;
     if (s.kind === 'rect') pts.push({ x: s.x, y: s.y }, { x: s.x + s.w, y: s.y }, { x: s.x, y: s.y + s.h }, { x: s.x + s.w, y: s.y + s.h });
+    else if (s.kind === 'polygon') pts.push(...s.points);
   }
+  let best = Infinity;
   for (const p of pts) {
     const d = Math.hypot(p.x - hole.cup.x, p.y - hole.cup.y);
     if (d < best) best = d;

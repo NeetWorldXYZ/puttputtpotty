@@ -167,31 +167,57 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   // Obstacles.
   for (const ob of hole.obstacles) {
     const s = ob.shape;
-    const isBumper = ob.type === 'bumper';
-    const implemented = ob.type === 'blocker' || isBumper;
-    ctx.lineWidth = Math.max(2, S * 0.18);
+    const t = ob.type;
+    const implemented = t === 'blocker' || t === 'bumper' || t === 'post' || t === 'deadWall' || t === 'curb';
+    let fill: string = PALETTE.blocker;
+    let stroke: string = PALETTE.blockerEdge;
+    let lw = Math.max(2, S * 0.18);
+    if (t === 'bumper') {
+      fill = PALETTE.bumper;
+      stroke = PALETTE.bumperEdge;
+    } else if (t === 'post') {
+      fill = PALETTE.blockerEdge;
+      stroke = PALETTE.blockerEdge;
+    } else if (t === 'deadWall') {
+      fill = PALETTE.deadWall;
+      stroke = PALETTE.wallDead;
+      lw = Math.max(2, S * 0.28);
+    } else if (t === 'curb') {
+      fill = PALETTE.curb;
+      stroke = PALETTE.curbEdge;
+      lw = Math.max(1, S * 0.08);
+    } else if (!implemented) {
+      fill = 'transparent';
+      stroke = PALETTE.textDim;
+    }
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lw;
+    ctx.save();
+    if (t === 'curb') ctx.setLineDash([S * 0.35, S * 0.25]);
     if (s.kind === 'rect') {
-      ctx.fillStyle = implemented ? PALETTE.blocker : 'transparent';
-      ctx.strokeStyle = implemented ? PALETTE.blockerEdge : PALETTE.textDim;
       ctx.fillRect(s.x * S + cam.ox, s.y * S + cam.oy, s.w * S, s.h * S);
       ctx.strokeRect(s.x * S + cam.ox, s.y * S + cam.oy, s.w * S, s.h * S);
-    } else {
+    } else if (s.kind === 'circle') {
       ctx.beginPath();
       ctx.arc(s.x * S + cam.ox, s.y * S + cam.oy, s.r * S, 0, Math.PI * 2);
-      ctx.fillStyle = isBumper ? PALETTE.bumper : implemented ? PALETTE.blocker : 'transparent';
-      ctx.strokeStyle = isBumper ? PALETTE.bumperEdge : implemented ? PALETTE.blockerEdge : PALETTE.textDim;
       ctx.fill();
       ctx.stroke();
-      if (isBumper) {
+      if (t === 'bumper') {
         ctx.beginPath();
         ctx.arc(s.x * S + cam.ox, s.y * S + cam.oy, s.r * S * 0.45, 0, Math.PI * 2);
         ctx.fillStyle = PALETTE.bumperEdge;
         ctx.fill();
       }
+    } else {
+      tracePolygon(ctx, cam, s.points);
+      ctx.fill();
+      ctx.stroke();
     }
+    ctx.restore();
     if (o.zoneLabels && !implemented) {
-      const cx = s.kind === 'rect' ? s.x + s.w / 2 : s.x;
-      const cy = s.kind === 'rect' ? s.y + s.h / 2 : s.y;
+      const cx = s.kind === 'rect' ? s.x + s.w / 2 : s.kind === 'circle' ? s.x : polygonCentroid(s.points).x;
+      const cy = s.kind === 'rect' ? s.y + s.h / 2 : s.kind === 'circle' ? s.y : polygonCentroid(s.points).y;
       drawLabel(ctx, cam, [{ x: cx, y: cy }], ob.type);
     }
   }
@@ -338,9 +364,14 @@ export function drawMinimap(
     const sh = ob.shape;
     ctx.fillStyle = ob.type === 'bumper' ? PALETTE.bumper : PALETTE.blocker;
     if (sh.kind === 'rect') ctx.fillRect(sh.x * s + ox, sh.y * s + oy, sh.w * s, sh.h * s);
-    else {
+    else if (sh.kind === 'circle') {
       ctx.beginPath();
       ctx.arc(sh.x * s + ox, sh.y * s + oy, sh.r * s, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      sh.points.forEach((p, i) => (i ? ctx.lineTo(p.x * s + ox, p.y * s + oy) : ctx.moveTo(p.x * s + ox, p.y * s + oy)));
+      ctx.closePath();
       ctx.fill();
     }
   }

@@ -23,6 +23,10 @@ import { PALETTE } from '../render/palette';
 import { PlayView } from '../game/PlayView';
 import { useTuning } from '../game/paramsStore';
 import type { SolveReport } from '../solver/solver';
+import { ARCHETYPES, type Archetype } from '../generator/archetypes';
+import type { Difficulty } from '../generator/decorate';
+import type { GeneratedHole } from '../generator/generator';
+import { randomSeed } from '../game/courses';
 import { COURSE } from '../holes';
 import { downloadJson, loadAutosave, saveAutosave } from './storage';
 
@@ -36,6 +40,7 @@ type Tool =
   | 'hazard'
   | 'blockerRect'
   | 'blockerCircle'
+  | 'blockerPoly'
   | 'bumper';
 
 const TOOLS: { id: Tool; label: string; key: string }[] = [
@@ -48,8 +53,18 @@ const TOOLS: { id: Tool; label: string; key: string }[] = [
   { id: 'hazard', label: 'Hazard zone', key: 'H' },
   { id: 'blockerRect', label: 'Blocker (rect)', key: 'B' },
   { id: 'blockerCircle', label: 'Blocker (circle)', key: 'O' },
+  { id: 'blockerPoly', label: 'Blocker (polygon)', key: 'K' },
   { id: 'bumper', label: 'Bumper', key: 'U' },
 ];
+
+/** Obstacle types the editor can assign to a placed shape. */
+const SOLID_TYPES = ['blocker', 'deadWall', 'curb'] as const;
+const CIRCLE_TYPES = ['blocker', 'bumper', 'post', 'deadWall', 'curb'] as const;
+
+function shapeAnchor(s: Obstacle['shape']): Point {
+  if (s.kind === 'polygon') return s.points[0];
+  return { x: s.x, y: s.y };
+}
 
 type Selection =
   | { kind: 'wall'; index: number }
@@ -96,10 +111,8 @@ function handlePoint(h: Hole, hd: Handle): Point {
       return h.tee;
     case 'cup':
       return h.cup;
-    case 'obstacle': {
-      const s = h.obstacles[hd.index].shape;
-      return s.kind === 'rect' ? { x: s.x, y: s.y } : { x: s.x, y: s.y };
-    }
+    case 'obstacle':
+      return shapeAnchor(h.obstacles[hd.index].shape);
   }
 }
 
@@ -138,8 +151,14 @@ function moveHandle(h: Hole, hd: Handle, to: Point): void {
       break;
     case 'obstacle': {
       const s = h.obstacles[hd.index].shape;
-      s.x = to.x;
-      s.y = to.y;
+      if (s.kind === 'polygon') {
+        const dx = to.x - s.points[0].x;
+        const dy = to.y - s.points[0].y;
+        s.points = s.points.map((q) => ({ x: q.x + dx, y: q.y + dy }));
+      } else {
+        s.x = to.x;
+        s.y = to.y;
+      }
       break;
     }
   }
@@ -213,9 +232,25 @@ export function EditorView({ onExit }: { onExit: () => void }) {
     const id = ++solveIdRef.current;
     setSolving(true);
     setReportHoleJson(JSON.stringify(holeRef.current));
-    w.postMessage({ id, hole: holeRef.current, params: tuning.paramsRef.current });
+    w.postMessage({ kind: 'solve', id, hole: holeRef.current, params: tuning.paramsRef.current });
   }, [tuning.paramsRef]);
   const reportStale = report !== null && reportHoleJson !== JSON.stringify(hole);
+
+  // --- canvas + camera
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const sizeRef = useRef({ w: 800, h: 600, dpr: 1 });
+  const [cam, setCam] = useState<Camera>({ scale: 10, ox: 40, oy: 40 });
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  const dragRef = useRef<DragOp | null>(null);
+  const [, setTick] = useState(0);
+  const redraw = useCallback(() => setTick((t) => t + 1), []);
+
+  const fit = useCallback(() => {
+    const { w, h } = sizeRef.current;
+    setCam(fitCamera(holeRef.current.bounds, w, h, 40));
+  }, []);
 
   // --- undo/redo
   const undoRef = useRef<Hole[]>([]);
@@ -259,21 +294,47 @@ export function EditorView({ onExit }: { onExit: () => void }) {
     if (!jsonDirtyRef.current) setJsonText(JSON.stringify(hole, null, 2));
   }, [hole]);
 
-  // --- canvas + camera
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const sizeRef = useRef({ w: 800, h: 600, dpr: 1 });
-  const [cam, setCam] = useState<Camera>({ scale: 10, ox: 40, oy: 40 });
-  const camRef = useRef(cam);
-  camRef.current = cam;
-  const dragRef = useRef<DragOp | null>(null);
-  const [, setTick] = useState(0);
-  const redraw = useCallback(() => setTick((t) => t + 1), []);
+  // --- generator
+  const [genSeed, setGenSeed] = useState(() => randomSeed());
+  const [genArche, setGenArche] = useState<Archetype | 'any'>('any');
+  const [genDiff, setGenDiff] = useState<Difficulty | 'any'>('any');
+  const [generating, setGenerating] = useState(false);
+  const [genInfo, setGenInfo] = useState<string | null>(null);
+  const genIdRef = useRef(0);
+  const runGenerator = useCallback(() => {
+    const w = workerRef.current;
+    if (!w) return;
+    const id = 1_000_000 + ++genIdRef.current;
+    setGenerating(true);
+    const handler = (e: MessageEvent<{ id: number; generated?: GeneratedHole; error?: string }>) => {
+      if (e.data.id !== id) return;
+      w.removeEventListener('message', handler);
+      setGenerating(false);
+      if (e.data.generated) {
+        const g = e.data.generated;
+        commit(g.hole);
+        setSelection(null);
+        setDraft([]);
+        setReport(g.report);
+        setReportHoleJson(JSON.stringify(g.hole));
+        setGenInfo(`${g.archetype} · ${g.difficulty} · par ${g.hole.par} · ${g.attempts} attempt${g.attempts === 1 ? '' : 's'}${g.fallback ? ' · FALLBACK (undecorated)' : ''}`);
+        setTimeout(fit, 0);
+      } else setGenInfo(`error: ${e.data.error}`);
+    };
+    w.addEventListener('message', handler);
+    w.postMessage({
+      kind: 'generate',
+      id,
+      options: {
+        seed: genSeed,
+        archetype: genArche === 'any' ? undefined : genArche,
+        difficulty: genDiff === 'any' ? undefined : genDiff,
+        params: tuning.paramsRef.current,
+      },
+    });
+  }, [genSeed, genArche, genDiff, commit, fit, tuning.paramsRef]);
 
-  const fit = useCallback(() => {
-    const { w, h } = sizeRef.current;
-    setCam(fitCamera(holeRef.current.bounds, w, h, 40));
-  }, []);
+
 
   useEffect(() => {
     if (testing) return;
@@ -345,7 +406,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       const hit =
         s.kind === 'rect'
           ? p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h
-          : (p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= s.r * s.r;
+          : s.kind === 'circle'
+            ? (p.x - s.x) ** 2 + (p.y - s.y) ** 2 <= s.r * s.r
+            : pointInPolygon(p.x, p.y, s.points);
       if (hit) return { kind: 'obstacle', index: i };
     }
     for (let i = h.hazards.length - 1; i >= 0; i--) if (pointInPolygon(p.x, p.y, h.hazards[i].polygon)) return { kind: 'hazard', index: i };
@@ -369,6 +432,14 @@ export function EditorView({ onExit }: { onExit: () => void }) {
         for (let i = 0; i + 1 < pts.length; i++) h.walls.push({ a: pts[i], b: pts[i + 1] });
         if (close && pts.length >= 3) h.walls.push({ a: pts[pts.length - 1], b: pts[0] });
         commit(h);
+      } else if (tool === 'blockerPoly') {
+        if (pts.length < 3) {
+          setDraft([]);
+          return;
+        }
+        h.obstacles.push({ type: 'blocker', shape: { kind: 'polygon', points: pts } });
+        commit(h);
+        setSelection({ kind: 'obstacle', index: h.obstacles.length - 1 });
       } else if (tool === 'surface' || tool === 'slope' || tool === 'hazard') {
         if (pts.length < 3) {
           setDraft([]);
@@ -511,8 +582,8 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           };
           // store the grab offset in the draft-free way: remember the raw grab point via closure below
           grabOffsetRef.current = (() => {
-            const s = holeRef.current.obstacles[sel.index].shape;
-            return { x: raw.x - s.x, y: raw.y - s.y };
+            const a = shapeAnchor(holeRef.current.obstacles[sel.index].shape);
+            return { x: raw.x - a.x, y: raw.y - a.y };
           })();
         } else grabOffsetRef.current = null;
         return;
@@ -520,7 +591,8 @@ export function EditorView({ onExit }: { onExit: () => void }) {
       case 'wall':
       case 'surface':
       case 'slope':
-      case 'hazard': {
+      case 'hazard':
+      case 'blockerPoly': {
         if (draft.length >= 2) {
           const f = draft[0];
           const tol = pxToUnits(HANDLE_PX);
@@ -712,9 +784,14 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           } else if (selection.kind === 'obstacle' && hole.obstacles[selection.index]) {
             const s = hole.obstacles[selection.index].shape;
             if (s.kind === 'rect') c.strokeRect(s.x * S + cam.ox - 2, s.y * S + cam.oy - 2, s.w * S + 4, s.h * S + 4);
-            else {
+            else if (s.kind === 'circle') {
               c.beginPath();
               c.arc(s.x * S + cam.ox, s.y * S + cam.oy, s.r * S + 2, 0, Math.PI * 2);
+              c.stroke();
+            } else {
+              c.beginPath();
+              s.points.forEach((q, i) => (i ? c.lineTo(q.x * S + cam.ox, q.y * S + cam.oy) : c.moveTo(q.x * S + cam.ox, q.y * S + cam.oy)));
+              c.closePath();
               c.stroke();
             }
           } else if (selection.kind === 'tee' || selection.kind === 'cup') {
@@ -898,7 +975,7 @@ export function EditorView({ onExit }: { onExit: () => void }) {
     draft.length > 0
       ? tool === 'wall'
         ? `Wall: ${draft.length} pt · click first point or Enter/dbl-click to finish · Backspace removes last · Esc cancels`
-        : `Zone: ${draft.length} pt · click first point or Enter/dbl-click to close · Esc cancels`
+        : `${tool === 'blockerPoly' ? 'Blocker' : 'Zone'}: ${draft.length} pt · click first point or Enter/dbl-click to close · Esc cancels`
       : null;
 
   return (
@@ -1017,9 +1094,9 @@ export function EditorView({ onExit }: { onExit: () => void }) {
           </div>
         </div>
 
-        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle') && (
+        {(tool === 'surface' || tool === 'slope' || tool === 'hazard' || tool === 'bumper' || tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly') && (
           <>
-            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' ? 'blocker' : tool} defaults</h4>
+            <h4>New {tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'blockerPoly' ? 'blocker' : tool} defaults</h4>
             {tool === 'surface' && (
               <div className="field">
                 <label>surface</label>
@@ -1102,13 +1179,54 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                 </div>
               </>
             )}
-            {(tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'bumper') && (
+            {(tool === 'blockerRect' || tool === 'blockerCircle' || tool === 'bumper' || tool === 'blockerPoly') && (
               <div style={{ fontSize: 12, color: 'var(--dim)' }}>
-                Drag on the canvas to size it. Restitution is editable after placing (select it).
+                {tool === 'blockerPoly' ? 'Click points to outline it.' : 'Drag on the canvas to size it.'} Type (blocker / dead
+                wall / curb / post) and restitution are editable after placing (select it).
               </div>
             )}
           </>
         )}
+
+        <h4>Generate</h4>
+        <div className="field">
+          <label>seed</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input value={genSeed} onChange={(e) => setGenSeed(e.target.value)} />
+            <button style={{ padding: '4px 8px' }} onClick={() => setGenSeed(randomSeed())} title="new seed">
+              ⟳
+            </button>
+          </div>
+        </div>
+        <div className="field">
+          <label>archetype</label>
+          <select value={genArche} onChange={(e) => setGenArche(e.target.value as Archetype | 'any')}>
+            <option value="any">any</option>
+            {ARCHETYPES.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>difficulty</label>
+          <select value={genDiff} onChange={(e) => setGenDiff(e.target.value as Difficulty | 'any')}>
+            <option value="any">any</option>
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+          </select>
+        </div>
+        <div className="btnrow">
+          <button className="primary" onClick={runGenerator} disabled={generating || !genSeed.trim()}>
+            {generating ? 'Generating…' : '✦ Generate hole'}
+          </button>
+        </div>
+        {genInfo && <div className="ok" style={{ color: genInfo.startsWith('error') ? 'var(--danger)' : 'var(--good)' }}>{genInfo}</div>}
+        <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 6 }}>
+          Replaces the current hole (undo to get it back). Same seed + settings = same hole.
+        </div>
 
         <h4>Selection</h4>
         {!selection && <div style={{ color: 'var(--dim)', fontSize: 12 }}>Nothing selected. Use the Select tool.</div>}
@@ -1222,6 +1340,24 @@ export function EditorView({ onExit }: { onExit: () => void }) {
             )}
             {selection.kind === 'obstacle' && hole.obstacles[selection.index] && (
               <>
+                <div className="field">
+                  <label>type</label>
+                  <select
+                    value={hole.obstacles[selection.index].type}
+                    onChange={(e) =>
+                      updateHole((h) => {
+                        const o = h.obstacles[selection.index] as { type: string };
+                        o.type = e.target.value;
+                      })
+                    }
+                  >
+                    {(hole.obstacles[selection.index].shape.kind === 'circle' ? CIRCLE_TYPES : SOLID_TYPES).map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {hole.obstacles[selection.index].shape.kind === 'circle' && (
                   <div className="field">
                     <label>radius</label>
@@ -1268,7 +1404,26 @@ export function EditorView({ onExit }: { onExit: () => void }) {
                     </div>
                   </div>
                 )}
-                {(hole.obstacles[selection.index].type === 'blocker' || hole.obstacles[selection.index].type === 'bumper') && (
+                {hole.obstacles[selection.index].type === 'curb' && (
+                  <div className="field">
+                    <label>jump speed</label>
+                    <input
+                      type="number"
+                      step={1}
+                      min={1}
+                      placeholder="global"
+                      value={(hole.obstacles[selection.index] as { jumpSpeed?: number }).jumpSpeed ?? ''}
+                      onChange={(e) =>
+                        updateHole((h) => {
+                          const o = h.obstacles[selection.index] as { jumpSpeed?: number };
+                          if (e.target.value === '') delete o.jumpSpeed;
+                          else o.jumpSpeed = parseFloat(e.target.value);
+                        })
+                      }
+                    />
+                  </div>
+                )}
+                {hole.obstacles[selection.index].type !== 'curb' && (
                   <div className="field">
                     <label>restitution</label>
                     <input

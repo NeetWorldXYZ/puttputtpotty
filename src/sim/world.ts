@@ -3,10 +3,10 @@
  * function can iterate cheaply. The world is immutable after compile.
  */
 
-import type { Hole, Polygon, SurfaceType, Hazard, SlopeZone } from './types';
+import type { Hole, Polygon, SurfaceType, Hazard, SlopeZone, ObstacleShape } from './types';
 import { polygonBounds, compassVector } from './geometry';
 
-export type ColliderKind = 'wall' | 'bounds' | 'blocker' | 'bumper';
+export type ColliderKind = 'wall' | 'bounds' | 'blocker' | 'bumper' | 'post' | 'deadWall' | 'curb';
 
 export interface SegmentCollider {
   ax: number;
@@ -16,6 +16,8 @@ export interface SegmentCollider {
   kind: ColliderKind;
   /** Per-collider override; null means "use the global for this kind". */
   restitution: number | null;
+  /** Curbs only: speed above which the ball passes over. null = global. */
+  jumpSpeed: number | null;
 }
 
 export interface CircleCollider {
@@ -24,6 +26,7 @@ export interface CircleCollider {
   r: number;
   kind: ColliderKind;
   restitution: number | null;
+  jumpSpeed: number | null;
 }
 
 export interface ZoneAABB {
@@ -71,13 +74,37 @@ function rectSegments(
   h: number,
   kind: ColliderKind,
   restitution: number | null,
+  jumpSpeed: number | null = null,
 ): SegmentCollider[] {
   return [
-    { ax: x, ay: y, bx: x + w, by: y, kind, restitution },
-    { ax: x + w, ay: y, bx: x + w, by: y + h, kind, restitution },
-    { ax: x + w, ay: y + h, bx: x, by: y + h, kind, restitution },
-    { ax: x, ay: y + h, bx: x, by: y, kind, restitution },
+    { ax: x, ay: y, bx: x + w, by: y, kind, restitution, jumpSpeed },
+    { ax: x + w, ay: y, bx: x + w, by: y + h, kind, restitution, jumpSpeed },
+    { ax: x + w, ay: y + h, bx: x, by: y + h, kind, restitution, jumpSpeed },
+    { ax: x, ay: y + h, bx: x, by: y, kind, restitution, jumpSpeed },
   ];
+}
+
+function polygonSegments(pts: Polygon, kind: ColliderKind, restitution: number | null, jumpSpeed: number | null = null): SegmentCollider[] {
+  const out: SegmentCollider[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    out.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, kind, restitution, jumpSpeed });
+  }
+  return out;
+}
+
+function addShape(
+  segments: SegmentCollider[],
+  circles: CircleCollider[],
+  shape: ObstacleShape,
+  kind: ColliderKind,
+  restitution: number | null,
+  jumpSpeed: number | null = null,
+): void {
+  if (shape.kind === 'rect') segments.push(...rectSegments(shape.x, shape.y, shape.w, shape.h, kind, restitution, jumpSpeed));
+  else if (shape.kind === 'circle') circles.push({ x: shape.x, y: shape.y, r: shape.r, kind, restitution, jumpSpeed });
+  else if (shape.points.length >= 2) segments.push(...polygonSegments(shape.points, kind, restitution, jumpSpeed));
 }
 
 export function compileHole(hole: Hole): World {
@@ -96,22 +123,31 @@ export function compileHole(hole: Hole): World {
       by: w.b.y,
       kind: 'wall',
       restitution: w.restitution ?? null,
+      jumpSpeed: null,
     });
   }
 
   for (const o of hole.obstacles) {
-    if (o.type === 'blocker') {
-      const s = o.shape;
-      if (s.kind === 'rect') {
-        segments.push(...rectSegments(s.x, s.y, s.w, s.h, 'blocker', o.restitution ?? null));
-      } else {
-        circles.push({ x: s.x, y: s.y, r: s.r, kind: 'blocker', restitution: o.restitution ?? null });
-      }
-    } else if (o.type === 'bumper') {
-      const s = o.shape;
-      circles.push({ x: s.x, y: s.y, r: s.r, kind: 'bumper', restitution: o.restitution ?? null });
+    switch (o.type) {
+      case 'blocker':
+        addShape(segments, circles, o.shape, 'blocker', o.restitution ?? null);
+        break;
+      case 'bumper':
+        addShape(segments, circles, o.shape, 'bumper', o.restitution ?? null);
+        break;
+      case 'post':
+        addShape(segments, circles, o.shape, 'post', o.restitution ?? null);
+        break;
+      case 'deadWall':
+        addShape(segments, circles, o.shape, 'deadWall', o.restitution ?? null);
+        break;
+      case 'curb':
+        addShape(segments, circles, o.shape, 'curb', null, o.jumpSpeed ?? null);
+        break;
+      default:
+        // Reserved for later phases; ignored by the simulation.
+        break;
     }
-    // Other obstacle types are reserved for later phases and ignored here.
   }
 
   const surfaceZones: CompiledSurfaceZone[] = hole.surfaceZones.map((z) => ({

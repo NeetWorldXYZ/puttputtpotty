@@ -106,10 +106,13 @@ export function validateHole(input: unknown): { ok: boolean; errors: string[]; h
       } else if (s.kind === 'circle') {
         if (!isNum(s.x) || !isNum(s.y) || !isNum(s.r) || (s.r as number) <= 0)
           errors.push(`obstacles[${i}]: circle needs x,y,r>0`);
+      } else if (s.kind === 'polygon') {
+        checkPolygon(s.points, `obstacles[${i}].shape.points`, errors);
       } else {
         errors.push(`obstacles[${i}]: unknown shape kind ${String(s.kind)}`);
       }
-      if (oo.type === 'bumper' && s.kind !== 'circle') errors.push(`obstacles[${i}]: bumpers must be circles`);
+      if ((oo.type === 'bumper' || oo.type === 'post') && s.kind !== 'circle')
+        errors.push(`obstacles[${i}]: ${oo.type}s must be circles`);
     });
 
   return errors.length === 0 ? { ok: true, errors, hole: input as Hole } : { ok: false, errors };

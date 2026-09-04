@@ -194,7 +194,15 @@ const MIN_BOUNCE_SPEED = 0.75;
 
 function restitutionOf(c: SegmentCollider | CircleCollider, p: PhysicsParams): number {
   if (c.restitution !== null) return c.restitution;
-  return c.kind === 'bumper' ? p.bumperRestitution : p.wallRestitution;
+  if (c.kind === 'bumper') return p.bumperRestitution;
+  if (c.kind === 'deadWall') return p.deadWallRestitution;
+  return p.wallRestitution;
+}
+
+/** Curbs are skipped entirely while the ball is fast enough to jump them. */
+function skipCollider(c: SegmentCollider | CircleCollider, speed: number, p: PhysicsParams): boolean {
+  if (c.kind !== 'curb') return false;
+  return speed > (c.jumpSpeed ?? p.curbJumpSpeed);
 }
 
 interface HitAcc {
@@ -223,8 +231,10 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
 
     let tMin = Infinity;
     hits.length = 0;
+    const speedNow = len(b.vx, b.vy);
 
     for (const s of world.segments) {
+      if (skipCollider(s, speedNow, p)) continue;
       const h = sweepCircleSegment(b.x, b.y, b.vx, b.vy, r, s.ax, s.ay, s.bx, s.by, remaining);
       if (!h) continue;
       if (h.t < tMin - TOI_GROUP_EPS) {
@@ -236,6 +246,7 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
       }
     }
     for (const c of world.circles) {
+      if (skipCollider(c, speedNow, p)) continue;
       const h = sweepCirclePoint(b.x, b.y, b.vx, b.vy, r + c.r, c.x, c.y, remaining);
       if (!h) continue;
       if (h.t < tMin - TOI_GROUP_EPS) {
@@ -301,13 +312,15 @@ function integrate(state: SimState, world: World, p: PhysicsParams, dt: number, 
     path.push(b.x, b.y);
   }
 
-  resolveOverlaps(b, world, r);
+  resolveOverlaps(b, world, r, p);
 }
 
 /** Static push-out for any residual penetration (belt and braces). */
-function resolveOverlaps(b: Ball, world: World, r: number): void {
+function resolveOverlaps(b: Ball, world: World, r: number, p: PhysicsParams): void {
+  const speed = len(b.vx, b.vy);
   for (let pass = 0; pass < 2; pass++) {
     for (const s of world.segments) {
+      if (skipCollider(s, speed, p)) continue;
       const c = closestPointOnSegment(b.x, b.y, s.ax, s.ay, s.bx, s.by);
       let dx = b.x - c.x;
       let dy = b.y - c.y;
@@ -330,6 +343,7 @@ function resolveOverlaps(b: Ball, world: World, r: number): void {
       b.y += dy * push;
     }
     for (const c of world.circles) {
+      if (skipCollider(c, speed, p)) continue;
       let dx = b.x - c.x;
       let dy = b.y - c.y;
       const d = len(dx, dy);

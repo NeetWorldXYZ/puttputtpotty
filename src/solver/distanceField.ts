@@ -47,7 +47,7 @@ export function buildDistanceField(world: World, ballRadius: number, cell = 0.5)
       let ok = x - ballRadius >= b.x && x + ballRadius <= b.x + b.w && y - ballRadius >= b.y && y + ballRadius <= b.y + b.h;
       if (ok) {
         for (const s of world.segments) {
-          if (s.kind === 'bounds') continue;
+          if (s.kind === 'bounds' || s.kind === 'curb') continue;
           if (distSqPointSegment(x, y, s.ax, s.ay, s.bx, s.by) < r2) {
             ok = false;
             break;
@@ -56,6 +56,7 @@ export function buildDistanceField(world: World, ballRadius: number, cell = 0.5)
       }
       if (ok) {
         for (const c of world.circles) {
+          if (c.kind === 'curb') continue;
           const dx = x - c.x;
           const dy = y - c.y;
           const m = block + c.r;
@@ -65,12 +66,18 @@ export function buildDistanceField(world: World, ballRadius: number, cell = 0.5)
           }
         }
       }
-      // Inside a closed rect blocker but not near its edge: also blocked.
+      // Inside a solid obstacle but not near its edge: also blocked.
       if (ok) {
         for (const o of hole.obstacles) {
-          if (o.type !== 'blocker' || o.shape.kind !== 'rect') continue;
+          if (o.type !== 'blocker' && o.type !== 'deadWall') continue;
           const s = o.shape;
-          if (x > s.x && x < s.x + s.w && y > s.y && y < s.y + s.h) {
+          const inside =
+            s.kind === 'rect'
+              ? x > s.x && x < s.x + s.w && y > s.y && y < s.y + s.h
+              : s.kind === 'polygon'
+                ? pointInPolygon(x, y, s.points)
+                : false;
+          if (inside) {
             ok = false;
             break;
           }
