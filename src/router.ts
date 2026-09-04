@@ -1,8 +1,7 @@
 /**
- * Minimal path router: `/` and `/editor`, plus an optional `?seed=` query
- * that selects a generated course. Uses history.pushState so the URLs are
- * real paths (Vite's dev server and any SPA-fallback host serve them).
- * Also accepts `#/editor` for static hosts without a fallback.
+ * Minimal path router: `/` (title), `/?course=handmade`, `/?seed=xyz` and
+ * `/editor`. Uses history.pushState so the URLs are real paths; `#/editor`
+ * also works on static hosts without an SPA fallback.
  */
 
 import { useEffect, useState } from 'react';
@@ -11,23 +10,30 @@ export type Route = 'play' | 'editor';
 
 export interface Location {
   route: Route;
-  /** Generated-course seed, or null for the handmade course. */
+  /** Generated-course seed, or null. */
   seed: string | null;
+  /** Named course ('handmade'), or null. */
+  course: string | null;
 }
 
 function read(): Location {
   const p = window.location.pathname.replace(/\/+$/, '');
   const h = window.location.hash;
   const route: Route = p.endsWith('/editor') || h === '#/editor' || h === '#editor' ? 'editor' : 'play';
-  const seed = new URLSearchParams(window.location.search).get('seed');
-  return { route, seed: seed && seed.trim() ? seed.trim() : null };
+  const q = new URLSearchParams(window.location.search);
+  const seed = q.get('seed');
+  const course = q.get('course');
+  return { route, seed: seed && seed.trim() ? seed.trim() : null, course: course && course.trim() ? course.trim() : null };
 }
 
-export function navigate(route: Route, seed: string | null = null): void {
+export function navigate(route: Route, seed: string | null = null, course: string | null = null): void {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
   const path = route === 'editor' ? `${base}/editor` : `${base}/`;
-  const q = seed ? `?seed=${encodeURIComponent(seed)}` : '';
-  window.history.pushState(null, '', path + q);
+  const q = new URLSearchParams();
+  if (seed) q.set('seed', seed);
+  if (course) q.set('course', course);
+  const qs = q.toString();
+  window.history.pushState(null, '', path + (qs ? `?${qs}` : ''));
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

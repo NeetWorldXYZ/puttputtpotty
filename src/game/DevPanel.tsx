@@ -44,6 +44,7 @@ export function DevPanel(p: Props) {
             <button onClick={() => goToCourse('handmade')} disabled={p.courseSeed === null}>
               Handmade
             </button>
+            <button onClick={() => goToCourse('title')}>Title screen</button>
           </div>
         </>
       )}

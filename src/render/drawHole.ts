@@ -10,8 +10,8 @@ import type { Hole } from '../sim/types';
 import type { Camera } from './camera';
 import { themeById, OUTLINE, type Theme } from './themes';
 import { drawFloor, drawSurround } from './floors';
-import { drawDecal, drawProp, placeDecals, placeProps } from './props';
-import { traceRegion, wallLoops } from './region';
+import { ANIMATED_KINDS, drawDecal, drawProp, drawPropAnimated, placeDecals, placeProps, type PropPlacement } from './props';
+import { traceRegion, wallLoops, type Region } from './region';
 import {
   COLORS,
   drawAim,
@@ -24,6 +24,7 @@ import {
   drawTee,
   drawTrail,
   drawWalls,
+  drawWallGlow,
   hazardSeed,
   holeSeed,
 } from './objects';
@@ -51,6 +52,10 @@ export interface DrawOptions {
   overlay?: (ctx: CanvasRenderingContext2D) => void;
   /** Device pixel ratio the target context is scaled by (for bitmap resolution). */
   dpr?: number;
+  /** Seconds, for animated environment bits. Omit for a still frame. */
+  time?: number;
+  /** Hide the static ball drawn by callers (e.g. during the sink animation). */
+  extra?: (ctx: CanvasRenderingContext2D) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +65,8 @@ interface StaticLayer {
   canvas: HTMLCanvasElement | OffscreenCanvas;
   ppu: number;
   key: string;
+  animated: PropPlacement[];
+  region: Region;
 }
 
 const layerCache = new Map<string, StaticLayer>();
@@ -97,8 +104,8 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
   ctx.setTransform(ppu, 0, 0, ppu, -b.x * ppu, -b.y * ppu);
-  paintStatic(ctx, hole, cupR, ballR);
-  const layer = { canvas, ppu, key };
+  const { animated, region } = paintStatic(ctx, hole, cupR, ballR);
+  const layer: StaticLayer = { canvas, ppu, key, animated, region };
   // Small LRU.
   if (layerCache.size > 6) {
     const first = layerCache.keys().next().value;
@@ -108,15 +115,20 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   return layer;
 }
 
-function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): void {
+function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): { animated: PropPlacement[]; region: Region } {
   const theme: Theme = themeById(hole.theme);
   const b = hole.bounds;
   const seed = holeSeed(hole);
   const region = wallLoops(hole);
 
-  // Out of play area + props.
+  // Out of play area + props (animated ones are drawn per frame instead).
   drawSurround(ctx, b, theme);
-  for (const p of placeProps(hole, region, theme)) drawProp(ctx, p);
+  const props = placeProps(hole, region, theme);
+  const animated: PropPlacement[] = [];
+  for (const p of props) {
+    if (ANIMATED_KINDS.includes(p.kind)) animated.push(p);
+    else drawProp(ctx, p);
+  }
 
   // Floor inside the playable region.
   ctx.save();
@@ -127,12 +139,59 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   hole.surfaceZones.forEach((z, i) => drawSurfaceZone(ctx, z, seed + i * 7));
   hole.slopeZones.forEach((z) => drawSlopeZone(ctx, z));
   hole.hazards.forEach((h, i) => drawHazard(ctx, h, hazardSeed(h, i)));
+  // Ambient occlusion along the walls: the floor darkens where it meets a pipe.
+  if (!region.fallback) {
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = 'round';
+    traceRegion(ctx, region);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 
   drawTee(ctx, hole.tee.x, hole.tee.y, ballR);
   hole.obstacles.forEach((o, i) => drawObstacle(ctx, o, seed + 31 * i));
   drawCup(ctx, hole.cup.x, hole.cup.y, cupR, 0);
   drawWalls(ctx, hole.walls, theme);
+
+  // Spotlight vignette over the whole bounds.
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const rMax = Math.hypot(b.w, b.h) * 0.62;
+  const grad = ctx.createRadialGradient(cx, cy, rMax * 0.45, cx, cy, rMax);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.38)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  return { animated, region };
+}
+
+/** Per-frame environment life: animated props, water ripples, neon flicker. */
+function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLayer, theme: Theme, t: number): void {
+  for (const p of layer.animated) drawPropAnimated(ctx, p, t);
+  // Water hazards ripple.
+  for (const h of hole.hazards) {
+    if (h.type !== 'water' && h.type !== 'overflow') continue;
+    const c = polygonCentroid(h.polygon);
+    ctx.save();
+    ctx.strokeStyle = '#ffffff';
+    for (let k = 0; k < 2; k++) {
+      const ph = ((t * 0.45 + k * 0.5) % 1);
+      ctx.globalAlpha = (1 - ph) * 0.55;
+      ctx.lineWidth = 0.12;
+      ctx.beginPath();
+      ctx.ellipse(c.x - 1.2, c.y + 0.9, 0.3 + ph * 2.2, 0.16 + ph * 1.1, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (theme.pipe.style === 'neon') {
+    const flick = Math.sin(t * 15) * Math.sin(t * 2.3) > 0.9 ? 0.05 : 0.16 + 0.06 * Math.sin(t * 6);
+    drawWallGlow(ctx, hole.walls, theme.pipe.fill, flick);
+  }
 }
 
 /** Drop cached bitmaps (e.g. after editing). Cheap to call. */
@@ -161,11 +220,13 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.save();
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
+  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
   if (o.trail && o.trail.length >= 4) drawTrail(ctx, o.trail, 0.55, 0.22);
   if (o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
   if (o.aim) drawAim(ctx, o.aim.x, o.aim.y, o.aim.dx, o.aim.dy, o.aim.lengthUnits * (0.25 + 0.75 * o.aim.power), o.aim.cancelling);
   if (o.ball) drawBall(ctx, o.ball.x, o.ball.y, o.ballRadius);
+  if (o.extra) o.extra(ctx);
 
   if (o.zoneLabels) {
     const label = (text: string, x: number, y: number) => {

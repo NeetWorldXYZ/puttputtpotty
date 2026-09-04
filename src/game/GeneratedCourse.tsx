@@ -94,7 +94,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
                 Try another seed
               </button>
             )}
-            <button onClick={() => goToCourse('handmade')}>Handmade course instead</button>
+            <button onClick={() => goToCourse('title')}>Back to title</button>
           </div>
         </div>
       </div>

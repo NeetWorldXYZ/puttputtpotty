@@ -338,11 +338,20 @@ function shapePath(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
 
 function shapeShadow(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
   ctx.save();
-  ctx.globalAlpha = 0.22;
+  ctx.globalAlpha = 0.25;
   ctx.fillStyle = OUTLINE;
-  ctx.translate(0.2, 0.32);
+  ctx.translate(0.3, 0.95);
   shapePath(ctx, s);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Raised block: a darker side face below the top face. */
+function shapeSide(ctx: CanvasRenderingContext2D, s: Obstacle['shape'], color: string): void {
+  ctx.save();
+  ctx.translate(0, 0.55);
+  shapePath(ctx, s);
+  chunky(ctx, color, 0.24);
   ctx.restore();
 }
 
@@ -351,6 +360,7 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
   switch (o.type) {
     case 'blocker': {
       shapeShadow(ctx, s);
+      shapeSide(ctx, s, COLORS.blockerShade);
       shapePath(ctx, s);
       chunky(ctx, COLORS.blocker, 0.24);
       // top highlight band
@@ -367,6 +377,7 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
     }
     case 'deadWall': {
       shapeShadow(ctx, s);
+      shapeSide(ctx, s, COLORS.deadWallDot);
       shapePath(ctx, s);
       chunky(ctx, COLORS.deadWall, 0.24);
       ctx.save();
@@ -571,12 +582,24 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: Wall[], theme: T
       ctx.lineTo(w.b.x, w.b.y);
     }
   };
-  // shadow
+  // contact shadow
   ctx.save();
-  ctx.translate(0.2, 0.35);
-  ctx.globalAlpha = 0.25;
+  ctx.translate(0.3, 0.9);
+  ctx.globalAlpha = 0.28;
   ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = W + 0.3;
+  ctx.lineWidth = W + 0.5;
+  path();
+  ctx.stroke();
+  ctx.restore();
+  // extruded side (the pipe sits above the floor)
+  ctx.save();
+  ctx.translate(0, 0.55);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = W + 0.48;
+  path();
+  ctx.stroke();
+  ctx.strokeStyle = p.shade;
+  ctx.lineWidth = W;
   path();
   ctx.stroke();
   ctx.restore();
@@ -654,6 +677,23 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: Wall[], theme: T
     ctx.stroke();
     ctx.restore();
   }
+}
+
+/** Per-frame glow pass for neon pipes (flicker). */
+export function drawWallGlow(ctx: CanvasRenderingContext2D, walls: Wall[], color: string, alpha: number): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (const w of walls) {
+    ctx.moveTo(w.a.x, w.a.y);
+    ctx.lineTo(w.b.x, w.b.y);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {

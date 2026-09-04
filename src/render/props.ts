@@ -93,6 +93,150 @@ export function placeDecals(hole: Hole, region: Region, theme: Theme): DecalPlac
   return out;
 }
 
+/** Props that move; they are skipped in the static layer and drawn every frame. */
+export const ANIMATED_KINDS: readonly PropKind[] = ['neonSign', 'star', 'torch', 'crowd', 'waterfall', 'sensor', 'sinkPuddle', 'droplet'];
+
+export function drawPropAnimated(ctx: CanvasRenderingContext2D, p: PropPlacement, t: number): void {
+  const ph = (p.seed % 1000) / 1000;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  switch (p.kind) {
+    case 'star': {
+      const a = 0.45 + 0.55 * Math.abs(Math.sin(t * 2.2 + ph * 9));
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#ffffff';
+      const r = 0.12 + ph * 0.16 + 0.05 * Math.sin(t * 5 + ph * 7);
+      circle(ctx, 0, 0, r);
+      ctx.fill();
+      if (ph > 0.7) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.06;
+        ctx.beginPath();
+        ctx.moveTo(-r * 3, 0);
+        ctx.lineTo(r * 3, 0);
+        ctx.moveTo(0, -r * 3);
+        ctx.lineTo(0, r * 3);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'neonSign': {
+      const flick = Math.sin(t * 17 + ph * 20) * Math.sin(t * 3.1 + ph) > 0.85 ? 0.25 : 1;
+      ctx.rotate((ph - 0.5) * 0.3);
+      roundRectPath(ctx, -1.8, -0.7, 3.6, 1.4, 0.4);
+      chunky(ctx, '#1a1226', 0.14);
+      ctx.save();
+      ctx.globalAlpha = flick;
+      ctx.shadowColor = '#ff3fa4';
+      ctx.shadowBlur = 8;
+      label(ctx, 'OPEN', 0, 0, 0.8, '#ff9fd2');
+      ctx.restore();
+      break;
+    }
+    case 'torch': {
+      roundRectPath(ctx, -0.22, -0.4, 0.44, 1.8, 0.2);
+      chunky(ctx, '#8a5a2b', 0.12);
+      const w = 1 + 0.18 * Math.sin(t * 9 + ph * 10);
+      const h = 1 + 0.22 * Math.sin(t * 7.3 + ph * 5);
+      ctx.beginPath();
+      ctx.moveTo(-0.6 * w, -0.4);
+      ctx.quadraticCurveTo(-0.5 * w, -1.7 * h, 0.1 * Math.sin(t * 6 + ph), -1.9 * h);
+      ctx.quadraticCurveTo(0.5 * w, -1.7 * h, 0.6 * w, -0.4);
+      ctx.closePath();
+      chunky(ctx, '#ff9f1c', 0.12);
+      ctx.fillStyle = '#ffd166';
+      ellipse(ctx, 0, -1.0 * h, 0.25 * w, 0.45 * h);
+      ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.globalAlpha = 0.6;
+      circle(ctx, 0.4 * Math.sin(t * 4 + ph), -2.3 - ((t * 1.5 + ph * 3) % 1.2), 0.08);
+      ctx.fill();
+      break;
+    }
+    case 'crowd': {
+      for (let k = -2; k <= 2; k++) {
+        const c = ['#3a86ff', '#e63946', '#ffd166', '#5be3a3', '#ff6f3c'][k + 2];
+        const bob = -0.3 * Math.abs(Math.sin(t * 4 + k * 0.9 + ph * 6));
+        circle(ctx, k * 0.9, -0.5 + bob, 0.42);
+        chunky(ctx, '#f1c27d', 0.12);
+        roundRectPath(ctx, k * 0.9 - 0.5, -0.1 + bob, 1.0, 1.1, 0.3);
+        chunky(ctx, c, 0.12);
+      }
+      break;
+    }
+    case 'waterfall': {
+      roundRectPath(ctx, -1.6, -1.6, 3.2, 3.2, 0.6);
+      chunky(ctx, '#3a86ff', 0.16);
+      ctx.save();
+      roundRectPath(ctx, -1.6, -1.6, 3.2, 3.2, 0.6);
+      ctx.clip();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.18;
+      const off = (t * 3) % 1.2;
+      ctx.beginPath();
+      for (let k = -1; k <= 1; k++) {
+        for (let y = -2.2 + off; y < 2; y += 1.2) {
+          ctx.moveTo(k * 0.8, y);
+          ctx.lineTo(k * 0.8, y + 0.6);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';
+      for (let k = 0; k < 4; k++) {
+        circle(ctx, -1.0 + k * 0.7, 1.0 + 0.12 * Math.sin(t * 6 + k), 0.18);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'sensor': {
+      roundRectPath(ctx, -0.6, -0.4, 1.2, 0.8, 0.2);
+      chunky(ctx, '#dde2e7', 0.14);
+      const on = Math.sin(t * 2.5 + ph * 6) > 0.6;
+      ctx.fillStyle = on ? '#e63946' : '#7a1f1a';
+      circle(ctx, 0, 0, 0.15);
+      ctx.fill();
+      if (on) {
+        ctx.strokeStyle = '#e63946';
+        ctx.lineWidth = 0.08;
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.5, -0.6, 0.6);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'sinkPuddle': {
+      ctx.globalAlpha = 0.85;
+      ellipse(ctx, 0, 0, 1.7, 1.0);
+      chunky(ctx, '#3a86ff', 0.12);
+      highlight(ctx, -0.5, -0.3, 0.5, 0.18, 0.7);
+      const k = ((t * 0.7 + ph) % 1);
+      ctx.globalAlpha = (1 - k) * 0.8;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.1;
+      ellipse(ctx, 0.2, 0.1, 0.3 + k * 1.2, 0.18 + k * 0.7);
+      ctx.stroke();
+      break;
+    }
+    case 'droplet': {
+      ctx.translate(0.4 * Math.sin(t * 1.3 + ph * 8), 0.35 * Math.cos(t * 1.1 + ph * 5));
+      ctx.rotate(0.3 * Math.sin(t * 0.9 + ph));
+      ctx.beginPath();
+      ctx.moveTo(0, -1.1);
+      ctx.quadraticCurveTo(0.9, 0.1, 0, 0.8);
+      ctx.quadraticCurveTo(-0.9, 0.1, 0, -1.1);
+      chunky(ctx, '#3a86ff', 0.14);
+      highlight(ctx, -0.25, -0.2, 0.18, 0.28);
+      break;
+    }
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
 export function drawDecal(ctx: CanvasRenderingContext2D, d: DecalPlacement): void {
   const rand = makeRand(d.seed);
   ctx.save();
