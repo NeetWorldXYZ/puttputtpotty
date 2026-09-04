@@ -1,8 +1,9 @@
 /**
  * Bathrooms from OpenStreetMap via the Overpass API: public toilets plus
  * places that have one (gas stations, bars, restaurants, hotels, airports,
- * stadiums, big shops, rest stops). Cached per ~500 m cell for 15 minutes
- * so panning around doesn't hammer the public server.
+ * stadiums, big shops, rest stops). Several public mirrors are raced with a
+ * hard timeout each, because any one of them can hang for a minute. Cached
+ * per ~500 m cell for 15 minutes so panning around doesn't hammer them.
  */
 
 export interface OsmPlace {
@@ -13,9 +14,10 @@ export interface OsmPlace {
   lng: number;
 }
 
-const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
 const CACHE_KEY = 'ppp.osm.v1';
 const TTL = 15 * 60 * 1000;
+const PER_ENDPOINT_TIMEOUT_MS = 14000;
 
 function classify(tags: Record<string, string>): { poiType: string; label: string } | null {
   const a = tags.amenity;
@@ -32,59 +34,99 @@ function classify(tags: Record<string, string>): { poiType: string; label: strin
   return null;
 }
 
-function cellKey(lat: number, lng: number): string {
-  return `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200}`;
+function cellKey(lat: number, lng: number, radiusM: number): string {
+  return `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radiusM}`;
 }
 
-export async function fetchBathrooms(lat: number, lng: number, radiusM = 1500): Promise<OsmPlace[]> {
-  const key = cellKey(lat, lng);
+function readCache(key: string): OsmPlace[] | null {
   try {
     const cache = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}') as Record<string, { at: number; places: OsmPlace[] }>;
     const hit = cache[key];
-    if (hit && Date.now() - hit.at < TTL) return hit.places;
+    return hit && Date.now() - hit.at < TTL ? hit.places : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key: string, places: OsmPlace[]): void {
+  try {
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}') as Record<string, { at: number; places: OsmPlace[] }>;
+    cache[key] = { at: Date.now(), places };
+    const keys = Object.keys(cache);
+    if (keys.length > 40) for (const k of keys.slice(0, keys.length - 40)) delete cache[k];
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
   } catch {
     /* ignore */
   }
+}
+
+type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+
+function parse(elements: Element[]): OsmPlace[] {
+  const places: OsmPlace[] = [];
+  for (const el of elements) {
+    const tags = el.tags ?? {};
+    const c = classify(tags);
+    if (!c) continue;
+    const plat = el.lat ?? el.center?.lat;
+    const plng = el.lon ?? el.center?.lon;
+    if (plat === undefined || plng === undefined) continue;
+    places.push({ id: `osm:${el.type}:${el.id}`, name: tags.name || tags.brand || c.label, poiType: c.poiType, lat: plat, lng: plng });
+  }
+  return places;
+}
+
+async function queryOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
+  const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal });
+  if (!res.ok) throw new Error(`overpass ${res.status}`);
+  const data = (await res.json()) as { elements?: Element[] };
+  if (!Array.isArray(data.elements)) throw new Error('overpass: bad response');
+  return parse(data.elements);
+}
+
+/** First mirror to answer wins; the rest are aborted. */
+async function race(q: string): Promise<OsmPlace[]> {
+  const controllers = ENDPOINTS.map(() => new AbortController());
+  const timers = controllers.map((c) => setTimeout(() => c.abort(), PER_ENDPOINT_TIMEOUT_MS));
+  const errors: string[] = [];
+  return new Promise<OsmPlace[]>((resolve, reject) => {
+    let pending = ENDPOINTS.length;
+    ENDPOINTS.forEach((url, i) => {
+      queryOne(url, q, controllers[i].signal).then(
+        (places) => {
+          controllers.forEach((c, j) => j !== i && c.abort());
+          timers.forEach(clearTimeout);
+          resolve(places);
+        },
+        (e: Error) => {
+          errors.push(e.name === 'AbortError' ? 'timed out' : e.message);
+          if (--pending === 0) {
+            timers.forEach(clearTimeout);
+            reject(new Error(`OpenStreetMap is not answering (${errors[0]})`));
+          }
+        },
+      );
+    });
+  });
+}
+
+export async function fetchBathrooms(lat: number, lng: number, radiusM = 3000): Promise<OsmPlace[]> {
+  const key = cellKey(lat, lng, radiusM);
+  const cached = readCache(key);
+  if (cached) return cached;
+  const around = `(around:${radiusM},${lat},${lng})`;
   const q = `[out:json][timeout:20];
 (
-  nwr["amenity"="toilets"](around:${radiusM},${lat},${lng});
-  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"](around:${radiusM},${lat},${lng});
-  nwr["tourism"~"^(hotel|motel)$"](around:${radiusM},${lat},${lng});
-  nwr["aeroway"~"^(terminal|aerodrome)$"](around:${radiusM},${lat},${lng});
-  nwr["leisure"="stadium"](around:${radiusM},${lat},${lng});
-  nwr["shop"~"^(supermarket|mall|department_store)$"](around:${radiusM},${lat},${lng});
-  nwr["highway"~"^(rest_area|services)$"](around:${radiusM},${lat},${lng});
+  nwr["amenity"="toilets"]${around};
+  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"]${around};
+  nwr["tourism"~"^(hotel|motel)$"]${around};
+  nwr["aeroway"~"^(terminal|aerodrome)$"]${around};
+  nwr["leisure"="stadium"]${around};
+  nwr["shop"~"^(supermarket|mall|department_store)$"]${around};
+  nwr["highway"~"^(rest_area|services)$"]${around};
 );
-out center 120;`;
-  let lastErr: unknown = null;
-  for (const url of ENDPOINTS) {
-    try {
-      const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-      if (!res.ok) throw new Error(`overpass ${res.status}`);
-      const data = (await res.json()) as { elements: { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }[] };
-      const places: OsmPlace[] = [];
-      for (const el of data.elements) {
-        const tags = el.tags ?? {};
-        const c = classify(tags);
-        if (!c) continue;
-        const plat = el.lat ?? el.center?.lat;
-        const plng = el.lon ?? el.center?.lon;
-        if (plat === undefined || plng === undefined) continue;
-        places.push({ id: `osm:${el.type}:${el.id}`, name: tags.name || tags.brand || c.label, poiType: c.poiType, lat: plat, lng: plng });
-      }
-      try {
-        const cache = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '{}') as Record<string, { at: number; places: OsmPlace[] }>;
-        cache[key] = { at: Date.now(), places };
-        const keys = Object.keys(cache);
-        if (keys.length > 40) for (const k of keys.slice(0, keys.length - 40)) delete cache[k];
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-      } catch {
-        /* ignore */
-      }
-      return places;
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error('could not load bathrooms');
+out center 200;`;
+  const places = await race(q);
+  writeCache(key, places);
+  return places;
 }

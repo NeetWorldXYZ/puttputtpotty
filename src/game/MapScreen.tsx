@@ -16,7 +16,33 @@ import { navigate } from '../router';
 import { NamePrompt } from './NamePrompt';
 import { unlockAudio } from './sound';
 
-const SEARCH_RADIUS_M = 1500;
+const SEARCH_RADIUS_M = 3000;
+const WIDE_RADIUS_M = 12000;
+const MIN_RESULTS_BEFORE_WIDENING = 4;
+
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${what} timed out`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Founded bathrooms from the database render as pins even if OpenStreetMap never answers. */
+function mergePlaces(osm: OsmPlace[], db: NearbyLocation[]): OsmPlace[] {
+  const seen = new Set(osm.map((p) => p.id));
+  const out = osm.slice();
+  for (const l of db) if (!seen.has(l.id)) out.push({ id: l.id, name: l.name, poiType: l.poi_type, lat: l.lat, lng: l.lng });
+  return out;
+}
 
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -108,18 +134,47 @@ export function MapScreen() {
     );
   }, []);
 
+  const osmRef = useRef<OsmPlace[]>([]);
+  const dbRef = useRef<NearbyLocation[]>([]);
+  const [osmLoading, setOsmLoading] = useState(false);
+  const [wide, setWide] = useState(false);
+
   const search = useCallback(async (lat: number, lng: number) => {
     setLoading(true);
+    setOsmLoading(true);
     setNetError(null);
-    const [placesRes, kingsRes] = await Promise.allSettled([fetchBathrooms(lat, lng, SEARCH_RADIUS_M), api.nearby(lat, lng, SEARCH_RADIUS_M * 2)]);
-    if (placesRes.status === 'fulfilled') setPlaces(placesRes.value);
-    else setNetError(`Bathroom search failed: ${(placesRes.reason as Error).message}`);
-    if (kingsRes.status === 'fulfilled') {
-      const m: Record<string, NearbyLocation> = {};
-      for (const k of kingsRes.value) m[k.id] = k;
-      setKings(m);
-    } else if (placesRes.status === 'fulfilled') setNetError(`Thrones unavailable: ${(kingsRes.reason as Error).message}`);
-    setLoading(false);
+    setWide(false);
+    // Thrones come from our own database and are fast; show them as soon as they land.
+    const kingsP = withTimeout(api.nearby(lat, lng, WIDE_RADIUS_M), 12000, 'Thrones').then(
+      (rows) => {
+        dbRef.current = rows;
+        const m: Record<string, NearbyLocation> = {};
+        for (const k of rows) m[k.id] = k;
+        setKings(m);
+        setPlaces(mergePlaces(osmRef.current, rows));
+        setLoading(false);
+      },
+      (e: Error) => {
+        setNetError(`Thrones unavailable: ${e.message}`);
+        setLoading(false);
+      },
+    );
+    // Bathrooms from OpenStreetMap; widen once if the neighbourhood is thin.
+    try {
+      let osm = await fetchBathrooms(lat, lng, SEARCH_RADIUS_M);
+      osmRef.current = osm;
+      setPlaces(mergePlaces(osm, dbRef.current));
+      if (osm.length < MIN_RESULTS_BEFORE_WIDENING) {
+        setWide(true);
+        osm = await fetchBathrooms(lat, lng, WIDE_RADIUS_M);
+        osmRef.current = osm;
+        setPlaces(mergePlaces(osm, dbRef.current));
+      }
+    } catch (e) {
+      setNetError(`Bathroom search failed: ${(e as Error).message}`);
+    }
+    setOsmLoading(false);
+    await kingsP;
     setMoved(false);
   }, []);
 
@@ -275,7 +330,17 @@ export function MapScreen() {
         <div className="map-title">
           <div className="map-title-main">Nearby thrones</div>
           <div className="map-title-sub">
-            {loading ? 'searching…' : places.length ? `${places.length} bathrooms · ${claimedCount} claimed` : geoError ? 'no location' : fix ? 'no bathrooms in range' : 'finding you…'}
+            {!fix && !geoError
+              ? 'finding you…'
+              : geoError && !places.length
+                ? 'no location'
+                : osmLoading
+                  ? `${wide ? 'widening the search' : 'searching OpenStreetMap'}… ${places.length ? `${places.length} so far` : ''}`
+                  : loading
+                    ? `${places.length} bathrooms · loading thrones…`
+                    : places.length
+                      ? `${places.length} bathrooms · ${claimedCount} claimed`
+                      : 'no bathrooms found here'}
           </div>
         </div>
         <button className="name-chip" onClick={() => setAskName(true)} title="Change name">
@@ -297,6 +362,9 @@ export function MapScreen() {
       {(geoError || netError) && !selected && (
         <div className="map-notice">
           {geoError ?? netError}
+          {!geoError && netError && fix && (
+            <button onClick={() => void search(fix.lat, fix.lng)}>Retry</button>
+          )}
           {geoError && (
             <button
               onClick={() => {
