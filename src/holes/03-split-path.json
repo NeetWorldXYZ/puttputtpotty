@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "id": "03-split-path",
+  "name": "Two Stalls",
+  "par": 3,
+  "bounds": { "x": 0, "y": 0, "w": 30, "h": 102 },
+  "walls": [
+    { "a": { "x": 3, "y": 6 }, "b": { "x": 27, "y": 6 } },
+    { "a": { "x": 27, "y": 6 }, "b": { "x": 27, "y": 96 } },
+    { "a": { "x": 27, "y": 96 }, "b": { "x": 3, "y": 96 } },
+    { "a": { "x": 3, "y": 96 }, "b": { "x": 3, "y": 6 } }
+  ],
+  "tee": { "x": 15, "y": 90 },
+  "cup": { "x": 7, "y": 14 },
+  "surfaceZones": [
+    {
+      "surfaceType": "tile",
+      "polygon": [
+        { "x": 3, "y": 26 },
+        { "x": 10, "y": 26 },
+        { "x": 10, "y": 78 },
+        { "x": 3, "y": 78 }
+      ]
+    },
+    {
+      "surfaceType": "shag",
+      "polygon": [
+        { "x": 20, "y": 40 },
+        { "x": 27, "y": 40 },
+        { "x": 27, "y": 64 },
+        { "x": 20, "y": 64 }
+      ]
+    }
+  ],
+  "slopeZones": [
+    {
+      "direction": "W",
+      "grade": 1,
+      "polygon": [
+        { "x": 3, "y": 6 },
+        { "x": 27, "y": 6 },
+        { "x": 27, "y": 22 },
+        { "x": 3, "y": 22 }
+      ]
+    }
+  ],
+  "hazards": [
+    {
+      "type": "drain",
+      "penalty": 1,
+      "resetTo": "lastSafe",
+      "polygon": [
+        { "x": 3, "y": 44 },
+        { "x": 7, "y": 44 },
+        { "x": 7, "y": 56 },
+        { "x": 3, "y": 56 }
+      ]
+    }
+  ],
+  "obstacles": [
+    { "type": "blocker", "shape": { "kind": "rect", "x": 10, "y": 26, "w": 10, "h": 52 } },
+    { "type": "bumper", "shape": { "kind": "circle", "x": 24, "y": 10, "r": 1.2 } }
+  ]
+}

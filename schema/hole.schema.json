@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://puttputtpotty.dev/schema/hole.schema.json",
+  "title": "Putt Putt Potty hole",
+  "description": "A single mini golf hole. Units: 1 unit = ball diameter. y grows downward.",
+  "type": "object",
+  "required": ["version", "id", "name", "par", "bounds", "walls", "tee", "cup", "surfaceZones", "slopeZones", "hazards", "obstacles"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string" },
+    "par": { "type": "integer", "minimum": 1, "maximum": 9 },
+    "bounds": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "exclusiveMinimum": 0 },
+        "h": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "walls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["a", "b"],
+        "additionalProperties": false,
+        "properties": {
+          "a": { "$ref": "#/definitions/point" },
+          "b": { "$ref": "#/definitions/point" },
+          "restitution": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "tee": { "$ref": "#/definitions/point" },
+    "cup": { "$ref": "#/definitions/point" },
+    "surfaceZones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["polygon", "surfaceType"],
+        "additionalProperties": false,
+        "properties": {
+          "polygon": { "$ref": "#/definitions/polygon" },
+          "surfaceType": { "enum": ["felt", "tile", "shag", "wet", "sand", "sticky"] }
+        }
+      }
+    },
+    "slopeZones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["polygon", "direction", "grade"],
+        "additionalProperties": false,
+        "properties": {
+          "polygon": { "$ref": "#/definitions/polygon" },
+          "direction": { "enum": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] },
+          "grade": { "enum": [1, 2, 3] }
+        }
+      }
+    },
+    "hazards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["polygon", "type", "penalty", "resetTo"],
+        "additionalProperties": false,
+        "properties": {
+          "polygon": { "$ref": "#/definitions/polygon" },
+          "type": { "enum": ["drain", "water", "outOfBounds", "pit", "overflow"] },
+          "penalty": { "type": "integer", "minimum": 0 },
+          "resetTo": { "enum": ["lastSafe", "tee", "entry"] }
+        }
+      }
+    },
+    "obstacles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "shape"],
+        "properties": {
+          "type": {
+            "enum": [
+              "blocker", "bumper",
+              "deadWall", "gate", "post", "pipe", "rail", "curb", "backboard",
+              "windmill", "slidingGate", "pendulum", "piston", "rotatingPlatform",
+              "flipper", "whirlpool", "roller", "plungerBumper"
+            ]
+          },
+          "shape": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["kind", "x", "y", "w", "h"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "rect" },
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "w": { "type": "number", "exclusiveMinimum": 0 },
+                  "h": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["kind", "x", "y", "r"],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": { "const": "circle" },
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "r": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            ]
+          },
+          "restitution": { "type": "number", "minimum": 0 },
+          "params": {
+            "type": "object",
+            "description": "Free-form per-type parameters for obstacle kinds added in later phases (period, phase, speed, ...).",
+            "additionalProperties": { "type": ["number", "string", "boolean"] }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "point": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "polygon": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/definitions/point" }
+    }
+  }
+}
