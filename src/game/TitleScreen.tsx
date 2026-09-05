@@ -1,40 +1,22 @@
-import { useEffect, useRef, useState } from "react";
-import { COURSE } from "../holes";
-import { drawHole } from "../render/drawHole";
-import { fitCamera } from "../render/camera";
-import { DEFAULT_PARAMS, cupRadius } from "../sim/params";
-import type { Hole } from "../sim/types";
-import {
-  COURSE_LENGTHS,
-  dailySeed,
-  getBest,
-  getPreferredLength,
-  goToCourse,
-  setPreferredLength,
-} from "./courses";
-import { isMuted, setMuted, unlockAudio } from "./sound";
-import { navigate } from "../router";
-import { api } from "../net/api";
-import { ensureSession, getSavedName } from "../net/supabase";
-import { recallFix } from "../net/places";
-import { NamePrompt } from "./NamePrompt";
+import { useEffect, useRef, useState } from 'react';
+import { COURSE } from '../holes';
+import { drawHole } from '../render/drawHole';
+import { fitCamera } from '../render/camera';
+import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
+import type { Hole } from '../sim/types';
+import { COURSE_LENGTHS, dailySeed, getBest, getPreferredLength, goToCourse, setPreferredLength } from './courses';
+import { isMuted, setMuted, sfx, unlockAudio } from './sound';
+import { navigate } from '../router';
+import { api } from '../net/api';
+import { ensureSession, getSavedName } from '../net/supabase';
+import { recallFix } from '../net/places';
+import { NamePrompt } from './NamePrompt';
 
-const SHOW_THEMES = [
-  "diveBar",
-  "spaceship",
-  "tropical",
-  "castle",
-  "stadium",
-  "grandma",
-];
+const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 
 function untilTomorrowUtc(): string {
   const now = new Date();
-  const next = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + 1,
-  );
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
   const s = Math.max(0, Math.floor((next - now.getTime()) / 1000));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -79,15 +61,14 @@ export function TitleScreen() {
         played ? api.leaderboard(daily) : Promise.resolve([]),
       ]);
       if (cancelled) return;
-      if (kings.status === "fulfilled")
-        setThrones(kings.value.find((k) => k.user_id === me)?.thrones ?? 0);
-      if (near.status === "fulfilled" && fix)
+      if (kings.status === 'fulfilled') setThrones(kings.value.find((k) => k.user_id === me)?.thrones ?? 0);
+      if (near.status === 'fulfilled' && fix)
         setNearby({
           total: near.value.length,
           claimed: near.value.filter((l) => l.king_name).length,
           mine: near.value.filter((l) => l.king_user === me).length,
         });
-      if (board.status === "fulfilled" && played) {
+      if (board.status === 'fulfilled' && played) {
         const i = board.value.findIndex((r) => r.user_id === me);
         if (i >= 0) setDailyRank({ rank: i + 1, of: board.value.length });
       }
@@ -118,15 +99,12 @@ export function TitleScreen() {
     let lastSwap = start;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       if (!ctx) return;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (
-        canvas.width !== Math.round(w * dpr) ||
-        canvas.height !== Math.round(h * dpr)
-      ) {
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
       }
@@ -151,25 +129,38 @@ export function TitleScreen() {
         dpr,
         time: t,
       });
-      ctx.fillStyle = "rgba(7,9,10,0.62)";
+      ctx.fillStyle = 'rgba(7,9,10,0.62)';
       ctx.fillRect(0, 0, w, h);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const go = (fn: () => void) => {
+  const jingled = useRef(false);
+  const wake = () => {
     unlockAudio();
+    if (!jingled.current && !isMuted()) {
+      jingled.current = true;
+      // A beat later so the context is running on iOS.
+      setTimeout(() => sfx.jingle(), 60);
+    }
+  };
+  const go = (fn: () => void, sound: 'tap' | 'whoosh' = 'tap') => {
+    wake();
+    if (sound === 'whoosh') sfx.whoosh();
+    else sfx.tap();
     fn();
   };
   const pickLen = (n: number) => {
+    wake();
+    sfx.select();
     setLen(n);
     setPreferredLength(n);
   };
   const lenInfo = COURSE_LENGTHS.find((l) => l.n === len) ?? COURSE_LENGTHS[1];
 
   return (
-    <div className="title" onPointerDown={() => unlockAudio()}>
+    <div className="title" onPointerDown={wake}>
       <canvas ref={canvasRef} className="title-bg" />
       <div className="title-inner home">
         <div className="home-stack">
@@ -178,87 +169,59 @@ export function TitleScreen() {
               <span className="logo-top">Putt Putt</span>
               <span className="logo-bottom">Potty</span>
             </div>
-            <button
-              className="player-chip"
-              onClick={() => go(() => setAskName(true))}
-            >
-              <span className="player-name">{name ?? "Set your name"}</span>
-              <span className="player-thrones">👑 {thrones ?? "–"}</span>
+            <button className="player-chip" onClick={() => go(() => setAskName(true))}>
+              <span className="player-name">{name ?? 'Set your name'}</span>
+              <span className="player-thrones">👑 {thrones ?? '–'}</span>
             </button>
           </header>
-          <div className="tagline">
-            Every bathroom is a course. Every course has a king.
-          </div>
+          <div className="tagline">Every bathroom is a course. Every course has a king.</div>
 
-          <section
-            className="home-card hero"
-            onClick={() => go(() => navigate("map"))}
-          >
+          <section className="home-card hero" onClick={() => go(() => navigate('map'))}>
             <div className="card-icon">👑</div>
             <div className="card-body">
               <div className="card-title">Thrones</div>
               <div className="card-sub">
-                {nearby
-                  ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}`
-                  : "Real bathrooms near you. Beat the record, take the throne."}
+                {nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms near you. Beat the record, take the throne.'}
               </div>
             </div>
             <button className="card-cta">Open map</button>
           </section>
 
-          <section
-            className="home-card"
-            onClick={() => go(() => goToCourse("daily"))}
-          >
+          <section className="home-card" onClick={() => go(() => goToCourse('daily'))}>
             <div className="card-icon">📅</div>
             <div className="card-body">
               <div className="card-title">
-                Daily course{" "}
-                <span className={`pill${played ? " done" : ""}`}>
-                  {played ? "1/1" : "0/1"}
-                </span>
+                Daily course <span className={`pill${played ? ' done' : ''}`}>{played ? '1/1' : '0/1'}</span>
               </div>
               <div className="card-sub">
                 {played
-                  ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of} today` : ""} · next course in ${untilTomorrowUtc()}`
+                  ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of} today` : ''} · next course in ${untilTomorrowUtc()}`
                   : `Nine holes, one attempt, everyone plays the same course · resets in ${untilTomorrowUtc()}`}
               </div>
             </div>
-            <button className="card-cta">{played ? "Results" : "Play"}</button>
+            <button className="card-cta">{played ? 'Results' : 'Play'}</button>
           </section>
 
           <section className="home-card">
             <div className="card-icon">🎲</div>
             <div className="card-body">
               <div className="card-title">Custom game</div>
-              <div className="card-sub">
-                Fresh holes every time · {lenInfo.blurb}
-              </div>
+              <div className="card-sub">Fresh holes every time · {lenInfo.blurb}</div>
               <div className="len-chips">
                 {COURSE_LENGTHS.map((l) => (
-                  <button
-                    key={l.n}
-                    className={l.n === len ? "active" : ""}
-                    onClick={() => pickLen(l.n)}
-                  >
+                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)}>
                     {l.label}
                   </button>
                 ))}
               </div>
             </div>
-            <button
-              className="card-cta"
-              onClick={() => go(() => goToCourse("random", len))}
-            >
+            <button className="card-cta" onClick={() => go(() => goToCourse('random', len))}>
               Tee off
             </button>
           </section>
 
           <div className="home-row">
-            <button
-              className="menu-small"
-              onClick={() => go(() => navigate("leaders"))}
-            >
+            <button className="menu-small" onClick={() => go(() => navigate('leaders'))}>
               🏆 Leaderboard
             </button>
             <button
@@ -270,12 +233,9 @@ export function TitleScreen() {
                 })
               }
             >
-              {muted ? "🔇 Sound off" : "🔊 Sound on"}
+              {muted ? '🔇 Sound off' : '🔊 Sound on'}
             </button>
-            <button
-              className="menu-small"
-              onClick={() => go(() => setHelp(true))}
-            >
+            <button className="menu-small" onClick={() => go(() => setHelp(true))}>
               ❓ How to play
             </button>
           </div>
@@ -298,21 +258,17 @@ export function TitleScreen() {
             <h2>How to play</h2>
             <ul>
               <li>
-                <strong>Putt.</strong> Drag anywhere to aim, pull back for
-                power, release. Drag back to your finger to cancel.
+                <strong>Putt.</strong> Drag anywhere to aim, pull back for power, release. Drag back to your finger to cancel.
               </li>
               <li>
-                <strong>Thrones.</strong> Every real bathroom on the map is a
-                three-hole course. Stand within 50 m, check in, and play for the
-                record. Fewest strokes wins; ties go to the faster round.
+                <strong>Thrones.</strong> Every real bathroom on the map is a three-hole course. Stand within 50 m, check in, and play for the record. Fewest strokes wins; ties go
+                to the faster round.
               </li>
               <li>
-                <strong>Kings.</strong> Hold the record and you're King of the
-                Throne until someone beats it. Thrones reset every six weeks.
+                <strong>Kings.</strong> Hold the record and you're King of the Throne until someone beats it. Thrones reset every six weeks.
               </li>
               <li>
-                <strong>Daily.</strong> One shared nine-hole course a day, one
-                attempt, ranked against everyone.
+                <strong>Daily.</strong> One shared nine-hole course a day, one attempt, ranked against everyone.
               </li>
             </ul>
             <button className="primary" onClick={() => setHelp(false)}>

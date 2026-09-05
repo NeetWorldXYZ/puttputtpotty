@@ -299,20 +299,24 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             fx.text(e.x, e.y - 3, 'HOLE IN ONE!', '#ffd166', 1.4);
             fx.shake(6);
             setTimeout(() => sfx.fanfare('ace'), 350);
+            setTimeout(() => sfx.cheer('huge'), 250);
             buzz(60);
           } else if (d < 0) {
             fx.burst(e.x, e.y, { count: 34, kind: 'confetti', color: ['#ffd166', '#5be3a3', '#3a86ff', '#ffffff'], speed: 13, size: 0.28, life: 1.3, gravity: 14, drag: 1.5 });
             fx.text(e.x, e.y - 3, scoreTerm(strokes, par, true).toUpperCase(), '#5be3a3', 1.3);
             setTimeout(() => sfx.fanfare('great'), 350);
+            setTimeout(() => sfx.cheer('big'), 250);
             buzz(40);
           } else if (d === 0) {
             fx.burst(e.x, e.y, { count: 12, kind: 'star', color: '#ffffff', speed: 8, size: 0.3, life: 0.6 });
             fx.text(e.x, e.y - 3, 'PAR', '#ffffff', 1.2);
             setTimeout(() => sfx.fanfare('ok'), 350);
+            setTimeout(() => sfx.cheer('ok'), 250);
             buzz(25);
           } else {
             fx.text(e.x, e.y - 3, scoreTerm(strokes, par, true).toUpperCase(), '#c9d8ff', 1.1);
             setTimeout(() => sfx.fanfare(d >= 3 ? 'bad' : 'meh'), 350);
+            if (d < 3) setTimeout(() => sfx.cheer('polite'), 250);
           }
           return true;
         }
