@@ -234,6 +234,15 @@ export function TitleScreen() {
             <span className="pb-go">{played ? 'Results' : 'Play'}</span>
           </button>
 
+          <button className="play-btn versus" onClick={() => go(() => navigate('match'), 'whoosh')}>
+            <span className="pb-icon">⚔️</span>
+            <span className="pb-text">
+              <span className="pb-title">Quick match</span>
+              <span className="pb-sub">A friend or a stranger, same three holes, live</span>
+            </span>
+            <span className="pb-go">Play</span>
+          </button>
+
           <div className="play-btn custom">
             <span className="pb-icon">🎲</span>
             <span className="pb-text">

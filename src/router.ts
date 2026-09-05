@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 
-export type Route = 'play' | 'editor' | 'map' | 'leaders';
+export type Route = 'play' | 'editor' | 'map' | 'leaders' | 'match';
 
 export interface Location {
   route: Route;
@@ -21,6 +21,9 @@ export interface Location {
   mode: string | null;
   /** Hole count for a generated course (default 9). */
   n: number | null;
+  /** Quick-match invite code or match id. */
+  code: string | null;
+  match: string | null;
 }
 
 export interface NavigateOptions {
@@ -29,6 +32,8 @@ export interface NavigateOptions {
   loc?: string | null;
   mode?: string | null;
   n?: number | null;
+  code?: string | null;
+  match?: string | null;
   /** Replace the history entry instead of pushing one. */
   replace?: boolean;
 }
@@ -36,17 +41,18 @@ export interface NavigateOptions {
 function read(): Location {
   const p = window.location.pathname.replace(/\/+$/, '');
   const h = window.location.hash.replace(/^#\/?/, '');
-  const route: Route = p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : 'play';
+  const route: Route =
+    p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : p.endsWith('/match') || h === 'match' ? 'match' : 'play';
   const q = new URLSearchParams(window.location.search);
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
   const nRaw = Number(q.get('n'));
   const n = Number.isInteger(nRaw) && nRaw >= 1 && nRaw <= 36 ? nRaw : null;
-  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n };
+  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n, code: clean(q.get('code')), match: clean(q.get('match')) };
 }
 
 export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
-  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : route === 'leaders' ? `${base}/leaders` : `${base}/`;
+  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : route === 'leaders' ? `${base}/leaders` : route === 'match' ? `${base}/match` : `${base}/`;
   const q = new URLSearchParams();
   const s = extra.seed ?? seed;
   const c = extra.course ?? course;
@@ -55,6 +61,8 @@ export function navigate(route: Route, seed: string | null = null, course: strin
   if (extra.loc) q.set('loc', extra.loc);
   if (extra.mode) q.set('mode', extra.mode);
   if (extra.n && extra.n !== 9) q.set('n', String(extra.n));
+  if (extra.code) q.set('code', extra.code);
+  if (extra.match) q.set('match', extra.match);
   const qs = q.toString();
   const url = path + (qs ? `?${qs}` : '');
   if (extra.replace) window.history.replaceState(null, '', url);
