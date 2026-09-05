@@ -3,8 +3,39 @@
  * context is created on the first user gesture (browser autoplay rules).
  */
 
-let ctx: AudioContext | null = null;
+import { stinger, type StingerLevel } from './music';
+
+let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
+
+/**
+ * Optional recorded crowd cheers. Drop files at public/sfx/cheer-big.mp3
+ * and public/sfx/cheer-small.mp3 (any format the browser decodes) and they
+ * play under the ace / birdie stingers. Missing files are silently skipped.
+ */
+const samples: { big: AudioBuffer | null; small: AudioBuffer | null; tried: boolean } = { big: null, small: null, tried: false };
+export function loadCheerSamples(): void {
+  if (samples.tried || !ctx) return;
+  samples.tried = true;
+  const c = ctx;
+  for (const [key, file] of [
+    ['big', 'cheer-big.mp3'],
+    ['small', 'cheer-small.mp3'],
+  ] as const) {
+    fetch(`${import.meta.env.BASE_URL.replace(/\/+$/, '')}/sfx/${file}`)
+      .then((r) => (r.ok && /audio|octet/.test(r.headers.get('content-type') ?? '') ? r.arrayBuffer() : null))
+      .then((ab) => (ab ? c.decodeAudioData(ab) : null))
+      .then((buf) => {
+        if (buf) samples[key] = buf;
+      })
+      .catch(() => {});
+  }
+}
+
+/** The live context and master bus, once unlocked (music hangs off the same bus). */
+export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
+  return ctx && master && ctx instanceof AudioContext ? { ctx, master } : null;
+}
 let muted = false;
 
 const MUTE_KEY = 'ppp.mute.v1';
@@ -58,7 +89,7 @@ function primeMediaSession(): void {
 export function unlockAudio(): void {
   primeMediaSession();
   if (ctx) {
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
     return;
   }
   try {
@@ -68,8 +99,9 @@ export function unlockAudio(): void {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
+    loadCheerSamples();
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch {
     ctx = null;
   }
@@ -79,7 +111,7 @@ export function unlockAudio(): void {
 if (typeof window !== 'undefined') {
   for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (document.visibilityState === 'visible' && ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
   });
 }
 
@@ -197,25 +229,25 @@ export const sfx = {
     noise(0.5, { gain: 0.12, filter: 1500, to: 300, q: 0.5, delay: 0.42 });
   },
   /**
-   * Crowd cheer: layered swells of filtered noise, a few "whoo" glides and
-   * scattered claps. Bigger scores get a bigger crowd.
+   * Sink celebration: the theme's hook as a stinger, sized by the score.
+   * If a recorded crowd file exists under /sfx it plays underneath on the
+   * bigger ones (see loadCheerSamples).
    */
-  cheer(level: 'huge' | 'big' | 'ok' | 'polite'): void {
+  stinger(level: StingerLevel): void {
     if (!ctx || !master || muted) return;
-    const size = { huge: 1, big: 0.75, ok: 0.5, polite: 0.3 }[level];
-    const dur = 0.9 + size * 1.4;
-    const bands = level === 'polite' ? 1 : level === 'ok' ? 2 : 3;
-    for (let i = 0; i < bands; i++) noise(dur, { gain: 0.16 * size + 0.05, filter: 900 + i * 350, to: 1300 + i * 200, q: 0.35, attack: 0.18 + i * 0.05, delay: i * 0.06 });
-    const whoops = level === 'polite' ? 0 : level === 'ok' ? 1 : level === 'big' ? 2 : 4;
-    for (let i = 0; i < whoops; i++) {
-      const f0 = 380 + Math.random() * 120;
-      tone(f0, 0.35, { type: 'sine', gain: 0.07, to: f0 * 2.1, attack: 0.05, delay: 0.1 + i * 0.16 + Math.random() * 0.08 });
-    }
-    const claps = Math.round(6 + size * 22);
-    for (let i = 0; i < claps; i++) noise(0.045, { gain: 0.08 + Math.random() * 0.06, filter: 1800 + Math.random() * 1200, q: 1.4, delay: 0.05 + Math.random() * (dur - 0.3) });
-    if (level === 'huge') {
-      tone(311, 0.7, { type: 'sawtooth', gain: 0.07, delay: 0.35 });
-      tone(466, 0.7, { type: 'sawtooth', gain: 0.05, delay: 0.35 });
+    const bus = ctx.createGain();
+    bus.gain.value = 0.9;
+    bus.connect(master);
+    stinger({ ctx, out: bus }, level, now());
+    const sample = level === 'ace' ? samples.big : level === 'great' ? samples.small : null;
+    if (sample && ctx instanceof AudioContext) {
+      const src = ctx.createBufferSource();
+      const g = ctx.createGain();
+      src.buffer = sample;
+      g.gain.value = level === 'ace' ? 0.7 : 0.5;
+      src.connect(g);
+      g.connect(master);
+      src.start(now() + 0.15);
     }
   },
   whoosh(): void {
@@ -243,3 +275,24 @@ export const sfx = {
     tone(1200, 0.03, { type: 'square', gain: 0.05 });
   },
 };
+
+
+/** Renders one effect offline (previews and tests); restores the live context afterwards. */
+export async function renderSfx(name: keyof typeof sfx, seconds = 3, arg?: unknown, sampleRate = 44100): Promise<AudioBuffer> {
+  const off = new OfflineAudioContext(1, Math.ceil(seconds * sampleRate), sampleRate);
+  const g = off.createGain();
+  g.gain.value = 0.8;
+  g.connect(off.destination);
+  const saved = { ctx, master, muted };
+  ctx = off;
+  master = g;
+  muted = false;
+  try {
+    (sfx[name] as (a?: unknown) => void)(arg);
+  } finally {
+    ctx = saved.ctx;
+    master = saved.master;
+    muted = saved.muted;
+  }
+  return await off.startRendering();
+}

@@ -5,7 +5,8 @@ import { fitCamera } from '../render/camera';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import type { Hole } from '../sim/types';
 import { COURSE_LENGTHS, dailySeed, getBest, getPreferredLength, goToCourse, setPreferredLength } from './courses';
-import { isMuted, setMuted, sfx, unlockAudio } from './sound';
+import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
+import { startTheme, stopTheme } from './music';
 import { navigate } from '../router';
 import { api } from '../net/api';
 import { ensureSession, getSavedName } from '../net/supabase';
@@ -136,15 +137,20 @@ export function TitleScreen() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const jingled = useRef(false);
+  const theme = () => {
+    const a = getAudio();
+    if (a && !isMuted()) startTheme(a.ctx, a.master, 0.45);
+  };
   const wake = () => {
     unlockAudio();
-    if (!jingled.current && !isMuted()) {
-      jingled.current = true;
-      // A beat later so the context is running on iOS.
-      setTimeout(() => sfx.jingle(), 60);
-    }
+    theme();
   };
+  // Coming back from a game the context is already unlocked: music starts straight away. Leaving fades it out.
+  useEffect(() => {
+    theme();
+    return () => stopTheme();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const go = (fn: () => void, sound: 'tap' | 'whoosh' = 'tap') => {
     wake();
     if (sound === 'whoosh') sfx.whoosh();
