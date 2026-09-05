@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
 import type { GeneratedHole } from '../generator/generator';
-import { HOLES_PER_COURSE, api, type King } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King } from '../net/api';
 import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
 import { navigate } from '../router';
@@ -16,7 +16,7 @@ interface Props {
   throne: boolean;
 }
 
-type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; score: number; holeScores: number[]; king: King | null; isKing: boolean } | { state: 'error'; message: string };
+type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; score: number; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean } | { state: 'error'; message: string };
 
 const RAMP: Record<string, ('easy' | 'medium' | 'hard')[]> = {
   easy: ['easy', 'easy', 'medium'],
@@ -37,6 +37,8 @@ export function LocationPlay({ locationId, throne }: Props) {
   const [holes, setHoles] = useState<Hole[] | null>(null);
   const [king, setKing] = useState<King | null>(null);
   const strokesRef = useRef<Stroke[][]>([]);
+  const [timerFrom, setTimerFrom] = useState<number | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [submit, setSubmit] = useState<Submit>({ state: 'idle' });
@@ -93,6 +95,22 @@ export function LocationPlay({ locationId, throne }: Props) {
   }, [locationId, throne]);
 
   useEffect(() => {
+    if (!throne || !holes) return;
+    let cancelled = false;
+    api
+      .start(locationId)
+      .then((r) => {
+        if (!cancelled) setTimerFrom(new Date(r.startedAt).getTime());
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setStartError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [throne, holes, locationId]);
+
+  useEffect(() => {
     if (!throne) return;
     return watchPosition(
       (f) => {
@@ -119,7 +137,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     api
       .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy)
       .then((r) => {
-        setSubmit({ state: 'done', score: r.score, holeScores: r.holeScores, king: r.king, isKing: r.isKing });
+        setSubmit({ state: 'done', score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
         if (r.isKing) {
           sfx.fanfare('ace');
           buzz([30, 40, 30, 40, 80]);
@@ -167,6 +185,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     <div className="throne-result">
       {submit.state === 'sending' && <div className="sub">Submitting to the throne room…</div>}
       {submit.state === 'error' && <div className="err">{submit.message}</div>}
+      {submit.state === 'idle' && startError && <div className="err">Clock did not start: {startError}</div>}
       {submit.state === 'done' &&
         (submit.isKing ? (
           <div className="king-banner">
@@ -174,6 +193,7 @@ export function LocationPlay({ locationId, throne }: Props) {
             <div className="king-title">King of the Throne</div>
             <div className="sub">
               {place.name} · {submit.score} (par {coursePar}) · {submit.holeScores.join('-')}
+              {submit.elapsedMs !== null && ` · ${fmtElapsed(submit.elapsedMs)}`}
             </div>
           </div>
         ) : (
@@ -181,7 +201,8 @@ export function LocationPlay({ locationId, throne }: Props) {
             {submit.king ? (
               <>
                 <strong>{submit.king.display_name}</strong> keeps the throne with <strong>{submit.king.score}</strong>
-                {submit.king.hole_scores && ` (${submit.king.hole_scores.join('-')})`}. Beat it next visit.
+                {submit.king.hole_scores && ` (${submit.king.hole_scores.join('-')})`}
+                {submit.king.elapsed_ms !== null && ` in ${fmtElapsed(submit.king.elapsed_ms)}`}. Beat it next visit.
               </>
             ) : (
               'Recorded. The throne stays empty until someone finishes all three holes.'
@@ -200,6 +221,7 @@ export function LocationPlay({ locationId, throne }: Props) {
       exitLabel="Map"
       lockedParams={DEFAULT_PARAMS}
       noRetry={throne}
+      timerFrom={timerFrom}
       onHoleDone={onHoleDone}
       scorecardExtra={
         throne ? (
@@ -211,6 +233,7 @@ export function LocationPlay({ locationId, throne }: Props) {
               <>
                 <strong>{king.display_name}</strong> holds the throne with <strong>{king.score}</strong>
                 {king.hole_scores && ` (${king.hole_scores.join('-')})`}
+                {king.elapsed_ms !== null && ` in ${fmtElapsed(king.elapsed_ms)}`}
               </>
             ) : (
               'nobody holds this throne yet'

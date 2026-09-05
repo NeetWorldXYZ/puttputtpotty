@@ -1295,3 +1295,8 @@ input[type='checkbox'] {
   color: var(--dim);
   margin: 6px 0 10px;
 }
+
+.hud .env .clock {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}

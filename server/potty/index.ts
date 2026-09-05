@@ -397,6 +397,17 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, distance: dist });
     }
 
+    if (action === 'start') {
+      // Starts the throne-run clock. Needs a live check-in at this bathroom.
+      const { locationId } = body;
+      if (typeof locationId !== 'string') return json({ error: 'bad start' }, 400);
+      const { data: ci } = await admin.from('checkins').select('at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+      if (!ci) return json({ error: 'check in first' }, 400);
+      const startedAt = new Date().toISOString();
+      await admin.from('checkins').update({ started_at: startedAt }).eq('user_id', user.id).eq('location_id', locationId);
+      return json({ ok: true, startedAt });
+    }
+
     if (action === 'course-hole') {
       const { seed, index } = body;
       if (typeof seed !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(seed) || typeof index !== 'number') return json({ error: 'bad course' }, 400);
@@ -409,6 +420,7 @@ Deno.serve(async (req: Request) => {
       let holes: unknown[];
       let par: number;
       let strokeLists: Stroke[][];
+      let elapsedMs: number | null = null;
       if (typeof locationId === 'string') {
         if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
         strokeLists = strokes as Stroke[][];
@@ -422,11 +434,16 @@ Deno.serve(async (req: Request) => {
         const dist = haversine(lat, lng, loc.lat, loc.lng);
         if (dist > CLAIM_RADIUS_M + Math.min(acc, CLAIM_RADIUS_M)) return json({ error: `too far away (${Math.round(dist)} m)` }, 400);
         // Dwell: a check-in at this location at least DWELL_SECONDS ago and not stale.
-        const { data: ci } = await admin.from('checkins').select('at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+        const { data: ci } = await admin.from('checkins').select('at, started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
         if (!ci) return json({ error: 'check in first' }, 400);
         const age = (Date.now() - new Date(ci.at).getTime()) / 1000;
         if (age < DWELL_SECONDS) return json({ error: `stay a little longer (${Math.ceil(DWELL_SECONDS - age)} s)` }, 400);
         if (age > CHECKIN_MAX_AGE_S) return json({ error: 'check-in expired, check in again' }, 400);
+        // Round time, measured here: from the start action to this submission.
+        if (!ci.started_at) return json({ error: 'round was not started' }, 400);
+        elapsedMs = Date.now() - new Date(ci.started_at).getTime();
+        if (elapsedMs < 0 || elapsedMs > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'round took too long, start again' }, 400);
+        await admin.from('checkins').update({ started_at: null }).eq('user_id', user.id).eq('location_id', locationId);
         // Cooldown per location.
         const { data: last } = await admin.from('runs').select('created_at').eq('user_id', user.id).eq('location_id', locationId).order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (last) {
@@ -468,6 +485,7 @@ Deno.serve(async (req: Request) => {
         hole_index: typeof holeIndex === 'number' ? holeIndex : 0,
         strokes: isLocation ? strokeLists : strokeLists[0],
         hole_scores: isLocation ? holeScores : null,
+        elapsed_ms: elapsedMs,
         score,
         par,
         season: currentSeason(),
@@ -481,7 +499,7 @@ Deno.serve(async (req: Request) => {
         const { data } = await admin.from('thrones').select('*').eq('location_id', locationId).eq('season', currentSeason()).maybeSingle();
         king = data;
       }
-      return json({ score, par, sunk, holeScores, king, isKing: king ? king.user_id === user.id : false });
+      return json({ score, par, sunk, holeScores, elapsedMs, king, isKing: king ? king.user_id === user.id : false });
     }
 
     return json({ error: 'unknown action' }, 400);

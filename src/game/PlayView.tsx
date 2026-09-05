@@ -36,6 +36,8 @@ interface Props {
   scorecardExtra?: ReactNode;
   /** Hides the retry button on ranked holes. */
   noRetry?: boolean;
+  /** Epoch ms the round clock started; shows a live timer in the HUD. */
+  timerFrom?: number | null;
 }
 
 export interface HoleDoneInfo {
@@ -82,7 +84,7 @@ function relPar(n: number): string {
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry }: Props) {
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom }: Props) {
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
@@ -121,6 +123,14 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const timeRef = useRef(0);
   const holeParRef = useRef(hole.par);
   holeParRef.current = hole.par;
+
+  // --- round timer (ranked location play)
+  const [clockMs, setClockMs] = useState(0);
+  useEffect(() => {
+    if (!timerFrom) return;
+    const id = setInterval(() => setClockMs(Date.now() - timerFrom), 250);
+    return () => clearInterval(id);
+  }, [timerFrom]);
 
   // --- HUD mirror of the bits of sim state React needs to render
   const [hud, setHud] = useState({ strokes: 0, done: false, sunk: false, strokeHistory: [] as Stroke[] });
@@ -633,7 +643,10 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             HOLE {holeIndex + 1}/{holes.length} · PAR {par}
           </div>
           <div className="hole-name">{hole.name}</div>
-          <div className="env">{theme.name}</div>
+          <div className="env">
+            {theme.name}
+            {timerFrom ? <span className="clock"> · ⏱ {Math.floor(clockMs / 60000)}:{String(Math.floor((clockMs % 60000) / 1000)).padStart(2, '0')}</span> : null}
+          </div>
         </div>
         <div className="right">
           <div className="name">STROKES</div>

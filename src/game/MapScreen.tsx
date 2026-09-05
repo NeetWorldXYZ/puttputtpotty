@@ -6,7 +6,7 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
-import { HOLES_PER_COURSE, api, type King, type NearbyLocation } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King, type NearbyLocation } from '../net/api';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
 import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
@@ -307,6 +307,7 @@ export function MapScreen() {
               king_user: kg.user_id,
               king_since: kg.created_at,
               king_holes: kg.hole_scores,
+              king_elapsed_ms: kg.elapsed_ms,
             },
           }));
         }
@@ -458,13 +459,14 @@ export function MapScreen() {
                 <span>
                   <strong>{king.king_name}</strong> holds the throne with <strong>{king.king_score}</strong>
                   {king.king_holes && <span className="dim"> ({king.king_holes.join('-')})</span>}
+                  {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> in {fmtElapsed(king.king_elapsed_ms)}</span>}
                   {king.king_since && <span className="dim"> · {ago(king.king_since)}</span>}
                 </span>
               </>
             ) : (
               <>
                 <span className="crown">🪑</span>
-                <span>The throne is empty. First to finish all three holes is King.</span>
+                <span>The throne is empty. Fewest strokes over three holes wins; ties go to the faster round.</span>
               </>
             )}
           </div>
