@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { COURSE_STYLE, circlePolygon } from './mapStyle';
 import type { Hole } from '../sim/types';
 import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
@@ -23,7 +24,7 @@ const WIDE_RADIUS_M = 12000;
 const MIN_RESULTS_BEFORE_WIDENING = 4;
 /** Auto-search when the map centre drifts this far from the last search. */
 const RESEARCH_DISTANCE_M = 1800;
-const MIN_AUTO_ZOOM = 11;
+const MIN_AUTO_ZOOM = 10;
 const MAX_PINS = 400;
 
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
@@ -54,7 +55,7 @@ function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
   for (const p of sorted) {
     const absorbed = kept.some((q) => {
       const d = haversine(p.lat, p.lng, q.lat, q.lng);
-      return p.poiType === 'toilets' ? d < 150 : d < 40;
+      return p.poiType === 'toilets' ? d < 80 : d < 40;
     });
     if (!absorbed) kept.push(p);
   }
@@ -76,11 +77,11 @@ function ago(iso: string): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
-function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean): string {
+function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, holeNo: number | null): string {
   const icon = POI_ICON[p.poiType] ?? '🚽';
-  const crown = king?.king_name ? '<span class="pin-crown">👑</span>' : '';
-  const score = king?.king_score != null ? `<span class="pin-score">${king.king_score}</span>` : '';
-  return `<div class="pin${selected ? ' selected' : ''}${king?.king_name ? ' claimed' : ''}">${crown}<span class="pin-icon">${icon}</span>${score}</div>`;
+  const claimed = !!king?.king_name;
+  const cloth = claimed ? `👑 ${king!.king_score ?? ''}` : holeNo !== null ? String(holeNo) : '⛳';
+  return `<div class="flag${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}"><span class="flag-cloth">${cloth}</span><span class="flag-pole"></span><span class="flag-base">${icon}</span></div>`;
 }
 
 /** Hole preview drawn once per hole into a small canvas. */
@@ -111,17 +112,21 @@ function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
 }
 
 /** Golf-ball "you are here" marker. */
-function ballIcon(): L.DivIcon {
-  return L.divIcon({ html: '<div class="you-ring"></div><div class="you-ball"><i></i><i></i><i></i></div>', className: 'you-wrap', iconSize: [36, 36], iconAnchor: [18, 18] });
+function ballElement(): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'you-wrap';
+  el.innerHTML = '<div class="you-ring"></div><div class="you-ball"><i></i><i></i><i></i></div>';
+  return el;
 }
 
 export function MapScreen() {
   const mapEl = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<Map<string, L.Marker>>(new Map());
-  const userRef = useRef<{ dot: L.Marker; ring: L.Circle } | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const loadedRef = useRef(false);
+  const markersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
+  const userRef = useRef<maplibregl.Marker | null>(null);
   const lastSearchRef = useRef<{ lat: number; lng: number } | null>(null);
-  const lineRef = useRef<L.Polyline | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const placesRef = useRef<Map<string, OsmPlace>>(new Map());
   const [zoomClass, setZoomClass] = useState('z-mid');
@@ -156,23 +161,44 @@ export function MapScreen() {
     const el = mapEl.current;
     if (!el || mapRef.current) return;
     const start = recallFix() ?? { lat: 40.7484, lng: -73.9857 };
-    const map = L.map(el, { zoomControl: false, attributionControl: true }).setView([start.lat, start.lng], recallFix() ? 15 : 3);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    const map = new maplibregl.Map({
+      container: el,
+      style: COURSE_STYLE,
+      center: [start.lng, start.lat],
+      zoom: recallFix() ? 14 : 2,
+      attributionControl: false,
+      pitchWithRotate: false,
+      dragRotate: false,
+    });
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '© OpenFreeMap · © OpenMapTiles' }), 'bottom-right');
     map.on('click', () => setSelected(null));
-    map.on('dragend zoomend', () => setMoved(true));
+    map.on('dragend', () => setMoved(true));
+    map.on('zoomend', () => setMoved(true));
     const onZoom = () => {
       const z = map.getZoom();
-      setZoomClass(z < 12 ? 'z-low' : z < 14.5 ? 'z-mid' : 'z-high');
+      setZoomClass(z < 11 ? 'z-low' : z < 13.5 ? 'z-mid' : 'z-high');
     };
     map.on('zoomend', onZoom);
     onZoom();
+    map.on('load', () => {
+      map.addSource('accuracy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'accuracy-fill', type: 'fill', source: 'accuracy', paint: { 'fill-color': '#ffd166', 'fill-opacity': 0.15 } });
+      map.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy', paint: { 'line-color': '#1f2a44', 'line-width': 1, 'line-dasharray': [2, 2] } });
+      map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1f2a44', 'line-width': 3, 'line-dasharray': [1.5, 2], 'line-opacity': 0.85 } });
+      loadedRef.current = true;
+      setMapLoaded(true);
+    });
+    map.on('error', (e) => {
+      // Tile and font hiccups are non-fatal; keep them out of the user's face.
+      console.warn('map', (e as { error?: Error }).error?.message ?? e);
+    });
     mapRef.current = map;
     return () => {
       map.remove();
       mapRef.current = null;
+      loadedRef.current = false;
     };
   }, []);
 
@@ -276,49 +302,56 @@ export function MapScreen() {
   // First fix: centre and search.
   useEffect(() => {
     if (!fix || !mapRef.current) return;
+    const map = mapRef.current;
     if (!userRef.current) {
-      const ring = L.circle([fix.lat, fix.lng], { radius: fix.accuracy, color: '#1f2a44', weight: 1, dashArray: '4 4', fillColor: '#ffd166', fillOpacity: 0.12, interactive: false }).addTo(mapRef.current);
-      const dot = L.marker([fix.lat, fix.lng], { icon: ballIcon(), interactive: false, zIndexOffset: 2000 }).addTo(mapRef.current);
-      userRef.current = { dot, ring };
-    } else {
-      userRef.current.dot.setLatLng([fix.lat, fix.lng]);
-      userRef.current.ring.setLatLng([fix.lat, fix.lng]).setRadius(fix.accuracy);
+      userRef.current = new maplibregl.Marker({ element: ballElement(), anchor: 'center' }).setLngLat([fix.lng, fix.lat]).addTo(map);
+    } else userRef.current.setLngLat([fix.lng, fix.lat]);
+    if (loadedRef.current) {
+      const src = map.getSource('accuracy') as maplibregl.GeoJSONSource | undefined;
+      src?.setData({ type: 'FeatureCollection', features: [circlePolygon(fix.lng, fix.lat, fix.accuracy)] });
     }
     if (!searchedRef.current) {
       searchedRef.current = true;
-      mapRef.current.setView([fix.lat, fix.lng], 16);
+      map.jumpTo({ center: [fix.lng, fix.lat], zoom: 15 });
       void search(fix.lat, fix.lng);
       setMoved(false);
     }
-  }, [fix, search]);
+  }, [fix, search, mapLoaded]);
 
-  // Markers.
+  // Markers: every bathroom is a flag; hole numbers count outward from you.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<string>();
+    const ranked = fix ? places.slice().sort((a, b) => haversine(fix.lat, fix.lng, a.lat, a.lng) - haversine(fix.lat, fix.lng, b.lat, b.lng)) : [];
+    const holeNo = new Map<string, number>();
+    ranked.forEach((p, i) => holeNo.set(p.id, i + 1));
     for (const p of places) {
       seen.add(p.id);
-      const html = pinHtml(p, kings[p.id], selected?.id === p.id);
-      const icon = L.divIcon({ html, className: 'pin-wrap', iconSize: [44, 44], iconAnchor: [22, 40] });
+      const html = pinHtml(p, kings[p.id], selected?.id === p.id, holeNo.get(p.id) ?? null);
       let m = markersRef.current.get(p.id);
       if (!m) {
-        m = L.marker([p.lat, p.lng], { icon }).addTo(map);
-        m.on('click', () => {
+        const el = document.createElement('div');
+        el.className = 'pin-wrap';
+        el.innerHTML = html;
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
           unlockAudio();
           setSelected(p);
         });
+        const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lng, p.lat]).addTo(map);
+        m = { marker, el };
         markersRef.current.set(p.id, m);
-      } else m.setIcon(icon);
-      m.setZIndexOffset(selected?.id === p.id ? 1000 : kings[p.id]?.king_name ? 100 : 0);
+      } else if (m.el.innerHTML !== html) m.el.innerHTML = html;
+      m.el.style.zIndex = selected?.id === p.id ? '30' : kings[p.id]?.king_name ? '20' : '10';
     }
     for (const [id, m] of markersRef.current) {
       if (!seen.has(id)) {
-        m.remove();
+        m.marker.remove();
         markersRef.current.delete(id);
       }
     }
-  }, [places, kings, selected]);
+  }, [places, kings, selected, fix]);
 
   // Preview + founding on select.
   useEffect(() => {
@@ -371,19 +404,30 @@ export function MapScreen() {
   // Dashed line from you to the selected bathroom, kept current as you move.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !loadedRef.current) return;
+    const src = map.getSource('route') as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
     if (!fix || !selected) {
-      lineRef.current?.remove();
-      lineRef.current = null;
+      src.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
-    const pts: [number, number][] = [
-      [fix.lat, fix.lng],
-      [selected.lat, selected.lng],
-    ];
-    if (!lineRef.current) lineRef.current = L.polyline(pts, { color: '#1f2a44', weight: 3, dashArray: '6 8', opacity: 0.8, interactive: false }).addTo(map);
-    else lineRef.current.setLatLngs(pts);
-  }, [fix, selected]);
+    src.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [fix.lng, fix.lat],
+              [selected.lng, selected.lat],
+            ],
+          },
+        },
+      ],
+    });
+  }, [fix, selected, mapLoaded]);
 
   // Dwell countdown ticks once a second while a sheet is open.
   useEffect(() => {
@@ -456,17 +500,17 @@ export function MapScreen() {
     setNotice(null);
     setSelected(best);
     mapRef.current?.fitBounds(
-      L.latLngBounds([
-        [fix.lat, fix.lng],
-        [best.lat, best.lng],
-      ]),
-      { paddingTopLeft: [60, 120], paddingBottomRight: [60, 420], maxZoom: 18 },
+      [
+        [Math.min(fix.lng, best.lng), Math.min(fix.lat, best.lat)],
+        [Math.max(fix.lng, best.lng), Math.max(fix.lat, best.lat)],
+      ],
+      { padding: { top: 120, bottom: 420, left: 60, right: 60 }, maxZoom: 17, duration: 600 },
     );
   };
 
   const recentre = () => {
     if (fix && mapRef.current) {
-      mapRef.current.setView([fix.lat, fix.lng], 16);
+      mapRef.current.flyTo({ center: [fix.lng, fix.lat], zoom: 15, duration: 500 });
       setMoved(false);
     }
   };

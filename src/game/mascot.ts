@@ -1,8 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fd873"/><stop offset="1" stop-color="#4fa848"/></linearGradient></defs>
-<rect width="200" height="200" rx="44" fill="url(#bg)"/>
-<circle cx="100" cy="112" r="74" fill="#ffffff" opacity="0.14"/>
-<g transform="translate(22 14) scale(0.97)">
+/**
+ * The mascot: a crowned toilet with a golf ball. One SVG body used by the
+ * home screen (inline) and the app icon (public/icon.svg is generated from
+ * the same markup by scripts/icons.mjs). Ink outlines, porcelain gradient.
+ */
+export const MASCOT_VIEWBOX = '0 0 160 170';
+
+export const MASCOT_BODY = `
 <defs>
   <linearGradient id="porc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d6e2ee"/></linearGradient>
   <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ffb020"/></linearGradient>
@@ -40,5 +43,4 @@
 <circle cx="39" cy="140" r="1.8" fill="#aab6c4"/>
 <circle cx="34" cy="148" r="1.8" fill="#aab6c4"/>
 <circle cx="41" cy="149" r="1.8" fill="#aab6c4"/>
-</g>
-</svg>
+`;
