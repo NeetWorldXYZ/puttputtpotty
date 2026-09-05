@@ -28,10 +28,37 @@ export function setMuted(m: boolean): void {
   if (master) master.gain.value = m ? 0 : 0.8;
 }
 
+/**
+ * iOS keeps Web Audio silent while the ring/silent switch is on silent unless
+ * the page is treated as media. Two things flip that: the AudioSession API
+ * (Safari 17+) and playing any media element once inside a user gesture.
+ */
+const SILENT_WAV = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+let mediaPrimed = false;
+function primeMediaSession(): void {
+  try {
+    const nav = navigator as unknown as { audioSession?: { type: string } };
+    if (nav.audioSession) nav.audioSession.type = 'playback';
+  } catch {
+    /* ignore */
+  }
+  if (mediaPrimed) return;
+  try {
+    const el = new Audio(SILENT_WAV);
+    el.setAttribute('playsinline', '');
+    el.volume = 0.01;
+    const p = el.play();
+    if (p && typeof p.then === 'function') p.then(() => (mediaPrimed = true)).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Call from a pointer/touch handler so the context is allowed to start. */
 export function unlockAudio(): void {
+  primeMediaSession();
   if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
     return;
   }
   try {
@@ -41,9 +68,19 @@ export function unlockAudio(): void {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
+    // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch {
     ctx = null;
   }
+}
+
+// Any first touch anywhere counts; iOS only honours resume() inside these.
+if (typeof window !== 'undefined') {
+  for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  });
 }
 
 function now(): number {
