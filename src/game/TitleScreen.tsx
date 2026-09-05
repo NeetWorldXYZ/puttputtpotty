@@ -166,7 +166,7 @@ export function TitleScreen() {
   const lenInfo = COURSE_LENGTHS.find((l) => l.n === len) ?? COURSE_LENGTHS[1];
 
   return (
-    <div className="title" onPointerDown={wake}>
+    <div className="title" onPointerDown={wake} onPointerUp={wake} onClick={wake}>
       <canvas ref={canvasRef} className="title-bg" />
       <div className="title-inner home">
         <div className="home-stack">

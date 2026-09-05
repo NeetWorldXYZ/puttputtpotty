@@ -390,7 +390,13 @@ export function isThemePlaying(): boolean {
   return playing;
 }
 
-/** Starts the loop on the given context (call after the context is unlocked). Idempotent. */
+/**
+ * Starts the loop on the given context. Idempotent. The scheduler only lays
+ * down bars while the context is actually running: on iOS the first tap
+ * creates a suspended context that wakes a moment later, and backgrounding
+ * the tab interrupts it. In both cases the tune resumes in time, from the
+ * next bar, instead of never starting or dumping a burst of missed bars.
+ */
 export function startTheme(ctx: AudioContext, master: AudioNode, volume = 0.5): void {
   if (playing && liveCtx === ctx) return;
   stopTheme();
@@ -402,9 +408,15 @@ export function startTheme(ctx: AudioContext, master: AudioNode, volume = 0.5): 
   const v: Voice = { ctx, out: musicGain };
   playing = true;
   nextBar = 0;
-  nextTime = ctx.currentTime + 0.1;
+  nextTime = -1; // unset: (re)synced to the clock when the context is running
   const tick = () => {
     if (!playing) return;
+    if (ctx.state !== 'running') {
+      nextTime = -1;
+      timer = window.setTimeout(tick, 100);
+      return;
+    }
+    if (nextTime < 0 || nextTime < ctx.currentTime - 0.05) nextTime = ctx.currentTime + 0.08;
     while (nextTime < ctx.currentTime + 0.6) {
       scheduleBar(v, nextBar, nextTime);
       nextBar++;
