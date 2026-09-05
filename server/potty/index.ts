@@ -42,6 +42,14 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+const HOLES_PER_COURSE = 3;
+/** Difficulty ramp of a bathroom's three holes, by band. */
+const COURSE_RAMP: Record<'easy' | 'medium' | 'hard', ('easy' | 'medium' | 'hard')[]> = {
+  easy: ['easy', 'easy', 'medium'],
+  medium: ['easy', 'medium', 'medium'],
+  hard: ['medium', 'hard', 'hard'],
+};
+
 /** POI type -> environment + difficulty band (design doc section 11). */
 function bandFor(poiType: string, id: string): { theme: string; difficulty: 'easy' | 'medium' | 'hard' } {
   switch (poiType) {
@@ -304,23 +312,31 @@ async function ensureProfile(userId: string, displayName?: string): Promise<void
 
 async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string) {
   const { data: existing } = await admin.from('locations').select('*').eq('id', loc.id).maybeSingle();
-  if (existing && existing.hole) return existing;
+  if (existing && Array.isArray(existing.holes) && existing.holes.length === HOLES_PER_COURSE) return existing;
   const band = bandFor(loc.poiType, loc.id);
-  const g = generateHole({ seed: loc.id, difficulty: band.difficulty });
-  g.hole.theme = band.theme;
-  g.hole.id = loc.id;
-  g.hole.name = loc.name;
+  // Three distinct archetypes from the course planner, difficulty from the band, one environment.
+  const slots = courseSlots(loc.id, HOLES_PER_COURSE);
+  const holes = slots.map((slot: { index: number; seed: string; archetype: string; difficulty: string; theme: string }, i: number) => {
+    const g = generateSlot(loc.id, { ...slot, difficulty: COURSE_RAMP[band.difficulty][i], theme: band.theme });
+    g.hole.theme = band.theme;
+    g.hole.id = `${loc.id}#${i + 1}`;
+    g.hole.name = `${loc.name} ${i + 1}`;
+    return g.hole;
+  });
+  const par = holes.reduce((a: number, h: { par: number }) => a + h.par, 0);
   const row = {
     id: loc.id,
-    name: loc.name.slice(0, 80),
-    poi_type: loc.poiType,
-    lat: loc.lat,
-    lng: loc.lng,
+    name: (existing?.name ?? loc.name).slice(0, 80),
+    poi_type: existing?.poi_type ?? loc.poiType,
+    lat: existing?.lat ?? loc.lat,
+    lng: existing?.lng ?? loc.lng,
     theme: band.theme,
     difficulty: band.difficulty,
-    hole: g.hole,
-    hole_par: g.hole.par,
-    founded_by: userId,
+    hole: holes[0],
+    hole_par: holes[0].par,
+    holes,
+    par,
+    founded_by: existing?.founded_by ?? userId,
   };
   const { data, error } = await admin.from('locations').upsert(row).select('*').single();
   if (error) throw new Error(error.message);
@@ -357,7 +373,7 @@ Deno.serve(async (req: Request) => {
       await ensureProfile(user.id);
       const row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
       const { data: throne } = await admin.from('thrones').select('*').eq('location_id', row.id).eq('season', currentSeason()).maybeSingle();
-      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, king: throne });
+      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, holes: row.holes, par: row.par, king: throne });
     }
 
     if (action === 'bathrooms') {
@@ -389,15 +405,17 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'submit') {
       const { locationId, courseSeed, holeIndex, strokes, lat, lng, accuracy } = body;
-      if (!validStrokes(strokes)) return json({ error: 'bad strokes' }, 400);
       await ensureProfile(user.id);
-      let hole;
+      let holes: unknown[];
       let par: number;
+      let strokeLists: Stroke[][];
       if (typeof locationId === 'string') {
+        if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
+        strokeLists = strokes as Stroke[][];
         const { data: loc } = await admin.from('locations').select('*').eq('id', locationId).maybeSingle();
-        if (!loc || !loc.hole) return json({ error: 'unknown location' }, 404);
-        hole = loc.hole;
-        par = loc.hole_par;
+        if (!loc || !Array.isArray(loc.holes) || loc.holes.length !== HOLES_PER_COURSE) return json({ error: 'unknown location' }, 404);
+        holes = loc.holes;
+        par = loc.par;
         if (typeof lat !== 'number' || typeof lng !== 'number') return json({ error: 'no position' }, 400);
         const acc = typeof accuracy === 'number' ? accuracy : 999;
         if (acc > MAX_ACCURACY_M) return json({ error: 'GPS accuracy too low' }, 400);
@@ -423,24 +441,33 @@ Deno.serve(async (req: Request) => {
           if (dt > 0 && d / dt > MAX_SPEED_MPS) return json({ error: 'moved too fast between bathrooms' }, 400);
         }
       } else if (typeof courseSeed === 'string' && typeof holeIndex === 'number') {
-        hole = await courseHole(courseSeed, holeIndex);
+        if (!validStrokes(strokes)) return json({ error: 'bad strokes' }, 400);
+        strokeLists = [strokes];
+        const hole = await courseHole(courseSeed, holeIndex);
+        holes = [hole];
         par = hole.par;
         const { data: dup } = await admin.from('runs').select('id').eq('user_id', user.id).eq('course_seed', courseSeed).eq('hole_index', holeIndex).maybeSingle();
         if (dup) return json({ error: 'already played this hole today' }, 409);
       } else return json({ error: 'nothing to submit to' }, 400);
 
-      // Re-simulate. The client's claimed score is ignored; the server's replay is the record.
-      const seed = 0;
-      const r = replay(hole, seed, strokes, DEFAULT_PARAMS);
-      const st = r.state;
-      if (!st.done) return json({ error: 'run not finished' }, 400);
-      const score = holeScore(st, par);
+      // Re-simulate every hole. The client's claimed score is ignored; the server's replay is the record.
+      const holeScores: number[] = [];
+      let sunk = true;
+      for (let i = 0; i < holes.length; i++) {
+        const st = replay(holes[i], 0, strokeLists[i], DEFAULT_PARAMS).state;
+        if (!st.done) return json({ error: `hole ${i + 1} not finished` }, 400);
+        holeScores.push(holeScore(st, (holes[i] as { par: number }).par));
+        sunk = sunk && st.sunk;
+      }
+      const score = holeScores.reduce((a, b) => a + b, 0);
+      const isLocation = typeof locationId === 'string';
       const { error } = await admin.from('runs').insert({
         user_id: user.id,
-        location_id: typeof locationId === 'string' ? locationId : null,
+        location_id: isLocation ? locationId : null,
         course_seed: typeof courseSeed === 'string' ? courseSeed : null,
         hole_index: typeof holeIndex === 'number' ? holeIndex : 0,
-        strokes,
+        strokes: isLocation ? strokeLists : strokeLists[0],
+        hole_scores: isLocation ? holeScores : null,
         score,
         par,
         season: currentSeason(),
@@ -450,11 +477,11 @@ Deno.serve(async (req: Request) => {
       });
       if (error) return json({ error: error.message }, 500);
       let king = null;
-      if (typeof locationId === 'string') {
+      if (isLocation) {
         const { data } = await admin.from('thrones').select('*').eq('location_id', locationId).eq('season', currentSeason()).maybeSingle();
         king = data;
       }
-      return json({ score, par, sunk: st.sunk, king, isKing: king ? king.user_id === user.id : false });
+      return json({ score, par, sunk, holeScores, king, isKing: king ? king.user_id === user.id : false });
     }
 
     return json({ error: 'unknown action' }, 400);

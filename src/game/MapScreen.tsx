@@ -6,7 +6,7 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
-import { api, type King, type NearbyLocation } from '../net/api';
+import { HOLES_PER_COURSE, api, type King, type NearbyLocation } from '../net/api';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
 import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
@@ -19,6 +19,10 @@ import { unlockAudio } from './sound';
 const SEARCH_RADIUS_M = 3000;
 const WIDE_RADIUS_M = 12000;
 const MIN_RESULTS_BEFORE_WIDENING = 4;
+/** Auto-search when the map centre drifts this far from the last search. */
+const RESEARCH_DISTANCE_M = 1800;
+const MIN_AUTO_ZOOM = 11;
+const MAX_PINS = 400;
 
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -59,7 +63,7 @@ function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolea
 }
 
 /** Hole preview drawn once per hole into a small canvas. */
-function HolePreview({ hole }: { hole: Hole }) {
+function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -77,14 +81,27 @@ function HolePreview({ hole }: { hole: Hole }) {
     const cam = fitCamera(hole.bounds, w, h, 6);
     drawHole(ctx, hole, cam, { ballRadius: DEFAULT_PARAMS.ballRadius, cupRadius: cupRadius(DEFAULT_PARAMS), ball: { x: hole.tee.x, y: hole.tee.y }, dpr, time: 0 });
   }, [hole]);
-  return <canvas ref={ref} className="sheet-preview" />;
+  return (
+    <div className="sheet-hole">
+      <canvas ref={ref} className="sheet-preview" />
+      {label && <span className="sheet-hole-label">{label}</span>}
+    </div>
+  );
+}
+
+/** Golf-ball "you are here" marker. */
+function ballIcon(): L.DivIcon {
+  return L.divIcon({ html: '<div class="you-ring"></div><div class="you-ball"><i></i><i></i><i></i></div>', className: 'you-wrap', iconSize: [36, 36], iconAnchor: [18, 18] });
 }
 
 export function MapScreen() {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
-  const userRef = useRef<{ dot: L.CircleMarker; ring: L.Circle } | null>(null);
+  const userRef = useRef<{ dot: L.Marker; ring: L.Circle } | null>(null);
+  const lastSearchRef = useRef<{ lat: number; lng: number } | null>(null);
+  const placesRef = useRef<Map<string, OsmPlace>>(new Map());
+  const [zoomClass, setZoomClass] = useState('z-mid');
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -93,7 +110,7 @@ export function MapScreen() {
   const [loading, setLoading] = useState(false);
   const [netError, setNetError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OsmPlace | null>(null);
-  const [preview, setPreview] = useState<{ id: string; hole: Hole; king: King | null } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [moved, setMoved] = useState(false);
   const [checkinBusy, setCheckinBusy] = useState(false);
@@ -115,6 +132,12 @@ export function MapScreen() {
     }).addTo(map);
     map.on('click', () => setSelected(null));
     map.on('dragend zoomend', () => setMoved(true));
+    const onZoom = () => {
+      const z = map.getZoom();
+      setZoomClass(z < 12 ? 'z-low' : z < 14.5 ? 'z-mid' : 'z-high');
+    };
+    map.on('zoomend', onZoom);
+    onZoom();
     mapRef.current = map;
     return () => {
       map.remove();
@@ -134,56 +157,91 @@ export function MapScreen() {
     );
   }, []);
 
-  const osmRef = useRef<OsmPlace[]>([]);
-  const dbRef = useRef<NearbyLocation[]>([]);
   const [osmLoading, setOsmLoading] = useState(false);
   const [wide, setWide] = useState(false);
 
-  const search = useCallback(async (lat: number, lng: number) => {
-    setLoading(true);
-    setOsmLoading(true);
-    setNetError(null);
-    setWide(false);
-    // Thrones come from our own database and are fast; show them as soon as they land.
-    const kingsP = withTimeout(api.nearby(lat, lng, WIDE_RADIUS_M), 12000, 'Thrones').then(
-      (rows) => {
-        dbRef.current = rows;
-        const m: Record<string, NearbyLocation> = {};
-        for (const k of rows) m[k.id] = k;
-        setKings(m);
-        setPlaces(mergePlaces(osmRef.current, rows));
-        setLoading(false);
-      },
-      (e: Error) => {
-        setNetError(`Thrones unavailable: ${e.message}`);
-        setLoading(false);
-      },
-    );
-    // Bathrooms from OpenStreetMap; widen once if the neighbourhood is thin.
-    try {
-      let osm = await fetchBathrooms(lat, lng, SEARCH_RADIUS_M);
-      osmRef.current = osm;
-      setPlaces(mergePlaces(osm, dbRef.current));
-      if (osm.length < MIN_RESULTS_BEFORE_WIDENING) {
-        setWide(true);
-        osm = await fetchBathrooms(lat, lng, WIDE_RADIUS_M);
-        osmRef.current = osm;
-        setPlaces(mergePlaces(osm, dbRef.current));
-      }
-    } catch (e) {
-      setNetError(`Bathroom search failed: ${(e as Error).message}`);
+  /** Adds places to the pin set, dropping the farthest from the search centre past the cap. */
+  const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
+    const m = placesRef.current;
+    for (const p of incoming) m.set(p.id, p);
+    if (m.size > MAX_PINS) {
+      const sorted = [...m.values()].sort((a, b) => haversine(lat, lng, a.lat, a.lng) - haversine(lat, lng, b.lat, b.lng));
+      m.clear();
+      for (const p of sorted.slice(0, MAX_PINS)) m.set(p.id, p);
     }
-    setOsmLoading(false);
-    await kingsP;
-    setMoved(false);
+    setPlaces([...m.values()]);
   }, []);
+
+  const search = useCallback(
+    async (lat: number, lng: number) => {
+      lastSearchRef.current = { lat, lng };
+      setLoading(true);
+      setOsmLoading(true);
+      setNetError(null);
+      setWide(false);
+      // Thrones come from our own database and are fast; show them as soon as they land.
+      const kingsP = withTimeout(api.nearby(lat, lng, WIDE_RADIUS_M), 12000, 'Thrones').then(
+        (rows) => {
+          setKings((k) => {
+            const m = { ...k };
+            for (const r of rows) m[r.id] = r;
+            return m;
+          });
+          addPlaces(lat, lng, mergePlaces([], rows));
+          setLoading(false);
+        },
+        (e: Error) => {
+          setNetError(`Thrones unavailable: ${e.message}`);
+          setLoading(false);
+        },
+      );
+      // Bathrooms from OpenStreetMap; widen once if the neighbourhood is thin.
+      try {
+        let osm = await fetchBathrooms(lat, lng, SEARCH_RADIUS_M);
+        addPlaces(lat, lng, osm);
+        if (osm.length < MIN_RESULTS_BEFORE_WIDENING) {
+          setWide(true);
+          osm = await fetchBathrooms(lat, lng, WIDE_RADIUS_M);
+          addPlaces(lat, lng, osm);
+        }
+      } catch (e) {
+        setNetError(`Bathroom search failed: ${(e as Error).message}`);
+      }
+      setOsmLoading(false);
+      await kingsP;
+      setMoved(false);
+    },
+    [addPlaces],
+  );
+
+  // Auto-search as the map moves: once the centre is far enough from the last search.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    let timer = 0;
+    const onMove = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (map.getZoom() < MIN_AUTO_ZOOM) return;
+        const c = map.getCenter();
+        const last = lastSearchRef.current;
+        if (last && haversine(c.lat, c.lng, last.lat, last.lng) < RESEARCH_DISTANCE_M) return;
+        void search(c.lat, c.lng);
+      }, 500);
+    };
+    map.on('moveend', onMove);
+    return () => {
+      window.clearTimeout(timer);
+      map.off('moveend', onMove);
+    };
+  }, [search]);
 
   // First fix: centre and search.
   useEffect(() => {
     if (!fix || !mapRef.current) return;
     if (!userRef.current) {
-      const ring = L.circle([fix.lat, fix.lng], { radius: fix.accuracy, color: '#4da3ff', weight: 1, fillColor: '#4da3ff', fillOpacity: 0.12, interactive: false }).addTo(mapRef.current);
-      const dot = L.circleMarker([fix.lat, fix.lng], { radius: 7, color: '#ffffff', weight: 3, fillColor: '#2f7fff', fillOpacity: 1, interactive: false }).addTo(mapRef.current);
+      const ring = L.circle([fix.lat, fix.lng], { radius: fix.accuracy, color: '#1f2a44', weight: 1, dashArray: '4 4', fillColor: '#ffd166', fillOpacity: 0.12, interactive: false }).addTo(mapRef.current);
+      const dot = L.marker([fix.lat, fix.lng], { icon: ballIcon(), interactive: false, zIndexOffset: 2000 }).addTo(mapRef.current);
       userRef.current = { dot, ring };
     } else {
       userRef.current.dot.setLatLng([fix.lat, fix.lng]);
@@ -236,18 +294,19 @@ export function MapScreen() {
       .hole(selected)
       .then((r) => {
         if (cancelled) return;
-        setPreview({ id: selected.id, hole: r.hole, king: r.king });
+        setPreview({ id: selected.id, holes: r.holes, par: r.par, king: r.king });
         const kg = r.king;
         if (kg) {
           setKings((k) => ({
             ...k,
             [selected.id]: {
-              ...(k[selected.id] ?? { id: selected.id, name: selected.name, poi_type: selected.poiType, lat: selected.lat, lng: selected.lng, theme: r.location.theme, difficulty: r.location.difficulty, distance_m: 0, run_count: 0 }),
-              hole_par: r.hole.par,
+              ...(k[selected.id] ?? { id: selected.id, name: selected.name, poi_type: selected.poiType, lat: selected.lat, lng: selected.lng, theme: r.location.theme, difficulty: r.location.difficulty, hole_par: null, distance_m: 0, run_count: 0 }),
+              par: r.par,
               king_name: kg.display_name,
               king_score: kg.score,
               king_user: kg.user_id,
               king_since: kg.created_at,
+              king_holes: kg.hole_scores,
             },
           }));
         }
@@ -309,10 +368,6 @@ export function MapScreen() {
       setMoved(false);
     }
   };
-  const searchHere = () => {
-    const c = mapRef.current?.getCenter();
-    if (c) void search(c.lat, c.lng);
-  };
 
   const king = selected ? kings[selected.id] : undefined;
   const band = selected ? bandFor(selected.poiType, selected.id) : null;
@@ -320,7 +375,7 @@ export function MapScreen() {
   const claimedCount = Object.values(kings).filter((k) => k.king_name).length;
 
   return (
-    <div className="map-screen">
+    <div className={`map-screen ${zoomClass}`}>
       <div ref={mapEl} className="map-canvas" />
 
       <div className="map-head">
@@ -349,11 +404,7 @@ export function MapScreen() {
       </div>
 
       <div className="map-tools">
-        {moved && fix && (
-          <button className="map-tool" onClick={searchHere}>
-            Search this area
-          </button>
-        )}
+        {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
         <button className="map-tool round" onClick={recentre} title="Recentre">
           ◎
         </button>
@@ -393,7 +444,8 @@ export function MapScreen() {
               <div className="sheet-name">{selected.name}</div>
               <div className="sheet-sub">
                 {POI_LABEL[selected.poiType] ?? 'Bathroom'} · {themeName}
-                {preview?.hole ? ` · par ${preview.hole.par}` : king?.hole_par ? ` · par ${king.hole_par}` : ''}
+                {` · ${HOLES_PER_COURSE} holes`}
+                {preview?.id === selected.id ? ` · par ${preview.par}` : king?.par ? ` · par ${king.par}` : ''}
                 {distance !== null && ` · ${fmtDistance(distance)} away`}
               </div>
             </div>
@@ -405,18 +457,29 @@ export function MapScreen() {
                 <span className="crown">👑</span>
                 <span>
                   <strong>{king.king_name}</strong> holds the throne with <strong>{king.king_score}</strong>
+                  {king.king_holes && <span className="dim"> ({king.king_holes.join('-')})</span>}
                   {king.king_since && <span className="dim"> · {ago(king.king_since)}</span>}
                 </span>
               </>
             ) : (
               <>
                 <span className="crown">🪑</span>
-                <span>The throne is empty. First to finish it is King.</span>
+                <span>The throne is empty. First to finish all three holes is King.</span>
               </>
             )}
           </div>
 
-          {preview?.id === selected.id ? <HolePreview hole={preview.hole} /> : previewError ? <div className="sheet-err">{previewError}</div> : <div className="sheet-preview loading">loading hole…</div>}
+          {preview?.id === selected.id ? (
+            <div className="sheet-holes">
+              {preview.holes.map((h, i) => (
+                <HolePreview key={h.id} hole={h} label={`${i + 1} · par ${h.par}`} />
+              ))}
+            </div>
+          ) : previewError ? (
+            <div className="sheet-err">{previewError}</div>
+          ) : (
+            <div className="sheet-preview loading">loading course…</div>
+          )}
 
           <div className="sheet-actions">
             {!fix ? (
