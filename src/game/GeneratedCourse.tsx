@@ -3,7 +3,8 @@ import type { Hole } from '../sim/types';
 import { courseSlots, type GeneratedHole } from '../generator/generator';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { useTuning } from './paramsStore';
-import { dailySeed, goToCourse } from './courses';
+import { dailySeed, getBest, goToCourse, secondsUntilNextDaily } from './courses';
+import { navigate } from '../router';
 import { DEFAULT_PARAMS } from '../sim/params';
 import { api } from '../net/api';
 import { getSavedName } from '../net/supabase';
@@ -29,6 +30,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
   const [error, setError] = useState<string | null>(null);
   // The daily is ranked: generated with default physics (the server replays with the same) and each hole is submitted.
   const daily = seed === dailySeed();
+  const alreadyPlayed = daily && getBest(seed) !== null;
   const [askName, setAskName] = useState(daily && !getSavedName());
   const [submitted, setSubmitted] = useState(0);
 
@@ -72,6 +74,30 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     return () => workers.forEach((w) => w.terminate());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed, count]);
+
+  if (alreadyPlayed) {
+    const h = Math.floor(secondsUntilNextDaily() / 3600);
+    const m = Math.floor((secondsUntilNextDaily() % 3600) / 60);
+    return (
+      <div className="play">
+        <div className="overlay" style={{ background: 'var(--page)' }}>
+          <div className="card" style={{ minWidth: 300 }}>
+            <h2>You&apos;ve played this one</h2>
+            <div className="sub">
+              You shot {getBest(seed)} · the next course opens in {h > 0 ? `${h}h ` : ''}
+              {m}m
+            </div>
+            <DailyBoard seed={seed} />
+            <button className="primary" onClick={() => navigate('leaders')}>
+              Full leaderboard
+            </button>
+            <button onClick={() => goToCourse('random')}>Custom game instead</button>
+            <button onClick={() => goToCourse('title')}>Home</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!done) {
     const built = holes.filter(Boolean).length;

@@ -3,7 +3,7 @@ import { api, type KingRow } from '../net/api';
 import { currentUserId, getSavedName } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { recallFix } from '../net/places';
-import { dailySeed } from './courses';
+import { dailyEdition, dailySeed } from './courses';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 
@@ -75,7 +75,7 @@ export function LeaderboardScreen() {
         </button>
         <div className="map-title">
           <div className="map-title-main">Leaderboard</div>
-          <div className="map-title-sub">{tab === 'daily' ? `today's course · ${dailySeed()}` : tab === 'nearby' ? 'thrones within 25 km of you' : 'thrones across the whole world'}</div>
+          <div className="map-title-sub">{tab === 'daily' ? `${dailyEdition()} course · ${dailySeed().slice(0, 10)}` : tab === 'nearby' ? 'thrones within 25 km of you' : 'thrones across the whole world'}</div>
         </div>
         <button className="name-chip" onClick={() => setAskName(true)} title="Change name">
           {name ?? 'Set name'}
@@ -90,7 +90,7 @@ export function LeaderboardScreen() {
           Kings everywhere
         </button>
         <button className={tab === 'daily' ? 'active' : ''} onClick={() => setTab('daily')}>
-          Today&apos;s daily
+          {dailyEdition() === 'morning' ? 'Morning' : 'Evening'} course
         </button>
       </div>
 

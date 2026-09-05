@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
-import { HOLES_PER_COURSE, api, fmtElapsed, type MatchRow } from '../net/api';
+import { api, fmtElapsed, type MatchRow } from '../net/api';
+
+const INVITE_LENGTHS = [3, 9, 18] as const;
 import { ensureSession, getSavedName, loadProfile, supabase } from '../net/supabase';
 import { navigate } from '../router';
 import { PlayView, type HoleDoneInfo } from './PlayView';
@@ -45,6 +47,7 @@ export function MatchScreen({ code, matchId }: Props) {
   const [oppOnline, setOppOnline] = useState(false);
   const [mine, setMine] = useState<{ score: number; holes: number[]; elapsed: number } | null>(null);
   const [shared, setShared] = useState(false);
+  const [inviteLen, setInviteLen] = useState<number>(9);
   const strokesRef = useRef<Stroke[][]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const totalRef = useRef(0);
@@ -114,7 +117,8 @@ export function MatchScreen({ code, matchId }: Props) {
     (async () => {
       try {
         const hs: Hole[] = [];
-        for (let i = 0; i < HOLES_PER_COURSE; i++) {
+        const n = match.holes || 9;
+        for (let i = 0; i < n; i++) {
           setBuilding(i + 1);
           let hole: Hole | null = null;
           for (let attempt = 0; attempt < 4 && !hole; attempt++) {
@@ -195,10 +199,11 @@ export function MatchScreen({ code, matchId }: Props) {
     if (!match) return;
     strokesRef.current[info.holeIndex] = info.strokes;
     totalRef.current += info.score;
-    const last = info.holeIndex === HOLES_PER_COURSE - 1;
+    const n = match.holes || 9;
+    const last = info.holeIndex === n - 1;
     broadcast({ hole: info.holeIndex + 1, strokes: info.score, total: totalRef.current, done: last });
     if (!last) return;
-    const lists = strokesRef.current.slice(0, HOLES_PER_COURSE);
+    const lists = strokesRef.current.slice(0, n);
     api
       .submitMatch(match.id, lists)
       .then((r) => {
@@ -287,9 +292,11 @@ export function MatchScreen({ code, matchId }: Props) {
         topExtra={strip}
         renderDoneCard={(info, actions) => (
           <>
-            <div className="sub">Match · hole {info.holeIndex + 1} of {HOLES_PER_COURSE}</div>
+            <div className="sub">
+              Match · hole {info.holeIndex + 1} of {match.holes}
+            </div>
             <button className="primary" onClick={actions.next}>
-              {info.holeIndex + 1 < HOLES_PER_COURSE ? 'Next hole →' : 'See result'}
+              {info.holeIndex + 1 < match.holes ? 'Next hole →' : 'See result'}
             </button>
           </>
         )}
@@ -332,18 +339,28 @@ export function MatchScreen({ code, matchId }: Props) {
               <span className="pb-icon">🎯</span>
               <span className="pb-text">
                 <span className="pb-title">Find an opponent</span>
-                <span className="pb-sub">Whoever's waiting. Usually seconds.</span>
+                <span className="pb-sub">Nine holes against whoever's waiting.</span>
               </span>
               <span className="pb-go">Go</span>
             </button>
-            <button className="play-btn daily" disabled={busy} onClick={() => void start(() => api.createInvite())}>
+            <div className="play-btn daily">
               <span className="pb-icon">💌</span>
               <span className="pb-text">
                 <span className="pb-title">Invite a friend</span>
-                <span className="pb-sub">Get a code or a link to send.</span>
+                <span className="pb-sub">Get a code or a link to send. Pick the length.</span>
+                <span className="len-chips">
+                  {INVITE_LENGTHS.map((n) => (
+                    <button key={n} className={n === inviteLen ? 'active' : ''} onClick={() => setInviteLen(n)}>
+                      {n}
+                    </button>
+                  ))}
+                  <span className="len-word">holes</span>
+                </span>
               </span>
-              <span className="pb-go">Invite</span>
-            </button>
+              <button className="pb-go" disabled={busy} onClick={() => void start(() => api.createInvite(inviteLen))}>
+                Invite
+              </button>
+            </div>
             <div className="play-btn custom">
               <span className="pb-icon">🔑</span>
               <span className="pb-text">
@@ -367,7 +384,7 @@ export function MatchScreen({ code, matchId }: Props) {
                 <button className="primary" onClick={() => void share()}>
                   {shared ? 'Sent!' : 'Share the link'}
                 </button>
-                <div className="sub">Waiting for your friend to join…</div>
+                <div className="sub">{match.holes} holes · waiting for your friend to join…</div>
               </>
             ) : (
               <div className="sub">Looking for an opponent…</div>
@@ -379,7 +396,7 @@ export function MatchScreen({ code, matchId }: Props) {
         {phase === 'loading' && (
           <div className="waiting">
             <div className="spinner">🚽</div>
-            <div className="sub">{building ? `Laying out hole ${building} of ${HOLES_PER_COURSE}…` : 'Opening the match…'}</div>
+            <div className="sub">{building ? `Laying out hole ${building} of ${match?.holes ?? 9}…` : 'Opening the match…'}</div>
           </div>
         )}
 

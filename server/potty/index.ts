@@ -441,7 +441,8 @@ function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
 async function courseHole(seed: string, index: number) {
   const { data: cached } = await admin.from('course_holes').select('hole, par').eq('seed', seed).eq('hole_index', index).maybeSingle();
   if (cached) return cached.hole;
-  const slot = courseSlots(seed, 9)[index];
+  // The first N slots of a plan are the same for any count, so one 18-hole plan serves 3, 9 and 18.
+  const slot = courseSlots(seed, 18)[index];
   if (!slot) throw new Error('bad hole index');
   const g = generateSlot(seed, slot);
   await admin.from('course_holes').upsert({ seed, hole_index: index, hole: g.hole, par: g.hole.par });
@@ -527,7 +528,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'course-hole') {
       const { seed, index } = body;
-      if (typeof seed !== 'string' || !/^(\d{4}-\d{2}-\d{2}|m-[a-f0-9]{8})$/.test(seed) || typeof index !== 'number' || index < 0 || index > 8) return json({ error: 'bad course' }, 400);
+      if (typeof seed !== 'string' || !/^(\d{4}-\d{2}-\d{2}(-am|-pm)?|m-[a-f0-9]{8})$/.test(seed) || typeof index !== 'number' || index < 0 || index > 17) return json({ error: 'bad course' }, 400);
       return json({ hole: await courseHole(seed, index) });
     }
 
@@ -539,16 +540,17 @@ Deno.serve(async (req: Request) => {
       let strokeLists: Stroke[][];
       let elapsedMs: number | null = null;
       if (typeof matchId === 'string') {
-        // Quick match: three holes of the match seed, timed from when the second player joined.
-        if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
+        // Quick match: the match's holes of its seed, timed from when the second player joined.
         const { data: m } = await admin.from('matches').select('*').eq('id', matchId).maybeSingle();
         if (!m) return json({ error: 'no such match' }, 404);
+        const n = Number(m.holes) || 9;
+        if (!Array.isArray(strokes) || strokes.length !== n || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
         const side = m.p1 === user.id ? 'p1' : m.p2 === user.id ? 'p2' : null;
         if (!side) return json({ error: 'not your match' }, 403);
         if (m.status !== 'playing') return json({ error: m.status === 'waiting' ? 'opponent has not joined yet' : 'match is over' }, 400);
         if (m[`${side}_score`] !== null) return json({ error: 'already submitted' }, 409);
         const mh: unknown[] = [];
-        for (let i = 0; i < HOLES_PER_COURSE; i++) mh.push(await courseHole(m.seed, i));
+        for (let i = 0; i < n; i++) mh.push(await courseHole(m.seed, i));
         const scores: number[] = [];
         for (let i = 0; i < mh.length; i++) {
           const st = replay(mh[i], 0, (strokes as Stroke[][])[i], DEFAULT_PARAMS).state;

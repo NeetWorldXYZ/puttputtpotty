@@ -4,7 +4,7 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import type { Hole } from '../sim/types';
-import { COURSE_LENGTHS, dailySeed, getBest, getPreferredLength, goToCourse, secondsUntilNextDaily, setPreferredLength } from './courses';
+import { COURSE_LENGTHS, dailyEdition, dailySeed, getBest, getPreferredLength, goToCourse, secondsUntilNextDaily, setPreferredLength } from './courses';
 import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
 import { startTheme, stopTheme } from './music';
 import { navigate } from '../router';
@@ -56,8 +56,9 @@ export function TitleScreen() {
     of: number;
   } | null>(null);
   const daily = dailySeed();
+  const edition = dailyEdition(daily);
   const best = getBest(daily);
-  const played = best !== null;
+  const played = best !== null || dailyRank !== null;
 
   // Live stats: your thrones, the neighbourhood, your daily rank. All optional; the menu works without them.
   useEffect(() => {
@@ -85,7 +86,7 @@ export function TitleScreen() {
           claimed: near.value.filter((l) => l.king_name).length,
           mine: near.value.filter((l) => l.king_user === me).length,
         });
-      if (board.status === 'fulfilled' && played) {
+      if (board.status === 'fulfilled') {
         const i = board.value.findIndex((r) => r.user_id === me);
         if (i >= 0) setDailyRank({ rank: i + 1, of: board.value.length });
       }
@@ -93,7 +94,7 @@ export function TitleScreen() {
     return () => {
       cancelled = true;
     };
-  }, [daily, played]);
+  }, [daily]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 30000);
@@ -221,17 +222,19 @@ export function TitleScreen() {
             <span className="pb-go">Map</span>
           </button>
 
-          <button className="play-btn daily" onClick={() => go(() => goToCourse('daily'), 'whoosh')}>
-            <span className="pb-icon">📅</span>
+          <button className="play-btn daily" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            <span className="pb-icon">{edition === 'morning' ? '🌅' : '🌇'}</span>
             <span className="pb-text">
               <span className="pb-title">
-                Daily course <span className={`pill${played ? ' done' : ''}`}>{played ? '1/1' : '0/1'}</span>
+                {edition === 'morning' ? 'Morning' : 'Evening'} course <span className={`pill${played ? ' done' : ''}`}>{played ? '1/1' : '0/1'}</span>
               </span>
               <span className="pb-sub">
-                {played ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of} today` : ''} · next in ${untilTomorrowUtc()}` : `Nine holes, one shot at it · resets in ${untilTomorrowUtc()}`}
+                {played
+                  ? `${best !== null ? `You shot ${best}` : 'Played'}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of}` : ''} · next course in ${untilTomorrowUtc()}`
+                  : `Nine holes, one shot at it · ${edition === 'morning' ? 'evening' : 'morning'} course in ${untilTomorrowUtc()}`}
               </span>
             </span>
-            <span className="pb-go">{played ? 'Results' : 'Play'}</span>
+            <span className="pb-go">{played ? 'Leaderboard' : 'Play'}</span>
           </button>
 
           <button className="play-btn versus" onClick={() => go(() => navigate('match'), 'whoosh')}>
