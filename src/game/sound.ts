@@ -114,7 +114,7 @@ function tone(freq: number, dur: number, opts: { type?: OscillatorType; gain?: n
   o.stop(t0 + dur + 0.02);
 }
 
-function noise(dur: number, opts: { gain?: number; filter?: number; to?: number; q?: number; delay?: number } = {}): void {
+function noise(dur: number, opts: { gain?: number; filter?: number; to?: number; q?: number; delay?: number; attack?: number } = {}): void {
   if (!ctx || !master || muted) return;
   const buf = noiseBuffer(dur + 0.05);
   if (!buf) return;
@@ -128,7 +128,7 @@ function noise(dur: number, opts: { gain?: number; filter?: number; to?: number;
   if (opts.to) f.frequency.exponentialRampToValueAtTime(Math.max(40, opts.to), t0 + dur);
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(opts.gain ?? 0.3, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(opts.gain ?? 0.3, t0 + (opts.attack ?? 0.01));
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   src.connect(f);
   f.connect(g);
@@ -179,6 +179,44 @@ export const sfx = {
   },
   clink(): void {
     tone(1600, 0.08, { type: 'triangle', gain: 0.18, to: 1200 });
+  },
+  /** UI tap. */
+  tap(): void {
+    tone(620, 0.04, { type: 'triangle', gain: 0.14, to: 480 });
+    noise(0.03, { gain: 0.08, filter: 2400, to: 1200 });
+  },
+  /** Chip / option select. */
+  select(): void {
+    tone(740, 0.05, { type: 'triangle', gain: 0.14, to: 980 });
+  },
+  /** Startup jingle when audio wakes on the home screen. */
+  jingle(): void {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((f, i) => tone(f, 0.22, { type: 'triangle', gain: 0.16, delay: i * 0.09 }));
+    tone(1319, 0.5, { type: 'sine', gain: 0.12, delay: 0.4 });
+    noise(0.5, { gain: 0.12, filter: 1500, to: 300, q: 0.5, delay: 0.42 });
+  },
+  /**
+   * Crowd cheer: layered swells of filtered noise, a few "whoo" glides and
+   * scattered claps. Bigger scores get a bigger crowd.
+   */
+  cheer(level: 'huge' | 'big' | 'ok' | 'polite'): void {
+    if (!ctx || !master || muted) return;
+    const size = { huge: 1, big: 0.75, ok: 0.5, polite: 0.3 }[level];
+    const dur = 0.9 + size * 1.4;
+    const bands = level === 'polite' ? 1 : level === 'ok' ? 2 : 3;
+    for (let i = 0; i < bands; i++) noise(dur, { gain: 0.16 * size + 0.05, filter: 900 + i * 350, to: 1300 + i * 200, q: 0.35, attack: 0.18 + i * 0.05, delay: i * 0.06 });
+    const whoops = level === 'polite' ? 0 : level === 'ok' ? 1 : level === 'big' ? 2 : 4;
+    for (let i = 0; i < whoops; i++) {
+      const f0 = 380 + Math.random() * 120;
+      tone(f0, 0.35, { type: 'sine', gain: 0.07, to: f0 * 2.1, attack: 0.05, delay: 0.1 + i * 0.16 + Math.random() * 0.08 });
+    }
+    const claps = Math.round(6 + size * 22);
+    for (let i = 0; i < claps; i++) noise(0.045, { gain: 0.08 + Math.random() * 0.06, filter: 1800 + Math.random() * 1200, q: 1.4, delay: 0.05 + Math.random() * (dur - 0.3) });
+    if (level === 'huge') {
+      tone(311, 0.7, { type: 'sawtooth', gain: 0.07, delay: 0.35 });
+      tone(466, 0.7, { type: 'sawtooth', gain: 0.05, delay: 0.35 });
+    }
   },
   whoosh(): void {
     noise(0.3, { gain: 0.3, filter: 400, to: 2600, q: 1.2 });
