@@ -12,6 +12,7 @@ import { api } from '../net/api';
 import { ensureSession, getSavedName } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { NamePrompt } from './NamePrompt';
+import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -25,49 +26,6 @@ function seasonInfo(): { n: number; daysLeft: number } {
   return { n, daysLeft };
 }
 
-/** The mascot: a crowned toilet with a golf ball, drawn inline so it scales crisp. */
-function Mascot() {
-  return (
-    <svg className="mascot" viewBox="0 0 120 130" aria-hidden="true">
-      <defs>
-        <linearGradient id="porc" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#d9e4ee" />
-        </linearGradient>
-      </defs>
-      {/* shadow */}
-      <ellipse cx="60" cy="122" rx="40" ry="6" fill="rgba(0,0,0,0.35)" />
-      {/* tank */}
-      <rect x="30" y="34" width="60" height="42" rx="8" fill="url(#porc)" stroke="#1f2a44" strokeWidth="4" />
-      <rect x="38" y="30" width="44" height="9" rx="4" fill="#ffffff" stroke="#1f2a44" strokeWidth="4" />
-      {/* flush handle */}
-      <rect x="82" y="44" width="12" height="5" rx="2.5" fill="#c0c9d6" stroke="#1f2a44" strokeWidth="3" />
-      {/* bowl */}
-      <path d="M22 78 C22 70 32 66 60 66 C88 66 98 70 98 78 L94 96 C90 112 76 118 60 118 C44 118 30 112 26 96 Z" fill="url(#porc)" stroke="#1f2a44" strokeWidth="4" />
-      {/* seat */}
-      <ellipse cx="60" cy="78" rx="34" ry="12" fill="#ffffff" stroke="#1f2a44" strokeWidth="4" />
-      <ellipse cx="60" cy="79" rx="22" ry="7" fill="#4db8ff" stroke="#1f2a44" strokeWidth="3" />
-      {/* eyes on the tank */}
-      <circle cx="49" cy="52" r="7" fill="#fff" stroke="#1f2a44" strokeWidth="3" />
-      <circle cx="71" cy="52" r="7" fill="#fff" stroke="#1f2a44" strokeWidth="3" />
-      <circle cx="51" cy="53" r="3" fill="#1f2a44" />
-      <circle cx="73" cy="53" r="3" fill="#1f2a44" />
-      {/* smile */}
-      <path d="M50 64 Q60 70 70 64" fill="none" stroke="#1f2a44" strokeWidth="3" strokeLinecap="round" />
-      {/* crown */}
-      <path d="M36 30 L42 14 L52 24 L60 8 L68 24 L78 14 L84 30 Z" fill="#ffd166" stroke="#1f2a44" strokeWidth="4" strokeLinejoin="round" />
-      <circle cx="42" cy="14" r="3" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
-      <circle cx="60" cy="8" r="3.5" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
-      <circle cx="78" cy="14" r="3" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
-      {/* golf ball rolling in */}
-      <circle cx="104" cy="110" r="9" fill="#fff" stroke="#1f2a44" strokeWidth="3.5" />
-      <circle cx="101" cy="107" r="1.4" fill="#b7c3d0" />
-      <circle cx="106" cy="108" r="1.4" fill="#b7c3d0" />
-      <circle cx="103" cy="112" r="1.4" fill="#b7c3d0" />
-    </svg>
-  );
-}
-
 function untilTomorrowUtc(): string {
   const now = new Date();
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
@@ -75,6 +33,10 @@ function untilTomorrowUtc(): string {
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function Mascot() {
+  return <svg className="mascot" viewBox={MASCOT_VIEWBOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MASCOT_BODY }} />;
 }
 
 export function TitleScreen() {

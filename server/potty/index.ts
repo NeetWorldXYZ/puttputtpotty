@@ -265,7 +265,7 @@ function overpassRace(q: string): Promise<OsmPlace[]> {
 async function bathrooms(lat: number, lng: number, radius: number): Promise<{ places: OsmPlace[]; cached: boolean }> {
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
-  if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: hit.places as OsmPlace[], cached: true };
+  if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
   const q = overpassQuery(lat, lng, radius);
   const strategies: [string, () => Promise<OsmPlace[]>][] = [
     ['overpass-db', () => overpassViaDb(q)],
@@ -408,8 +408,8 @@ function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
   for (const p of sorted) {
     const absorbed = kept.some((q) => {
       const d = haversine(p.lat, p.lng, q.lat, q.lng);
-      // A standalone toilet within a venue's grounds is that venue; two venues merge only when they share a footprint.
-      return p.poiType === 'toilets' ? d < 150 : d < 40;
+      // A standalone toilet on a venue's lot is that venue's bathroom; two venues merge only when they share a footprint.
+      return p.poiType === 'toilets' ? d < 80 : d < 40;
     });
     if (!absorbed) kept.push(p);
   }

@@ -829,13 +829,22 @@ input[type='checkbox'] {
   overflow: hidden;
 }
 .map-canvas {
-  position: absolute;
+  /* MapLibre's stylesheet makes its container position: relative; keep it filling the screen. */
+  position: absolute !important;
   inset: 0;
-  background: #e9e2d3;
+  width: 100%;
+  height: 100%;
+  background: #7fcc63;
 }
-/* Brand tint over the stock tiles: warm paper, ink-leaning contrast. */
-.map-canvas .leaflet-tile-pane {
-  filter: saturate(0.62) sepia(0.22) contrast(1.02) brightness(1.02);
+.maplibregl-ctrl-attrib {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+.maplibregl-ctrl-bottom-right {
+  bottom: 0;
+}
+.pin-wrap {
+  cursor: pointer;
 }
 .map-tool.quiet {
   opacity: 0.85;
@@ -923,13 +932,6 @@ input[type='checkbox'] {
   background: rgba(31, 42, 68, 0.85);
   border-radius: 8px;
   padding: 2px 6px;
-}
-.leaflet-container {
-  font-family: var(--game-font);
-}
-.leaflet-container .leaflet-control-attribution {
-  font-size: 9px;
-  background: rgba(255, 255, 255, 0.7);
 }
 .pin-wrap {
   background: none;
@@ -1758,8 +1760,8 @@ input[type='checkbox'] {
   margin: 6px 0 4px;
 }
 .mascot {
-  width: 116px;
-  height: 126px;
+  width: 150px;
+  height: 160px;
   animation: mascot-bob 2.6s ease-in-out infinite;
   filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.35));
 }
@@ -1945,4 +1947,97 @@ input[type='checkbox'] {
   50% {
     transform: translateX(-50%) scale(1.08);
   }
+}
+
+/* ---------- flags ---------- */
+.flag {
+  position: relative;
+  width: 46px;
+  height: 64px;
+  transform-origin: 50% 100%;
+  transition: transform 0.12s;
+}
+.flag-pole {
+  position: absolute;
+  left: 21px;
+  top: 4px;
+  width: 4px;
+  height: 52px;
+  background: #ffffff;
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  box-sizing: content-box;
+}
+.flag-cloth {
+  position: absolute;
+  left: 25px;
+  top: 2px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5f7e;
+  color: #fff;
+  font-family: var(--game-font);
+  font-weight: 700;
+  font-size: 13px;
+  border: 3px solid var(--ink);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.3);
+  transform-origin: left center;
+  animation: flag-wave 2.2s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes flag-wave {
+  0%,
+  100% {
+    transform: skewY(0deg);
+  }
+  50% {
+    transform: skewY(-4deg) scaleX(0.97);
+  }
+}
+.flag-base {
+  position: absolute;
+  left: 4px;
+  bottom: 0;
+  width: 38px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.flag.claimed .flag-cloth {
+  background: var(--accent);
+  color: var(--ink);
+}
+.flag.claimed .flag-base {
+  background: #fff4cc;
+}
+.flag.selected {
+  transform: scale(1.18);
+}
+.flag.selected .flag-base {
+  border-color: #ff6f3c;
+  box-shadow: 0 0 0 3px #ff6f3c, 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.map-screen.z-low .flag {
+  transform: scale(0.6);
+}
+.map-screen.z-low .flag.selected {
+  transform: scale(0.8);
+}
+.map-screen.z-mid .flag {
+  transform: scale(0.82);
+}
+.map-screen.z-mid .flag.selected {
+  transform: scale(1.02);
 }
