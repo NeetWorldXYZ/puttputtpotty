@@ -325,6 +325,59 @@ export function scheduleBar(v: Voice, bar: number, t0: number): void {
   }
 }
 
+// ---- Sink stingers: the hook as a celebration, sized by the score.
+export type StingerLevel = 'ace' | 'great' | 'par' | 'bogey';
+
+/** A stinger at time t on the given voice bus. Returns its length in seconds. */
+export function stinger(v: Voice, level: StingerLevel, t: number): number {
+  const e = BEAT * 0.85; // a touch quicker than the theme
+  if (level === 'ace') {
+    // snare pickup, the hook up an octave, a held top note with kick + open hat, boing, flush
+    for (let i = 0; i < 3; i++) snare(v, t + i * e * 0.25);
+    const t1 = t + e * 0.8;
+    kick(v, t1);
+    for (const [b, n, len] of [
+      [0, 'C5', 0.45],
+      [0.5, 'C5', 0.45],
+      [1, 'A4', 0.4],
+      [1.25, 'F4', 0.4],
+      [1.75, 'G5', 1.6],
+    ] as [number, string, number][]) lead(v, N[n], t1 + b * e, len * e, 0.12);
+    kick(v, t1 + 1.75 * e);
+    hat(v, t1 + 1.75 * e, true);
+    stab(v, [N['E4'], N['G4'], N['C5']], t1 + 1.75 * e, 1.4 * e);
+    stab(v, [N['G4'], N['C5'], N['E5']], t1 + 2.25 * e, 0.9 * e);
+    boing(v, t1 + 3.2 * e, 0.14);
+    swoosh(v, t1 + 3.4 * e);
+    return e * 5.2;
+  }
+  if (level === 'great') {
+    kick(v, t);
+    for (const [b, n, len] of [
+      [0, 'G4', 0.45],
+      [0.5, 'G4', 0.45],
+      [1, 'E4', 0.4],
+      [1.25, 'C4', 0.4],
+      [1.75, 'G4', 1.1],
+    ] as [number, string, number][]) lead(v, N[n], t + b * e, len * e, 0.11);
+    snare(v, t + 1.75 * e);
+    stab(v, [N['E4'], N['G4'], N['C5']], t + 1.75 * e, 1 * e);
+    boing(v, t + 2.6 * e, 0.1);
+    return e * 3.6;
+  }
+  if (level === 'par') {
+    lead(v, N['E4'], t, 0.35 * e, 0.1);
+    lead(v, N['G4'], t + 0.4 * e, 0.7 * e, 0.1);
+    kick(v, t + 0.4 * e);
+    hat(v, t + 0.4 * e);
+    return e * 1.3;
+  }
+  // bogey: a sad plunger, twice
+  boing(v, t, 0.1);
+  boing(v, t + 0.35, 0.07);
+  return 0.9;
+}
+
 // ---- Live player: look-ahead scheduler on the page's audio context.
 let timer = 0;
 let playing = false;
@@ -381,6 +434,16 @@ export function stopTheme(fadeSeconds = 0.35): void {
     setTimeout(() => g.disconnect(), fadeSeconds * 1000 + 100);
   }
   musicGain = null;
+}
+
+/** Renders a stinger offline (previews and tests). */
+export async function renderStinger(level: StingerLevel, sampleRate = 44100): Promise<AudioBuffer> {
+  const ctx = new OfflineAudioContext(1, Math.ceil(3.2 * sampleRate), sampleRate);
+  const g = ctx.createGain();
+  g.gain.value = 0.6;
+  g.connect(ctx.destination);
+  stinger({ ctx, out: g }, level, 0.05);
+  return await ctx.startRendering();
 }
 
 /** Renders `bars` bars offline (used for previews and tests). */

@@ -3,8 +3,34 @@
  * context is created on the first user gesture (browser autoplay rules).
  */
 
+import { stinger, type StingerLevel } from './music';
+
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
+
+/**
+ * Optional recorded crowd cheers. Drop files at public/sfx/cheer-big.mp3
+ * and public/sfx/cheer-small.mp3 (any format the browser decodes) and they
+ * play under the ace / birdie stingers. Missing files are silently skipped.
+ */
+const samples: { big: AudioBuffer | null; small: AudioBuffer | null; tried: boolean } = { big: null, small: null, tried: false };
+export function loadCheerSamples(): void {
+  if (samples.tried || !ctx) return;
+  samples.tried = true;
+  const c = ctx;
+  for (const [key, file] of [
+    ['big', 'cheer-big.mp3'],
+    ['small', 'cheer-small.mp3'],
+  ] as const) {
+    fetch(`${import.meta.env.BASE_URL.replace(/\/+$/, '')}/sfx/${file}`)
+      .then((r) => (r.ok && /audio|octet/.test(r.headers.get('content-type') ?? '') ? r.arrayBuffer() : null))
+      .then((ab) => (ab ? c.decodeAudioData(ab) : null))
+      .then((buf) => {
+        if (buf) samples[key] = buf;
+      })
+      .catch(() => {});
+  }
+}
 
 /** The live context and master bus, once unlocked (music hangs off the same bus). */
 export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
@@ -73,6 +99,7 @@ export function unlockAudio(): void {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
+    loadCheerSamples();
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
     if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch {
@@ -202,98 +229,25 @@ export const sfx = {
     noise(0.5, { gain: 0.12, filter: 1500, to: 300, q: 0.5, delay: 0.42 });
   },
   /**
-   * Crowd cheer built from voices, not static: dozens of sawtooth "singers"
-   * pushed through two vocal formant filters each (ah / oh / eh / ay), with
-   * their own pitch, vibrato, onset and length, plus real-feeling claps
-   * (three quick slaps per clap) and a couple of whistles. Bigger scores
-   * get a bigger crowd.
+   * Sink celebration: the theme's hook as a stinger, sized by the score.
+   * If a recorded crowd file exists under /sfx it plays underneath on the
+   * bigger ones (see loadCheerSamples).
    */
-  cheer(level: 'huge' | 'big' | 'ok' | 'polite'): void {
+  stinger(level: StingerLevel): void {
     if (!ctx || !master || muted) return;
-    const c = ctx;
-    const bus = c.createGain();
-    bus.gain.value = { huge: 0.9, big: 0.8, ok: 0.7, polite: 0.55 }[level];
+    const bus = ctx.createGain();
+    bus.gain.value = 0.9;
     bus.connect(master);
-    const t0 = now();
-    const voices = { huge: 44, big: 30, ok: 18, polite: 8 }[level];
-    const spread = { huge: 0.7, big: 0.55, ok: 0.45, polite: 0.35 }[level];
-    const longest = { huge: 2.4, big: 2.0, ok: 1.6, polite: 1.2 }[level];
-    const formants: [number, number][] = [
-      [730, 1090], // ah
-      [570, 840], // oh
-      [530, 1840], // eh
-      [660, 1720], // ay
-    ];
-    const r = Math.random;
-    for (let i = 0; i < voices; i++) {
-      const female = r() < 0.45;
-      const f = female ? 200 + r() * 130 : 105 + r() * 80;
-      const onset = t0 + r() * spread;
-      const dur = 0.6 + r() * (longest - 0.6);
-      const attack = 0.06 + r() * 0.25;
-      const release = 0.25 + r() * 0.4;
-      const [f1, f2] = formants[Math.floor(r() * formants.length)];
-      const o = c.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.setValueAtTime(f, onset);
-      // some voices whoop upward, the rest drift a little
-      if (r() < 0.3) o.frequency.exponentialRampToValueAtTime(f * (1.25 + r() * 0.3), onset + 0.35 + r() * 0.3);
-      else o.frequency.exponentialRampToValueAtTime(f * (0.97 + r() * 0.06), onset + dur);
-      const vib = c.createOscillator();
-      const vibG = c.createGain();
-      vib.frequency.value = 4.5 + r() * 2.5;
-      vibG.gain.value = f * (0.015 + r() * 0.02);
-      vib.connect(vibG);
-      vibG.connect(o.frequency);
-      const g = c.createGain();
-      g.gain.setValueAtTime(0.0001, onset);
-      g.gain.exponentialRampToValueAtTime(0.16 + r() * 0.08, onset + attack);
-      g.gain.setValueAtTime(0.16, onset + Math.max(attack, dur - release));
-      g.gain.exponentialRampToValueAtTime(0.0001, onset + dur);
-      for (const [fc, q] of [
-        [f1, 5],
-        [f2, 7],
-      ] as [number, number][]) {
-        const bp = c.createBiquadFilter();
-        bp.type = 'bandpass';
-        bp.frequency.value = fc * (0.9 + r() * 0.2);
-        bp.Q.value = q;
-        o.connect(bp);
-        bp.connect(g);
-      }
-      g.connect(bus);
-      o.start(onset);
-      vib.start(onset);
-      o.stop(onset + dur + 0.05);
-      vib.stop(onset + dur + 0.05);
-    }
-    // claps: each one is three quick slaps
-    const claps = { huge: 34, big: 24, ok: 14, polite: 7 }[level];
-    for (let i = 0; i < claps; i++) {
-      const at = 0.08 + r() * (longest - 0.4);
-      for (let k = 0; k < 3; k++) noise(0.014, { gain: 0.14 + r() * 0.1, filter: 1000 + r() * 700, q: 1.6, delay: at + k * (0.011 + r() * 0.006) });
-    }
-    // whistles
-    const whistles = level === 'huge' ? 3 : level === 'big' ? 1 : 0;
-    for (let i = 0; i < whistles; i++) {
-      const w = c.createOscillator();
-      const wg = c.createGain();
-      const at = t0 + 0.2 + r() * 0.8;
-      w.type = 'sine';
-      w.frequency.setValueAtTime(1800 + r() * 300, at);
-      w.frequency.exponentialRampToValueAtTime(2600, at + 0.18);
-      w.frequency.exponentialRampToValueAtTime(2100, at + 0.5);
-      wg.gain.setValueAtTime(0.0001, at);
-      wg.gain.exponentialRampToValueAtTime(0.09, at + 0.04);
-      wg.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
-      w.connect(wg);
-      wg.connect(bus);
-      w.start(at);
-      w.stop(at + 0.6);
-    }
-    if (level === 'huge') {
-      tone(311, 0.7, { type: 'sawtooth', gain: 0.05, delay: 0.4 });
-      tone(466, 0.7, { type: 'sawtooth', gain: 0.035, delay: 0.4 });
+    stinger({ ctx, out: bus }, level, now());
+    const sample = level === 'ace' ? samples.big : level === 'great' ? samples.small : null;
+    if (sample && ctx instanceof AudioContext) {
+      const src = ctx.createBufferSource();
+      const g = ctx.createGain();
+      src.buffer = sample;
+      g.gain.value = level === 'ace' ? 0.7 : 0.5;
+      src.connect(g);
+      g.connect(master);
+      src.start(now() + 0.15);
     }
   },
   whoosh(): void {
