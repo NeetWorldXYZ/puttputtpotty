@@ -14,6 +14,59 @@ import { recallFix } from '../net/places';
 import { NamePrompt } from './NamePrompt';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
+const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
+const SEASON_EPOCH = Date.UTC(2026, 8, 1);
+const SEASON_MS = 6 * 7 * 24 * 3600 * 1000;
+
+function seasonInfo(): { n: number; daysLeft: number } {
+  const t = Date.now() - SEASON_EPOCH;
+  const n = Math.floor(t / SEASON_MS) + 1;
+  const daysLeft = Math.max(0, Math.ceil((n * SEASON_MS - t) / 86400000));
+  return { n, daysLeft };
+}
+
+/** The mascot: a crowned toilet with a golf ball, drawn inline so it scales crisp. */
+function Mascot() {
+  return (
+    <svg className="mascot" viewBox="0 0 120 130" aria-hidden="true">
+      <defs>
+        <linearGradient id="porc" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#d9e4ee" />
+        </linearGradient>
+      </defs>
+      {/* shadow */}
+      <ellipse cx="60" cy="122" rx="40" ry="6" fill="rgba(0,0,0,0.35)" />
+      {/* tank */}
+      <rect x="30" y="34" width="60" height="42" rx="8" fill="url(#porc)" stroke="#1f2a44" strokeWidth="4" />
+      <rect x="38" y="30" width="44" height="9" rx="4" fill="#ffffff" stroke="#1f2a44" strokeWidth="4" />
+      {/* flush handle */}
+      <rect x="82" y="44" width="12" height="5" rx="2.5" fill="#c0c9d6" stroke="#1f2a44" strokeWidth="3" />
+      {/* bowl */}
+      <path d="M22 78 C22 70 32 66 60 66 C88 66 98 70 98 78 L94 96 C90 112 76 118 60 118 C44 118 30 112 26 96 Z" fill="url(#porc)" stroke="#1f2a44" strokeWidth="4" />
+      {/* seat */}
+      <ellipse cx="60" cy="78" rx="34" ry="12" fill="#ffffff" stroke="#1f2a44" strokeWidth="4" />
+      <ellipse cx="60" cy="79" rx="22" ry="7" fill="#4db8ff" stroke="#1f2a44" strokeWidth="3" />
+      {/* eyes on the tank */}
+      <circle cx="49" cy="52" r="7" fill="#fff" stroke="#1f2a44" strokeWidth="3" />
+      <circle cx="71" cy="52" r="7" fill="#fff" stroke="#1f2a44" strokeWidth="3" />
+      <circle cx="51" cy="53" r="3" fill="#1f2a44" />
+      <circle cx="73" cy="53" r="3" fill="#1f2a44" />
+      {/* smile */}
+      <path d="M50 64 Q60 70 70 64" fill="none" stroke="#1f2a44" strokeWidth="3" strokeLinecap="round" />
+      {/* crown */}
+      <path d="M36 30 L42 14 L52 24 L60 8 L68 24 L78 14 L84 30 Z" fill="#ffd166" stroke="#1f2a44" strokeWidth="4" strokeLinejoin="round" />
+      <circle cx="42" cy="14" r="3" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
+      <circle cx="60" cy="8" r="3.5" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
+      <circle cx="78" cy="14" r="3" fill="#ff6f3c" stroke="#1f2a44" strokeWidth="2" />
+      {/* golf ball rolling in */}
+      <circle cx="104" cy="110" r="9" fill="#fff" stroke="#1f2a44" strokeWidth="3.5" />
+      <circle cx="101" cy="107" r="1.4" fill="#b7c3d0" />
+      <circle cx="106" cy="108" r="1.4" fill="#b7c3d0" />
+      <circle cx="103" cy="112" r="1.4" fill="#b7c3d0" />
+    </svg>
+  );
+}
 
 function untilTomorrowUtc(): string {
   const now = new Date();
@@ -130,7 +183,7 @@ export function TitleScreen() {
         dpr,
         time: t,
       });
-      ctx.fillStyle = 'rgba(7,9,10,0.62)';
+      ctx.fillStyle = 'rgba(12,16,40,0.55)';
       ctx.fillRect(0, 0, w, h);
     };
     raf = requestAnimationFrame(loop);
@@ -165,66 +218,79 @@ export function TitleScreen() {
   };
   const lenInfo = COURSE_LENGTHS.find((l) => l.n === len) ?? COURSE_LENGTHS[1];
 
+  const season = seasonInfo();
+
   return (
     <div className="title" onPointerDown={wake} onPointerUp={wake} onClick={wake}>
       <canvas ref={canvasRef} className="title-bg" />
+      <div className="floaters" aria-hidden="true">
+        {FLOATERS.map((f, i) => (
+          <span key={i} style={{ left: `${(i * 37 + 8) % 92}%`, animationDuration: `${14 + (i % 5) * 3}s`, animationDelay: `${-i * 2.3}s`, fontSize: `${22 + (i % 3) * 8}px` }}>
+            {f}
+          </span>
+        ))}
+      </div>
       <div className="title-inner home">
         <div className="home-stack">
-          <header className="home-head">
-            <div className="logo small">
+          <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
+            <span className="player-name">{name ?? 'Set your name'}</span>
+            <span className="player-thrones">👑 {thrones ?? '–'}</span>
+          </button>
+
+          <header className="hero-head">
+            <Mascot />
+            <div className="logo big">
               <span className="logo-top">Putt Putt</span>
               <span className="logo-bottom">Potty</span>
             </div>
-            <button className="player-chip" onClick={() => go(() => setAskName(true))}>
-              <span className="player-name">{name ?? 'Set your name'}</span>
-              <span className="player-thrones">👑 {thrones ?? '–'}</span>
-            </button>
+            <div className="tagline">Every bathroom is a course. Every course has a king.</div>
+            <div className="season-pill">
+              Season {season.n} · {season.daysLeft} days left
+            </div>
           </header>
-          <div className="tagline">Every bathroom is a course. Every course has a king.</div>
 
-          <section className="home-card hero" onClick={() => go(() => navigate('map'))}>
-            <div className="card-icon">👑</div>
-            <div className="card-body">
-              <div className="card-title">Thrones</div>
-              <div className="card-sub">
-                {nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms near you. Beat the record, take the throne.'}
-              </div>
-            </div>
-            <button className="card-cta">Open map</button>
-          </section>
+          <button className="play-btn thrones" onClick={() => go(() => navigate('map'), 'whoosh')}>
+            <span className="pb-icon">👑</span>
+            <span className="pb-text">
+              <span className="pb-title">Thrones</span>
+              <span className="pb-sub">{nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms near you. Take the throne.'}</span>
+            </span>
+            <span className="pb-go">Map</span>
+          </button>
 
-          <section className="home-card" onClick={() => go(() => goToCourse('daily'))}>
-            <div className="card-icon">📅</div>
-            <div className="card-body">
-              <div className="card-title">
+          <button className="play-btn daily" onClick={() => go(() => goToCourse('daily'), 'whoosh')}>
+            <span className="pb-icon">📅</span>
+            <span className="pb-text">
+              <span className="pb-title">
                 Daily course <span className={`pill${played ? ' done' : ''}`}>{played ? '1/1' : '0/1'}</span>
-              </div>
-              <div className="card-sub">
-                {played
-                  ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of} today` : ''} · next course in ${untilTomorrowUtc()}`
-                  : `Nine holes, one attempt, everyone plays the same course · resets in ${untilTomorrowUtc()}`}
-              </div>
-            </div>
-            <button className="card-cta">{played ? 'Results' : 'Play'}</button>
-          </section>
+              </span>
+              <span className="pb-sub">
+                {played ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of} today` : ''} · next in ${untilTomorrowUtc()}` : `Nine holes, one shot at it · resets in ${untilTomorrowUtc()}`}
+              </span>
+            </span>
+            <span className="pb-go">{played ? 'Results' : 'Play'}</span>
+          </button>
 
-          <section className="home-card">
-            <div className="card-icon">🎲</div>
-            <div className="card-body">
-              <div className="card-title">Custom game</div>
-              <div className="card-sub">Fresh holes every time · {lenInfo.blurb}</div>
-              <div className="len-chips">
+          <div className="play-btn custom">
+            <span className="pb-icon">🎲</span>
+            <span className="pb-text">
+              <span className="pb-title">Custom game</span>
+              <span className="pb-sub">
+                {len} holes · {lenInfo.blurb}
+              </span>
+              <span className="len-chips">
                 {COURSE_LENGTHS.map((l) => (
-                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)}>
+                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
                     {l.label}
                   </button>
                 ))}
-              </div>
-            </div>
-            <button className="card-cta" onClick={() => go(() => goToCourse('random', len))}>
+                <span className="len-word">holes</span>
+              </span>
+            </span>
+            <button className="pb-go" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
               Tee off
             </button>
-          </section>
+          </div>
 
           <div className="home-row">
             <button className="menu-small" onClick={() => go(() => navigate('leaders'))}>
@@ -234,8 +300,11 @@ export function TitleScreen() {
               className="menu-small"
               onClick={() =>
                 go(() => {
-                  setMuted(!muted);
-                  setMutedState(!muted);
+                  const m = !muted;
+                  setMuted(m);
+                  setMutedState(m);
+                  if (m) stopTheme();
+                  else theme();
                 })
               }
             >

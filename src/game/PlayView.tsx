@@ -61,6 +61,9 @@ const HUD_BOTTOM = 48;
 const SIDE_PAD = 8;
 const MIN_FIT_SCALE = 10;
 const CANCEL_POWER = 0.08;
+/** Holding the screen while the ball rolls runs the sim this many times faster. */
+const FAST_FORWARD = 3;
+const MAX_FRAME = 0.1;
 const INTRO_SECONDS = 1.4;
 
 function scoreTerm(strokes: number, par: number, sunk: boolean): string {
@@ -116,6 +119,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const cupFlashRef = useRef(0);
   const camTargetRef = useRef({ x: hole.tee.x, y: hole.tee.y });
   const dragRef = useRef<Drag | null>(null);
+  const fastRef = useRef(false);
+  const [fast, setFast] = useState(false);
   const fxRef = useRef(new Fx());
   const squashRef = useRef({ amt: 0, ang: 0 });
   const introRef = useRef({ t: INTRO_SECONDS + 1 });
@@ -151,6 +156,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       lastTrailRef.current = [];
       cupFlashRef.current = 0;
       dragRef.current = null;
+      fastRef.current = false;
       fxRef.current = new Fx();
       squashRef.current = { amt: 0, ang: 0 };
       sinkRef.current = null;
@@ -368,7 +374,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
 
       // --- fixed-step physics
       if (!s.resting && !s.done) {
-        accRef.current += frame;
+        accRef.current += Math.min(frame, MAX_FRAME) * (fastRef.current ? FAST_FORWARD : 1);
         let settled = false;
         while (accRef.current >= FIXED_DT) {
           prevBallRef.current = { x: s.ball.x, y: s.ball.y };
@@ -384,6 +390,10 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         if (settled) {
           lastTrailRef.current = trailRef.current;
           trailRef.current = [];
+          if (fastRef.current) {
+            fastRef.current = false;
+            setFast(false);
+          }
           syncHud();
         }
       } else {
@@ -528,6 +538,13 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     unlockAudio();
     const s = stateRef.current;
+    if (!s.resting && !s.done && !dragRef.current) {
+      // Ball in motion: hold to fast-forward.
+      e.currentTarget.setPointerCapture(e.pointerId);
+      fastRef.current = true;
+      setFast(true);
+      return;
+    }
     if (!s.resting || s.done || dragRef.current) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const r = e.currentTarget.getBoundingClientRect();
@@ -544,6 +561,10 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     d.curY = e.clientY - r.top;
   };
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (fastRef.current) {
+      fastRef.current = false;
+      setFast(false);
+    }
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     dragRef.current = null;
@@ -571,6 +592,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     }
   };
   const onPointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    fastRef.current = false;
+    setFast(false);
     if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
   };
 
@@ -692,7 +715,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         </div>
       )}
 
-      {!hud.done && !dragging && hud.strokes === 0 && !banner && <div className="hint">Drag anywhere to aim · release to putt · drag back to cancel</div>}
+      {!hud.done && !dragging && hud.strokes === 0 && !banner && <div className="hint">Drag anywhere to aim · release to putt · hold while it rolls to fast-forward</div>}
+      {fast && <div className="ff-badge">⏩ ×{FAST_FORWARD}</div>}
 
       {hud.done && !courseDone && (
         <div className="overlay">

@@ -1711,3 +1711,238 @@ input[type='checkbox'] {
 .card.help li {
   margin-bottom: 8px;
 }
+
+/* ---------- home: landing page ---------- */
+.floaters {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.floaters span {
+  position: absolute;
+  bottom: -60px;
+  opacity: 0;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35));
+  animation-name: float-up;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes float-up {
+  0% {
+    transform: translateY(0) rotate(-10deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.55;
+  }
+  92% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-110vh) rotate(14deg);
+    opacity: 0;
+  }
+}
+.player-chip.corner {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 12px;
+  z-index: 2;
+}
+.hero-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 4px;
+}
+.mascot {
+  width: 116px;
+  height: 126px;
+  animation: mascot-bob 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.35));
+}
+@keyframes mascot-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
+}
+.logo.big {
+  animation: logo-in 0.7s cubic-bezier(0.2, 1.5, 0.4, 1);
+  margin-top: -6px;
+}
+.logo.big .logo-top {
+  font-size: 34px;
+}
+.logo.big .logo-bottom {
+  font-size: 58px;
+}
+.season-pill {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  padding: 4px 12px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.play-btn {
+  width: min(400px, 94vw);
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 4px solid var(--ink);
+  border-radius: 22px;
+  padding: 12px 12px 12px 8px;
+  color: var(--ink);
+  font-family: var(--game-font);
+  text-align: left;
+  box-shadow: 0 7px 0 var(--ink), 0 12px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s, box-shadow 0.08s;
+  cursor: pointer;
+}
+.play-btn:active {
+  transform: translateY(5px);
+  box-shadow: 0 2px 0 var(--ink), 0 6px 10px rgba(0, 0, 0, 0.35);
+}
+.play-btn.thrones {
+  background: linear-gradient(180deg, #ffe08a, #ffc93c);
+  transform: rotate(-1deg);
+  padding: 16px 12px 16px 8px;
+}
+.play-btn.thrones:active {
+  transform: rotate(-1deg) translateY(5px);
+}
+.play-btn.daily {
+  background: linear-gradient(180deg, #8ff0c1, #4fd69a);
+  transform: rotate(0.8deg);
+}
+.play-btn.daily:active {
+  transform: rotate(0.8deg) translateY(5px);
+}
+.play-btn.custom {
+  background: linear-gradient(180deg, #a9d7ff, #6db8ff);
+  transform: rotate(-0.6deg);
+  cursor: default;
+}
+.pb-icon {
+  font-size: 36px;
+  line-height: 1;
+  text-align: center;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.25));
+}
+.play-btn.thrones .pb-icon {
+  font-size: 44px;
+  animation: crown-wiggle 3s ease-in-out infinite;
+}
+@keyframes crown-wiggle {
+  0%,
+  80%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  86% {
+    transform: rotate(6deg) scale(1.08);
+  }
+  93% {
+    transform: rotate(-12deg) scale(1.08);
+  }
+}
+.pb-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.pb-title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.05;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.play-btn.thrones .pb-title {
+  font-size: 26px;
+}
+.pb-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(31, 42, 68, 0.78);
+}
+.pb-go {
+  font-family: var(--game-font);
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 14px;
+  border: 3px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  padding: 10px 14px;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.play-btn .len-chips {
+  margin-top: 6px;
+}
+.play-btn .len-chips button {
+  background: rgba(255, 255, 255, 0.7);
+}
+.play-btn .len-chips button.active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.play-btn .len-chips {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.play-btn .len-chips button {
+  min-width: 38px;
+  padding: 5px 0;
+  text-align: center;
+}
+.len-word {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(31, 42, 68, 0.7);
+  margin-left: 2px;
+}
+.play-btn.daily .pb-title {
+  font-size: 20px;
+}
+
+.ff-badge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--game-font);
+  font-weight: 700;
+  font-size: 14px;
+  pointer-events: none;
+  animation: ff-pulse 0.6s ease-in-out infinite;
+}
+@keyframes ff-pulse {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.08);
+  }
+}

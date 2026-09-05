@@ -11,10 +11,10 @@ export function randomSeed(): string {
 }
 
 export const COURSE_LENGTHS = [
-  { n: 3, label: 'Quick 3', blurb: 'a coffee break' },
-  { n: 9, label: 'Nine', blurb: 'the classic' },
-  { n: 18, label: 'Eighteen', blurb: 'a proper round' },
-  { n: 27, label: 'Marathon', blurb: "it'll be a while" },
+  { n: 3, label: '3', blurb: 'quick one, a coffee break' },
+  { n: 9, label: '9', blurb: 'the classic' },
+  { n: 18, label: '18', blurb: 'a proper round' },
+  { n: 27, label: '27', blurb: "marathon, it'll be a while" },
 ] as const;
 
 const LEN_KEY = 'ppp.len.v1';
