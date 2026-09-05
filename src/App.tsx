@@ -44,7 +44,7 @@ export function App() {
         <LocationPlay key={`${loc.loc}:${loc.mode}`} locationId={loc.loc} throne={loc.mode === 'throne'} />
       </Suspense>
     );
-  if (loc.seed) return <GeneratedCourse key={loc.seed} seed={loc.seed} onOpenEditor={() => navigate('editor')} />;
+  if (loc.seed) return <GeneratedCourse key={`${loc.seed}:${loc.n ?? 9}`} seed={loc.seed} count={loc.n ?? 9} onOpenEditor={() => navigate('editor')} />;
   if (loc.course === 'handmade') return <PlayView holes={COURSE} onOpenEditor={() => navigate('editor')} courseSeed={null} />;
-  return <TitleScreen onOpenEditor={() => navigate('editor')} />;
+  return <TitleScreen />;
 }

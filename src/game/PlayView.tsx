@@ -618,7 +618,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   };
   const share = async () => {
     const text = `Putt Putt Potty${courseSeed ? ` · ${courseSeed}` : ''}: ${totalScore} (${relPar(totalScore - totalPar)}) — ${results.join(' ')}`;
-    const url = courseSeed ? `${location.origin}/?seed=${encodeURIComponent(courseSeed)}` : location.origin;
+    const url = courseSeed ? `${location.origin}/?seed=${encodeURIComponent(courseSeed)}${holes.length !== 9 ? `&n=${holes.length}` : ''}` : location.origin;
     try {
       if (navigator.share) await navigator.share({ title: 'Putt Putt Potty', text, url });
       else await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -746,7 +746,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             <button className="primary" onClick={share}>
               {shared ? 'Shared!' : 'Share score'}
             </button>
-            {!onExit && <button onClick={() => goToCourse('random')}>New random course</button>}
+            {!onExit && <button onClick={() => goToCourse('random', holes.length)}>New course, same length</button>}
             {!onExit && courseSeed !== dailySeed() && <button onClick={() => goToCourse('daily')}>Today&apos;s daily</button>}
             {!noRetry && <button onClick={restartCourse}>Play again</button>}
             {onExit ? <button onClick={onExit}>{exitLabel ?? 'Back'}</button> : <button onClick={() => goToCourse('title')}>Title screen</button>}

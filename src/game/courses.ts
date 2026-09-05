@@ -10,11 +10,35 @@ export function randomSeed(): string {
   return s;
 }
 
-export function goToCourse(choice: CourseChoice): void {
+export const COURSE_LENGTHS = [
+  { n: 3, label: 'Quick 3', blurb: 'a coffee break' },
+  { n: 9, label: 'Nine', blurb: 'the classic' },
+  { n: 18, label: 'Eighteen', blurb: 'a proper round' },
+  { n: 27, label: 'Marathon', blurb: "it'll be a while" },
+] as const;
+
+const LEN_KEY = 'ppp.len.v1';
+export function getPreferredLength(): number {
+  try {
+    const n = Number(localStorage.getItem(LEN_KEY));
+    return COURSE_LENGTHS.some((l) => l.n === n) ? n : 9;
+  } catch {
+    return 9;
+  }
+}
+export function setPreferredLength(n: number): void {
+  try {
+    localStorage.setItem(LEN_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function goToCourse(choice: CourseChoice, n?: number): void {
   if (choice === 'title') navigate('play', null, null);
   else if (choice === 'handmade') navigate('play', null, 'handmade');
   else if (choice === 'daily') navigate('play', dailySeed(), null);
-  else navigate('play', randomSeed(), null);
+  else navigate('play', randomSeed(), null, { n: n ?? getPreferredLength() });
 }
 
 const BEST_KEY = 'ppp.best.v1';

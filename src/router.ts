@@ -19,6 +19,8 @@ export interface Location {
   loc: string | null;
   /** 'throne' submits the run for the throne; anything else is practice. */
   mode: string | null;
+  /** Hole count for a generated course (default 9). */
+  n: number | null;
 }
 
 export interface NavigateOptions {
@@ -26,6 +28,7 @@ export interface NavigateOptions {
   course?: string | null;
   loc?: string | null;
   mode?: string | null;
+  n?: number | null;
   /** Replace the history entry instead of pushing one. */
   replace?: boolean;
 }
@@ -36,7 +39,9 @@ function read(): Location {
   const route: Route = p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : 'play';
   const q = new URLSearchParams(window.location.search);
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
-  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')) };
+  const nRaw = Number(q.get('n'));
+  const n = Number.isInteger(nRaw) && nRaw >= 1 && nRaw <= 36 ? nRaw : null;
+  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n };
 }
 
 export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
@@ -49,6 +54,7 @@ export function navigate(route: Route, seed: string | null = null, course: strin
   if (c) q.set('course', c);
   if (extra.loc) q.set('loc', extra.loc);
   if (extra.mode) q.set('mode', extra.mode);
+  if (extra.n && extra.n !== 9) q.set('n', String(extra.n));
   const qs = q.toString();
   const url = path + (qs ? `?${qs}` : '');
   if (extra.replace) window.history.replaceState(null, '', url);
