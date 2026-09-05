@@ -3,7 +3,7 @@
  * context is created on the first user gesture (browser autoplay rules).
  */
 
-import { stinger, type StingerLevel } from './music';
+import { setHookVocal, stinger, type StingerLevel } from './music';
 
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
@@ -21,12 +21,15 @@ export function loadCheerSamples(): void {
   for (const [key, file] of [
     ['big', 'cheer-big.mp3'],
     ['small', 'cheer-small.mp3'],
+    ['hook', 'hook-vocal.wav'],
   ] as const) {
     fetch(`${import.meta.env.BASE_URL.replace(/\/+$/, '')}/sfx/${file}`)
       .then((r) => (r.ok && /audio|octet/.test(r.headers.get('content-type') ?? '') ? r.arrayBuffer() : null))
       .then((ab) => (ab ? c.decodeAudioData(ab) : null))
       .then((buf) => {
-        if (buf) samples[key] = buf;
+        if (!buf) return;
+        if (key === 'hook') setHookVocal(buf);
+        else samples[key] = buf;
       })
       .catch(() => {});
   }

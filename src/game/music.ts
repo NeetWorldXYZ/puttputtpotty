@@ -310,9 +310,28 @@ function drumsBar(v: Voice, bar: number, t0: number): void {
   if (bar === 7) kick(v, t0 + 3.5 * BEAT);
 }
 
+// ---- The chant. A recorded/synthesised "PUTT PUTT POT-TY" laid over the hook
+// bars, already cut to the hook rhythm (see public/sfx/README.md).
+let hookVocal: AudioBuffer | null = null;
+export function setHookVocal(buf: AudioBuffer | null): void {
+  hookVocal = buf;
+}
+function chant(v: Voice, t: number, rate = 1, gain = 0.85): void {
+  if (!hookVocal) return;
+  const { ctx, out } = v;
+  const src = ctx.createBufferSource();
+  src.buffer = hookVocal;
+  src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(g).connect(out);
+  src.start(t);
+}
+
 /** Schedules one bar of everything at time t0. */
 export function scheduleBar(v: Voice, bar: number, t0: number): void {
   const ch = CHORDS[bar % BARS];
+  if (bar % 2 === 0) chant(v, t0, bar % BARS === 4 ? 1.06 : 1);
   bassBar(v, N[ch.bass], t0);
   drumsBar(v, bar % BARS, t0);
   const stabs = ch.stab.map((n) => N[n]);
@@ -459,13 +478,19 @@ export async function renderStinger(level: StingerLevel, sampleRate = 44100): Pr
 }
 
 /** Renders `bars` bars offline (used for previews and tests). */
-export async function renderTheme(bars = BARS, sampleRate = 44100): Promise<AudioBuffer> {
+export async function renderTheme(bars = BARS, sampleRate = 44100, vocal: AudioBuffer | null = hookVocal): Promise<AudioBuffer> {
   const length = Math.ceil((bars * BAR + 1.5) * sampleRate);
   const ctx = new OfflineAudioContext(1, length, sampleRate);
   const g = ctx.createGain();
   g.gain.value = 0.5;
   g.connect(ctx.destination);
   const v: Voice = { ctx, out: g };
-  for (let b = 0; b < bars; b++) scheduleBar(v, b, 0.05 + b * BAR);
+  const live = hookVocal;
+  hookVocal = vocal;
+  try {
+    for (let b = 0; b < bars; b++) scheduleBar(v, b, 0.05 + b * BAR);
+  } finally {
+    hookVocal = live;
+  }
   return await ctx.startRendering();
 }
