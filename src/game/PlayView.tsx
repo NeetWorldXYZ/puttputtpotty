@@ -157,9 +157,11 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   }, [hole, holeIndex, resetHole]);
 
   useEffect(() => {
-    if (!hud.done || doneFiredRef.current) return;
-    doneFiredRef.current = true;
+    // hud.done can be stale for one render after a hole change (the sim is
+    // reset before the HUD mirror is), so trust the sim state, not the mirror.
     const st = stateRef.current;
+    if (!hud.done || doneFiredRef.current || !st.done || st.strokeHistory.length === 0) return;
+    doneFiredRef.current = true;
     onHoleDoneRef.current?.({ holeIndex, hole, strokes: st.strokeHistory.slice(), score: holeScore(st, hole.par), sunk: st.sunk });
   }, [hud.done, holeIndex, hole]);
 
