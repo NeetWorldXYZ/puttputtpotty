@@ -3,8 +3,13 @@
  * context is created on the first user gesture (browser autoplay rules).
  */
 
-let ctx: AudioContext | null = null;
+let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
+
+/** The live context and master bus, once unlocked (music hangs off the same bus). */
+export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
+  return ctx && master && ctx instanceof AudioContext ? { ctx, master } : null;
+}
 let muted = false;
 
 const MUTE_KEY = 'ppp.mute.v1';
@@ -58,7 +63,7 @@ function primeMediaSession(): void {
 export function unlockAudio(): void {
   primeMediaSession();
   if (ctx) {
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
     return;
   }
   try {
@@ -69,7 +74,7 @@ export function unlockAudio(): void {
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
-    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
   } catch {
     ctx = null;
   }
@@ -79,7 +84,7 @@ export function unlockAudio(): void {
 if (typeof window !== 'undefined') {
   for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (document.visibilityState === 'visible' && ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
   });
 }
 
@@ -197,25 +202,98 @@ export const sfx = {
     noise(0.5, { gain: 0.12, filter: 1500, to: 300, q: 0.5, delay: 0.42 });
   },
   /**
-   * Crowd cheer: layered swells of filtered noise, a few "whoo" glides and
-   * scattered claps. Bigger scores get a bigger crowd.
+   * Crowd cheer built from voices, not static: dozens of sawtooth "singers"
+   * pushed through two vocal formant filters each (ah / oh / eh / ay), with
+   * their own pitch, vibrato, onset and length, plus real-feeling claps
+   * (three quick slaps per clap) and a couple of whistles. Bigger scores
+   * get a bigger crowd.
    */
   cheer(level: 'huge' | 'big' | 'ok' | 'polite'): void {
     if (!ctx || !master || muted) return;
-    const size = { huge: 1, big: 0.75, ok: 0.5, polite: 0.3 }[level];
-    const dur = 0.9 + size * 1.4;
-    const bands = level === 'polite' ? 1 : level === 'ok' ? 2 : 3;
-    for (let i = 0; i < bands; i++) noise(dur, { gain: 0.16 * size + 0.05, filter: 900 + i * 350, to: 1300 + i * 200, q: 0.35, attack: 0.18 + i * 0.05, delay: i * 0.06 });
-    const whoops = level === 'polite' ? 0 : level === 'ok' ? 1 : level === 'big' ? 2 : 4;
-    for (let i = 0; i < whoops; i++) {
-      const f0 = 380 + Math.random() * 120;
-      tone(f0, 0.35, { type: 'sine', gain: 0.07, to: f0 * 2.1, attack: 0.05, delay: 0.1 + i * 0.16 + Math.random() * 0.08 });
+    const c = ctx;
+    const bus = c.createGain();
+    bus.gain.value = { huge: 0.9, big: 0.8, ok: 0.7, polite: 0.55 }[level];
+    bus.connect(master);
+    const t0 = now();
+    const voices = { huge: 44, big: 30, ok: 18, polite: 8 }[level];
+    const spread = { huge: 0.7, big: 0.55, ok: 0.45, polite: 0.35 }[level];
+    const longest = { huge: 2.4, big: 2.0, ok: 1.6, polite: 1.2 }[level];
+    const formants: [number, number][] = [
+      [730, 1090], // ah
+      [570, 840], // oh
+      [530, 1840], // eh
+      [660, 1720], // ay
+    ];
+    const r = Math.random;
+    for (let i = 0; i < voices; i++) {
+      const female = r() < 0.45;
+      const f = female ? 200 + r() * 130 : 105 + r() * 80;
+      const onset = t0 + r() * spread;
+      const dur = 0.6 + r() * (longest - 0.6);
+      const attack = 0.06 + r() * 0.25;
+      const release = 0.25 + r() * 0.4;
+      const [f1, f2] = formants[Math.floor(r() * formants.length)];
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f, onset);
+      // some voices whoop upward, the rest drift a little
+      if (r() < 0.3) o.frequency.exponentialRampToValueAtTime(f * (1.25 + r() * 0.3), onset + 0.35 + r() * 0.3);
+      else o.frequency.exponentialRampToValueAtTime(f * (0.97 + r() * 0.06), onset + dur);
+      const vib = c.createOscillator();
+      const vibG = c.createGain();
+      vib.frequency.value = 4.5 + r() * 2.5;
+      vibG.gain.value = f * (0.015 + r() * 0.02);
+      vib.connect(vibG);
+      vibG.connect(o.frequency);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, onset);
+      g.gain.exponentialRampToValueAtTime(0.16 + r() * 0.08, onset + attack);
+      g.gain.setValueAtTime(0.16, onset + Math.max(attack, dur - release));
+      g.gain.exponentialRampToValueAtTime(0.0001, onset + dur);
+      for (const [fc, q] of [
+        [f1, 5],
+        [f2, 7],
+      ] as [number, number][]) {
+        const bp = c.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = fc * (0.9 + r() * 0.2);
+        bp.Q.value = q;
+        o.connect(bp);
+        bp.connect(g);
+      }
+      g.connect(bus);
+      o.start(onset);
+      vib.start(onset);
+      o.stop(onset + dur + 0.05);
+      vib.stop(onset + dur + 0.05);
     }
-    const claps = Math.round(6 + size * 22);
-    for (let i = 0; i < claps; i++) noise(0.045, { gain: 0.08 + Math.random() * 0.06, filter: 1800 + Math.random() * 1200, q: 1.4, delay: 0.05 + Math.random() * (dur - 0.3) });
+    // claps: each one is three quick slaps
+    const claps = { huge: 34, big: 24, ok: 14, polite: 7 }[level];
+    for (let i = 0; i < claps; i++) {
+      const at = 0.08 + r() * (longest - 0.4);
+      for (let k = 0; k < 3; k++) noise(0.014, { gain: 0.14 + r() * 0.1, filter: 1000 + r() * 700, q: 1.6, delay: at + k * (0.011 + r() * 0.006) });
+    }
+    // whistles
+    const whistles = level === 'huge' ? 3 : level === 'big' ? 1 : 0;
+    for (let i = 0; i < whistles; i++) {
+      const w = c.createOscillator();
+      const wg = c.createGain();
+      const at = t0 + 0.2 + r() * 0.8;
+      w.type = 'sine';
+      w.frequency.setValueAtTime(1800 + r() * 300, at);
+      w.frequency.exponentialRampToValueAtTime(2600, at + 0.18);
+      w.frequency.exponentialRampToValueAtTime(2100, at + 0.5);
+      wg.gain.setValueAtTime(0.0001, at);
+      wg.gain.exponentialRampToValueAtTime(0.09, at + 0.04);
+      wg.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
+      w.connect(wg);
+      wg.connect(bus);
+      w.start(at);
+      w.stop(at + 0.6);
+    }
     if (level === 'huge') {
-      tone(311, 0.7, { type: 'sawtooth', gain: 0.07, delay: 0.35 });
-      tone(466, 0.7, { type: 'sawtooth', gain: 0.05, delay: 0.35 });
+      tone(311, 0.7, { type: 'sawtooth', gain: 0.05, delay: 0.4 });
+      tone(466, 0.7, { type: 'sawtooth', gain: 0.035, delay: 0.4 });
     }
   },
   whoosh(): void {
@@ -243,3 +321,24 @@ export const sfx = {
     tone(1200, 0.03, { type: 'square', gain: 0.05 });
   },
 };
+
+
+/** Renders one effect offline (previews and tests); restores the live context afterwards. */
+export async function renderSfx(name: keyof typeof sfx, seconds = 3, arg?: unknown, sampleRate = 44100): Promise<AudioBuffer> {
+  const off = new OfflineAudioContext(1, Math.ceil(seconds * sampleRate), sampleRate);
+  const g = off.createGain();
+  g.gain.value = 0.8;
+  g.connect(off.destination);
+  const saved = { ctx, master, muted };
+  ctx = off;
+  master = g;
+  muted = false;
+  try {
+    (sfx[name] as (a?: unknown) => void)(arg);
+  } finally {
+    ctx = saved.ctx;
+    master = saved.master;
+    muted = saved.muted;
+  }
+  return await off.startRendering();
+}
