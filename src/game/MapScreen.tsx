@@ -6,7 +6,8 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
-import { HOLES_PER_COURSE, api, fmtElapsed, type King, type NearbyLocation } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation } from '../net/api';
+import { currentUserId } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
 import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
@@ -112,6 +113,11 @@ export function MapScreen() {
   const [selected, setSelected] = useState<OsmPlace | null>(null);
   const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    void currentUserId().then(setMe);
+  }, []);
   const [moved, setMoved] = useState(false);
   const [checkinBusy, setCheckinBusy] = useState(false);
   const [checkinError, setCheckinError] = useState<string | null>(null);
@@ -288,6 +294,13 @@ export function MapScreen() {
     if (!selected) return;
     rememberPlace(selected);
     setPreviewError(null);
+    if (board?.id !== selected.id) {
+      const id = selected.id;
+      api
+        .locationBoard(id, 5)
+        .then((rows) => setBoard((b) => (selected && id === selected.id ? { id, rows } : b)))
+        .catch(() => setBoard({ id, rows: [] }));
+    }
     if (preview?.id === selected.id) return;
     let cancelled = false;
     api
@@ -399,6 +412,9 @@ export function MapScreen() {
                       : 'no bathrooms found here'}
           </div>
         </div>
+        <button className="corner-btn" onClick={() => navigate('leaders')} title="Leaderboard">
+          🏆
+        </button>
         <button className="name-chip" onClick={() => setAskName(true)} title="Change name">
           {name ?? 'Set name'}
         </button>
@@ -470,6 +486,22 @@ export function MapScreen() {
               </>
             )}
           </div>
+
+          {board?.id === selected.id && board.rows.length > 0 && (
+            <ol className="sheet-board">
+              {board.rows.map((r) => (
+                <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
+                  <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+                  <span className="who">{r.display_name}</span>
+                  <span className="stat">
+                    {r.score}
+                    {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}
+                  </span>
+                  <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
+                </li>
+              ))}
+            </ol>
+          )}
 
           {preview?.id === selected.id ? (
             <div className="sheet-holes">

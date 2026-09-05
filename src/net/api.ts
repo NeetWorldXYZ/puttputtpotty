@@ -41,6 +41,25 @@ export function fmtElapsed(ms: number): string {
 
 export const HOLES_PER_COURSE = 3;
 
+export interface KingRow {
+  user_id: string;
+  display_name: string;
+  thrones: number;
+  best_rel: number;
+  last_win: string;
+}
+
+export interface LocationRow {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  score: number;
+  par: number;
+  hole_scores: number[] | null;
+  elapsed_ms: number | null;
+  played_at: string;
+}
+
 export interface LocationSummary {
   id: string;
   name: string;
@@ -85,6 +104,16 @@ export const api = {
     const { data, error } = await supabase.rpc('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: radiusM });
     if (error) throw new Error(error.message);
     return (data ?? []) as NearbyLocation[];
+  },
+  async kings(opts: { lat?: number; lng?: number; radiusM?: number; limit?: number } = {}): Promise<KingRow[]> {
+    const { data, error } = await supabase.rpc('kings_leaderboard', { in_lat: opts.lat ?? null, in_lng: opts.lng ?? null, radius_m: opts.radiusM ?? null, lim: opts.limit ?? 50 });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as KingRow[];
+  },
+  async locationBoard(locationId: string, limit = 20): Promise<LocationRow[]> {
+    const { data, error } = await supabase.rpc('location_leaderboard', { in_location: locationId, lim: limit });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as LocationRow[];
   },
   async leaderboard(seed: string): Promise<{ user_id: string; display_name: string; total: number; holes: number; finished_at: string }[]> {
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });

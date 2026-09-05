@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 
-export type Route = 'play' | 'editor' | 'map';
+export type Route = 'play' | 'editor' | 'map' | 'leaders';
 
 export interface Location {
   route: Route;
@@ -33,7 +33,7 @@ export interface NavigateOptions {
 function read(): Location {
   const p = window.location.pathname.replace(/\/+$/, '');
   const h = window.location.hash.replace(/^#\/?/, '');
-  const route: Route = p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : 'play';
+  const route: Route = p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : 'play';
   const q = new URLSearchParams(window.location.search);
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
   return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')) };
@@ -41,7 +41,7 @@ function read(): Location {
 
 export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
-  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : `${base}/`;
+  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : route === 'leaders' ? `${base}/leaders` : `${base}/`;
   const q = new URLSearchParams();
   const s = extra.seed ?? seed;
   const c = extra.course ?? course;
