@@ -86,7 +86,7 @@ export const api = {
   setProfile: (displayName: string) => call<{ ok: true }>({ action: 'profile', displayName }),
   /** Founds the bathroom if needed and returns its (server-generated) three holes and current king. */
   hole: (location: { id: string; name: string; poiType: string; lat: number; lng: number }) =>
-    call<{ location: LocationSummary; holes: Hole[]; par: number; king: King | null }>({ action: 'hole', location }),
+    call<{ location: LocationSummary; ready: boolean; holes: Hole[]; par: number | null; building?: number; king: King | null }>({ action: 'hole', location }),
   checkin: (locationId: string, lat: number, lng: number, accuracy: number) =>
     call<{ ok: true; distance: number }>({ action: 'checkin', locationId, lat, lng, accuracy }),
   /** Bathrooms near a point, fetched from OpenStreetMap by the server and cached there. */

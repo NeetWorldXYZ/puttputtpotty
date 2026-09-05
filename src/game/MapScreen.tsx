@@ -13,6 +13,7 @@ import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
 import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
 import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
 import { getSavedName } from '../net/supabase';
+import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { NamePrompt } from './NamePrompt';
 import { unlockAudio } from './sound';
@@ -39,6 +40,25 @@ function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
       },
     );
   });
+}
+
+/** Same building, several OpenStreetMap objects: keep one pin (mirrors the server's rule). */
+const POI_PRIORITY = ['fuel', 'restaurant', 'fast_food', 'bar', 'hotel', 'retail', 'stadium', 'airport', 'park', 'toilets'];
+function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
+  const rank = (p: OsmPlace) => {
+    const r = POI_PRIORITY.indexOf(p.poiType);
+    return (r < 0 ? POI_PRIORITY.length : r) * 2 + (p.name && p.name !== 'Public toilet' ? 0 : 1);
+  };
+  const sorted = places.slice().sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  const kept: OsmPlace[] = [];
+  for (const p of sorted) {
+    const absorbed = kept.some((q) => {
+      const d = haversine(p.lat, p.lng, q.lat, q.lng);
+      return p.poiType === 'toilets' ? d < 150 : d < 40;
+    });
+    if (!absorbed) kept.push(p);
+  }
+  return kept;
 }
 
 /** Founded bathrooms from the database render as pins even if OpenStreetMap never answers. */
@@ -110,11 +130,14 @@ export function MapScreen() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [places, setPlaces] = useState<OsmPlace[]>([]);
   const [kings, setKings] = useState<Record<string, NearbyLocation>>({});
+  const kingsRef = useRef<Record<string, NearbyLocation>>({});
+  kingsRef.current = kings;
   const [loading, setLoading] = useState(false);
   const [netError, setNetError] = useState<string | null>(null);
   const [selected, setSelected] = useState<OsmPlace | null>(null);
   const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [building, setBuilding] = useState<{ id: string; n: number } | null>(null);
   const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
@@ -172,6 +195,12 @@ export function MapScreen() {
   const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
     const m = placesRef.current;
     for (const p of incoming) m.set(p.id, p);
+    // Claimed bathrooms must never be absorbed: keep them ahead of anything else.
+    const claimedIds = new Set(Object.values(kingsRef.current).filter((k) => k.king_name).map((k) => k.id));
+    const deduped = dedupePlaces([...m.values()].filter((p) => !claimedIds.has(p.id)));
+    m.clear();
+    for (const p of incoming) if (claimedIds.has(p.id)) m.set(p.id, p);
+    for (const p of deduped) if (!m.has(p.id)) m.set(p.id, p);
     if (m.size > MAX_PINS) {
       const sorted = [...m.values()].sort((a, b) => haversine(lat, lng, a.lat, a.lng) - haversine(lat, lng, b.lat, b.lng));
       m.clear();
@@ -305,10 +334,12 @@ export function MapScreen() {
     }
     if (preview?.id === selected.id) return;
     let cancelled = false;
-    api
-      .hole(selected)
+    const signal = { cancelled: false };
+    setBuilding(null);
+    loadCourse(selected, { signal, onProgress: (n) => !cancelled && setBuilding({ id: selected.id, n }) })
       .then((r) => {
         if (cancelled) return;
+        setBuilding(null);
         setPreview({ id: selected.id, holes: r.holes, par: r.par, king: r.king });
         const kg = r.king;
         if (kg) {
@@ -332,6 +363,7 @@ export function MapScreen() {
       });
     return () => {
       cancelled = true;
+      signal.cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
@@ -579,7 +611,7 @@ export function MapScreen() {
           ) : previewError ? (
             <div className="sheet-err">{previewError}</div>
           ) : (
-            <div className="sheet-preview loading">loading course…</div>
+            <div className="sheet-preview loading">{building?.id === selected.id ? `building hole ${building.n} of ${HOLES_PER_COURSE}…` : 'loading course…'}</div>
           )}
 
           <div className="sheet-actions">
