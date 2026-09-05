@@ -46,6 +46,7 @@ export interface MatchRow {
   seed: string;
   code: string | null;
   status: 'waiting' | 'playing' | 'done' | 'cancelled';
+  holes: number;
   p1: string;
   p2: string | null;
   p1_name?: string | null;
@@ -135,9 +136,9 @@ export const api = {
     if (error) throw new Error(error.message);
     return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },
-  async createInvite(): Promise<MatchRow> {
+  async createInvite(holes = 9): Promise<MatchRow> {
     await ensureSession();
-    const { data, error } = await supabase.rpc('create_invite');
+    const { data, error } = await supabase.rpc('create_invite', { in_holes: holes });
     if (error) throw new Error(error.message);
     return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },

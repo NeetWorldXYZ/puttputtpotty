@@ -219,16 +219,27 @@ export function generateSlot(courseSeed: string, slot: CourseSlot, params: Physi
 }
 
 /** Today's daily seed (UTC). */
-/** The daily rolls over at midnight US Eastern. en-CA formats as YYYY-MM-DD. */
+/**
+ * Two daily courses a day in US Eastern time: the morning course (midnight
+ * to noon) and the evening course (noon to midnight). en-CA formats as
+ * YYYY-MM-DD.
+ */
 export const DAILY_TIME_ZONE = 'America/New_York';
-export function dailySeed(date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: DAILY_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
-
-/** Seconds until the next daily rollover (midnight Eastern). */
-export function secondsUntilNextDaily(date = new Date()): number {
+function easternClock(date: Date): { day: string; seconds: number } {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: DAILY_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: DAILY_TIME_ZONE, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(date);
-  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0) % 24;
-  const elapsed = get('hour') * 3600 + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) * 60 + Number(parts.find((p) => p.type === 'second')?.value ?? 0);
-  return 86400 - elapsed;
+  const num = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return { day, seconds: (num('hour') % 24) * 3600 + num('minute') * 60 + num('second') };
+}
+export function dailySeed(date = new Date()): string {
+  const { day, seconds } = easternClock(date);
+  return `${day}-${seconds < 43200 ? 'am' : 'pm'}`;
+}
+export function dailyEdition(seed = dailySeed()): 'morning' | 'evening' {
+  return seed.endsWith('-pm') ? 'evening' : 'morning';
+}
+/** Seconds until the next daily rollover (noon or midnight Eastern). */
+export function secondsUntilNextDaily(date = new Date()): number {
+  const { seconds } = easternClock(date);
+  return seconds < 43200 ? 43200 - seconds : 86400 - seconds;
 }

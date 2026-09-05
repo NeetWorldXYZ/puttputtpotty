@@ -776,7 +776,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
               {shared ? 'Shared!' : 'Share score'}
             </button>
             {!onExit && <button onClick={() => goToCourse('random', holes.length)}>New course, same length</button>}
-            {!onExit && courseSeed !== dailySeed() && <button onClick={() => goToCourse('daily')}>Today&apos;s daily</button>}
+            {!onExit && courseSeed !== dailySeed() && getBest(dailySeed()) === null && <button onClick={() => goToCourse('daily')}>Daily course</button>}
             {!noRetry && <button onClick={restartCourse}>Play again</button>}
             {onExit ? <button onClick={onExit}>{exitLabel ?? 'Back'}</button> : <button onClick={() => goToCourse('title')}>Title screen</button>}
           </div>
