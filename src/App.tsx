@@ -9,6 +9,7 @@ import { navigate, useLocation } from './router';
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
 const LocationPlay = lazy(() => import('./game/LocationPlay').then((m) => ({ default: m.LocationPlay })));
+const LeaderboardScreen = lazy(() => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
 
 function Loading() {
   return (
@@ -29,6 +30,12 @@ export function App() {
     return (
       <Suspense fallback={<Loading />}>
         <MapScreen />
+      </Suspense>
+    );
+  if (loc.route === 'leaders')
+    return (
+      <Suspense fallback={<Loading />}>
+        <LeaderboardScreen />
       </Suspense>
     );
   if (loc.loc)

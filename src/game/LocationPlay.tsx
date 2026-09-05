@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
 import type { GeneratedHole } from '../generator/generator';
-import { HOLES_PER_COURSE, api, fmtElapsed, type King } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow } from '../net/api';
+import { currentUserId } from '../net/supabase';
 import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
 import { navigate } from '../router';
@@ -25,6 +26,42 @@ const RAMP: Record<string, ('easy' | 'medium' | 'hard')[]> = {
 };
 
 const toMap = () => navigate('map');
+
+/** Best round per player at this bathroom this season. */
+function LocationBoard({ locationId, refreshKey }: { locationId: string; refreshKey: number }) {
+  const [rows, setRows] = useState<LocationRow[] | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void currentUserId().then((id) => !cancelled && setMe(id));
+    api
+      .locationBoard(locationId, 10)
+      .then((r) => !cancelled && setRows(r))
+      .catch(() => !cancelled && setRows([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [locationId, refreshKey]);
+  if (!rows || !rows.length) return null;
+  return (
+    <div className="lb">
+      <div className="lb-title">Throne room</div>
+      <ol className="sheet-board dark">
+        {rows.map((r) => (
+          <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
+            <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+            <span className="who">{r.display_name}</span>
+            <span className="stat">
+              {r.score}
+              {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}
+            </span>
+            <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 /**
  * One bathroom's three-hole course. The holes come from the server (which
@@ -225,7 +262,10 @@ export function LocationPlay({ locationId, throne }: Props) {
       onHoleDone={onHoleDone}
       scorecardExtra={
         throne ? (
-          throneStatus
+          <>
+            {throneStatus}
+            <LocationBoard locationId={locationId} refreshKey={submit.state === 'done' ? 1 : 0} />
+          </>
         ) : (
           <div className="sub" style={{ marginBottom: 10 }}>
             {offline ? 'Practice (offline) · ' : 'Practice · '}
@@ -238,6 +278,7 @@ export function LocationPlay({ locationId, throne }: Props) {
             ) : (
               'nobody holds this throne yet'
             )}
+            <LocationBoard locationId={locationId} refreshKey={0} />
           </div>
         )
       }

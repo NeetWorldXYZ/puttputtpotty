@@ -100,6 +100,15 @@ export function TitleScreen({ onOpenEditor }: Props) {
             <small>the three handmade originals</small>
           </button>
           <div className="menu-row">
+            <button
+              className="menu-small"
+              onClick={() => {
+                unlockAudio();
+                navigate('leaders');
+              }}
+            >
+              🏆 Leaderboard
+            </button>
             <button className="menu-small" onClick={onOpenEditor}>
               Level editor
             </button>
