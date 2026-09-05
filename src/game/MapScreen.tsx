@@ -101,6 +101,8 @@ export function MapScreen() {
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const userRef = useRef<{ dot: L.Marker; ring: L.Circle } | null>(null);
   const lastSearchRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lineRef = useRef<L.Polyline | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const placesRef = useRef<Map<string, OsmPlace>>(new Map());
   const [zoomClass, setZoomClass] = useState('z-mid');
 
@@ -334,12 +336,35 @@ export function MapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
+  // Dashed line from you to the selected bathroom, kept current as you move.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!fix || !selected) {
+      lineRef.current?.remove();
+      lineRef.current = null;
+      return;
+    }
+    const pts: [number, number][] = [
+      [fix.lat, fix.lng],
+      [selected.lat, selected.lng],
+    ];
+    if (!lineRef.current) lineRef.current = L.polyline(pts, { color: '#1f2a44', weight: 3, dashArray: '6 8', opacity: 0.8, interactive: false }).addTo(map);
+    else lineRef.current.setLatLngs(pts);
+  }, [fix, selected]);
+
   // Dwell countdown ticks once a second while a sheet is open.
   useEffect(() => {
     if (!selected) return;
     const id = setInterval(() => setCheckinTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [selected]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(() => setNotice(null), 2500);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   const distance = useMemo(() => (fix && selected ? haversine(fix.lat, fix.lng, selected.lat, selected.lng) : null), [fix, selected]);
   const inRange = distance !== null && fix !== null && distance <= CLAIM_RADIUS_M + Math.min(fix.accuracy, CLAIM_RADIUS_M);
@@ -374,6 +399,37 @@ export function MapScreen() {
   const playPractice = () => {
     if (!selected) return;
     navigate('play', null, null, { loc: selected.id, mode: 'practice' });
+  };
+
+  const closest = () => {
+    if (!fix) {
+      setNotice('Waiting for your location…');
+      return;
+    }
+    if (!places.length) {
+      setNotice('No bathrooms loaded yet. Give the search a second.');
+      return;
+    }
+    let best: OsmPlace | null = null;
+    let bestD = Infinity;
+    for (const p of places) {
+      const d = haversine(fix.lat, fix.lng, p.lat, p.lng);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    if (!best) return;
+    unlockAudio();
+    setNotice(null);
+    setSelected(best);
+    mapRef.current?.fitBounds(
+      L.latLngBounds([
+        [fix.lat, fix.lng],
+        [best.lat, best.lng],
+      ]),
+      { paddingTopLeft: [60, 120], paddingBottomRight: [60, 420], maxZoom: 18 },
+    );
   };
 
   const recentre = () => {
@@ -422,10 +478,15 @@ export function MapScreen() {
 
       <div className="map-tools">
         {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
+        <button className="map-tool" onClick={closest} title="Closest bathroom">
+          🚽 Closest
+        </button>
         <button className="map-tool round" onClick={recentre} title="Recentre">
           ◎
         </button>
       </div>
+
+      {notice && <div className="map-toast">{notice}</div>}
 
       {(geoError || netError) && !selected && (
         <div className="map-notice">
@@ -463,10 +524,16 @@ export function MapScreen() {
                 {POI_LABEL[selected.poiType] ?? 'Bathroom'} · {themeName}
                 {` · ${HOLES_PER_COURSE} holes`}
                 {preview?.id === selected.id ? ` · par ${preview.par}` : king?.par ? ` · par ${king.par}` : ''}
-                {distance !== null && ` · ${fmtDistance(distance)} away`}
               </div>
             </div>
           </div>
+
+          {distance !== null && (
+            <div className={`sheet-dist${inRange ? ' here' : ''}`}>
+              <span className="dist-num">{fmtDistance(distance)}</span>
+              <span className="dist-sub">{inRange ? "you're here" : `about ${Math.max(1, Math.round(distance / 80))} min walk`}</span>
+            </div>
+          )}
 
           <div className={`throne-line${king?.king_name ? ' held' : ''}`}>
             {king?.king_name ? (

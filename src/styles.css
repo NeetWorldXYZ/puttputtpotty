@@ -1485,3 +1485,44 @@ input[type='checkbox'] {
 .sheet-board.dark .when {
   color: var(--dim);
 }
+
+.map-toast {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 78px);
+  transform: translateX(-50%);
+  z-index: 650;
+  background: var(--ink);
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.sheet-dist {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #eef3ff;
+  border: 2px solid var(--ink);
+}
+.sheet-dist .dist-num {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sheet-dist .dist-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5a80;
+}
+.sheet-dist.here {
+  background: #dff7ea;
+  border-color: #2fb36f;
+}
