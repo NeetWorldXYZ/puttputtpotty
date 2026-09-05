@@ -309,10 +309,32 @@ async function userFrom(req: Request): Promise<{ id: string } | null> {
   return { id: data.user.id };
 }
 
+const NAME_RE = /^[A-Za-z0-9 _.'\-]{2,24}$/;
+
+function escapeLike(v: string): string {
+  return v.replace(/[\\%_]/g, (m) => '\\' + m);
+}
+
+/** Case-insensitive uniqueness, excluding the caller. */
+async function nameTaken(name: string, userId: string): Promise<boolean> {
+  const { data } = await admin.from('profiles').select('id').ilike('display_name', escapeLike(name)).neq('id', userId).limit(1);
+  return !!data && data.length > 0;
+}
+
 async function ensureProfile(userId: string, displayName?: string): Promise<void> {
   const { data } = await admin.from('profiles').select('id').eq('id', userId).maybeSingle();
-  if (!data) await admin.from('profiles').insert({ id: userId, display_name: displayName?.slice(0, 24) || 'Anonymous Potty' });
-  else if (displayName) await admin.from('profiles').update({ display_name: displayName.slice(0, 24) }).eq('id', userId);
+  if (!data) {
+    // Default names are unique by construction: Golfer + a slice of the id.
+    for (const len of [4, 6, 8, 12]) {
+      const fallback = `Golfer ${userId.replace(/-/g, '').slice(0, len).toUpperCase()}`;
+      const { error } = await admin.from('profiles').insert({ id: userId, display_name: displayName?.slice(0, 24) || fallback });
+      if (!error) return;
+      if (displayName) throw new Error(error.message);
+    }
+  } else if (displayName) {
+    const { error } = await admin.from('profiles').update({ display_name: displayName.slice(0, 24) }).eq('id', userId);
+    if (error) throw new Error(error.message);
+  }
 }
 
 type LocationRow = {
@@ -435,8 +457,24 @@ Deno.serve(async (req: Request) => {
     const action = body.action as string;
 
     if (action === 'profile') {
-      await ensureProfile(user.id, typeof body.displayName === 'string' ? body.displayName : undefined);
+      const raw = typeof body.displayName === 'string' ? body.displayName.trim() : undefined;
+      if (raw !== undefined) {
+        if (!NAME_RE.test(raw)) return json({ error: "Names are 2 to 24 characters: letters, numbers, spaces, _ - . '" }, 400);
+        if (await nameTaken(raw, user.id)) return json({ error: 'That name is taken' }, 409);
+      }
+      try {
+        await ensureProfile(user.id, raw);
+      } catch (e) {
+        if (/profiles_display_name_unique/.test((e as Error).message)) return json({ error: 'That name is taken' }, 409);
+        throw e;
+      }
       return json({ ok: true });
+    }
+
+    if (action === 'me') {
+      await ensureProfile(user.id);
+      const { data: prof } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
+      return json({ id: user.id, displayName: prof?.display_name ?? null });
     }
 
     if (action === 'hole') {

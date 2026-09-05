@@ -4,14 +4,14 @@ import { drawHole } from '../render/drawHole';
 import { fitCamera } from '../render/camera';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import type { Hole } from '../sim/types';
-import { COURSE_LENGTHS, dailySeed, getBest, getPreferredLength, goToCourse, setPreferredLength } from './courses';
+import { COURSE_LENGTHS, dailySeed, getBest, getPreferredLength, goToCourse, secondsUntilNextDaily, setPreferredLength } from './courses';
 import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
 import { startTheme, stopTheme } from './music';
 import { navigate } from '../router';
 import { api } from '../net/api';
-import { ensureSession, getSavedName } from '../net/supabase';
+import { ensureSession, getSavedName, loadProfile } from '../net/supabase';
 import { recallFix } from '../net/places';
-import { NamePrompt } from './NamePrompt';
+import { AccountSheet } from './AccountSheet';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
@@ -27,9 +27,7 @@ function seasonInfo(): { n: number; daysLeft: number } {
 }
 
 function untilTomorrowUtc(): string {
-  const now = new Date();
-  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-  const s = Math.max(0, Math.floor((next - now.getTime()) / 1000));
+  const s = secondsUntilNextDaily();
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -70,6 +68,9 @@ export function TitleScreen() {
         .then((s) => s.user.id)
         .catch(() => null);
       if (!me || cancelled) return;
+      // The name lives on the server now; the phone only caches it.
+      const prof = await loadProfile();
+      if (prof?.name && !cancelled) setName(prof.name);
       const fix = recallFix();
       const [kings, near, board] = await Promise.allSettled([
         api.kings({ limit: 200 }),
@@ -280,12 +281,11 @@ export function TitleScreen() {
       </div>
 
       {askName && (
-        <NamePrompt
-          onDone={(n) => {
+        <AccountSheet
+          onClose={(n) => {
             setName(n);
             setAskName(false);
           }}
-          onCancel={() => setAskName(false)}
         />
       )}
 

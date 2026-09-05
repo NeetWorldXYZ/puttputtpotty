@@ -39,3 +39,36 @@ export async function currentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user.id ?? null;
 }
+
+/** Your profile as the server knows it. Caches the name locally. */
+export async function loadProfile(): Promise<{ id: string; name: string | null; email: string | null; anonymous: boolean } | null> {
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+  const { data: row } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
+  const name = (row?.display_name as string | undefined) ?? null;
+  if (name) saveName(name);
+  return { id: session.user.id, name, email: session.user.email ?? null, anonymous: !!session.user.is_anonymous };
+}
+
+/** Attach an email to the current (anonymous) account so it can be recovered on any phone. Sends a confirmation link. */
+export async function linkEmail(email: string): Promise<void> {
+  await ensureSession();
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: window.location.origin });
+  if (error) throw new Error(error.message);
+}
+
+/** Sign in to an existing account by magic link. */
+export async function signInWithEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin } });
+  if (error) throw new Error(/signups not allowed|not found/i.test(error.message) ? 'No account uses that email yet. Save your account first on the phone that has it.' : error.message);
+}
+
+export async function signOut(): Promise<void> {
+  await supabase.auth.signOut();
+  try {
+    localStorage.removeItem(NAME_KEY);
+  } catch {
+    /* ignore */
+  }
+}

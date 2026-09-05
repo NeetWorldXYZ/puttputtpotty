@@ -9,6 +9,7 @@ import { themeById } from '../render/themes';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation } from '../net/api';
 import { currentUserId } from '../net/supabase';
+import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
 import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
@@ -16,7 +17,7 @@ import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, reme
 import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
-import { NamePrompt } from './NamePrompt';
+import { AccountSheet } from './AccountSheet';
 import { unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
@@ -167,6 +168,7 @@ export function MapScreen() {
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
     void currentUserId().then(setMe);
+    void loadProfile().then((p) => p?.name && setName(p.name));
   }, []);
   const [moved, setMoved] = useState(false);
   const [checkinBusy, setCheckinBusy] = useState(false);
@@ -713,12 +715,11 @@ export function MapScreen() {
       )}
 
       {askName && (
-        <NamePrompt
-          onDone={(n) => {
+        <AccountSheet
+          onClose={(n) => {
             setName(n);
             setAskName(false);
           }}
-          onCancel={() => setAskName(false)}
         />
       )}
     </div>
