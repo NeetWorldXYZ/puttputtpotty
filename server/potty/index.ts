@@ -148,7 +148,16 @@ const NOMINATIM_CATEGORIES: [string, string][] = [
   ['shop', 'supermarket'],
 ];
 
-async function nominatimPlaces(lat: number, lng: number, radius: number): Promise<OsmPlace[]> {
+type TextFetcher = (url: string) => Promise<string>;
+
+const edgeGet: TextFetcher = async (url) => {
+  const res = await fetch(url, { headers: { 'User-Agent': 'PuttPuttPotty/1.0 (bathroom mini golf; contact via github.com/NeetWorldXYZ/puttputtpotty)', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`nominatim ${res.status}`);
+  return await res.text();
+};
+const dbGet: TextFetcher = (url) => dbFetch(url, null);
+
+async function nominatimPlaces(lat: number, lng: number, radius: number, get: TextFetcher): Promise<OsmPlace[]> {
   const dLat = radius / 111320;
   const dLng = radius / (111320 * Math.cos((lat * Math.PI) / 180));
   const viewbox = `${lng - dLng},${lat + dLat},${lng + dLng},${lat - dLat}`;
@@ -157,9 +166,7 @@ async function nominatimPlaces(lat: number, lng: number, radius: number): Promis
   for (const [k, v] of NOMINATIM_CATEGORIES) {
     const url = `${NOMINATIM}?q=[${k}=${v}]&viewbox=${viewbox}&bounded=1&format=jsonv2&limit=50`;
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'PuttPuttPotty/1.0 (bathroom mini golf; contact via github.com/NeetWorldXYZ/puttputtpotty)', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
-      if (!res.ok) continue;
-      const rows = (await res.json()) as { osm_type: string; osm_id: number; lat: string; lon: string; name?: string; display_name?: string; category?: string; type?: string }[];
+      const rows = JSON.parse(await get(url)) as { osm_type: string; osm_id: number; lat: string; lon: string; name?: string; display_name?: string; category?: string; type?: string }[];
       for (const r of rows) {
         const id = `osm:${r.osm_type}:${r.osm_id}`;
         if (seen.has(id)) continue;
@@ -176,6 +183,36 @@ async function nominatimPlaces(lat: number, lng: number, radius: number): Promis
   }
   if (!out.length) throw new Error('Nominatim returned nothing');
   return out;
+}
+
+/**
+ * Outbound request routed through Postgres (the `http` extension). The edge
+ * runtime's own egress gets "connection refused" / timeouts from the Overpass
+ * mirrors while the database reaches them in about a second.
+ */
+async function dbFetch(url: string, body: string | null): Promise<string> {
+  const { data, error } = await admin.rpc('http_fetch_osm', { url, body });
+  if (error) throw new Error(`db fetch: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as { status: number; content: string } | undefined;
+  if (!row) throw new Error('db fetch: empty');
+  if (row.status !== 200) throw new Error(`db fetch: ${row.status}`);
+  return row.content;
+}
+
+async function overpassViaDb(q: string): Promise<OsmPlace[]> {
+  const errors: string[] = [];
+  for (const url of OVERPASS.slice(0, 2)) {
+    try {
+      const text = await dbFetch(url, 'data=' + encodeURIComponent(q));
+      const data = JSON.parse(text) as { elements?: Element[] };
+      if (!Array.isArray(data.elements)) throw new Error('bad response');
+      return parsePlaces(data.elements);
+    } catch (e) {
+      errors.push(`${new URL(url).host}: ${(e as Error).message}`);
+      console.warn('overpass via db failed', url, (e as Error).message);
+    }
+  }
+  throw new Error(errors.join('; '));
 }
 
 async function overpassOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
@@ -217,15 +254,27 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
   if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: hit.places as OsmPlace[], cached: true };
-  let places: OsmPlace[];
-  let source = 'overpass';
-  try {
-    places = await overpassRace(overpassQuery(lat, lng, radius));
-  } catch (e) {
-    console.warn('overpass gave up, trying nominatim', (e as Error).message);
-    source = 'nominatim';
-    places = await nominatimPlaces(lat, lng, radius);
+  const q = overpassQuery(lat, lng, radius);
+  const strategies: [string, () => Promise<OsmPlace[]>][] = [
+    ['overpass-db', () => overpassViaDb(q)],
+    ['overpass-edge', () => overpassRace(q)],
+    ['nominatim-db', () => nominatimPlaces(lat, lng, radius, dbGet)],
+    ['nominatim-edge', () => nominatimPlaces(lat, lng, radius, edgeGet)],
+  ];
+  let places: OsmPlace[] | null = null;
+  let source = '';
+  const errors: string[] = [];
+  for (const [name, run] of strategies) {
+    try {
+      places = await run();
+      source = name;
+      break;
+    } catch (e) {
+      errors.push(`${name}: ${(e as Error).message}`);
+      console.warn('bathroom source failed', name, (e as Error).message);
+    }
   }
+  if (!places) throw new Error(`No bathroom source is answering (${errors.join(' | ')})`);
   console.log('bathrooms', key, source, places.length);
   await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
   return { places, cached: false };
