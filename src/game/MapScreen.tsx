@@ -27,21 +27,30 @@ const MIN_RESULTS_BEFORE_WIDENING = 4;
 const RESEARCH_DISTANCE_M = 1800;
 const MIN_AUTO_ZOOM = 10;
 const MAX_PINS = 400;
+const THRONES_RETRY_MS = 8000;
+const THRONES_CACHE_KEY = 'ppp.thrones.v1';
+const THRONES_CACHE_MAX = 600;
 
-function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${what} timed out`)), ms);
-    p.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
+/** Thrones this phone has seen, so the map is never empty while the server is unreachable. */
+function recallThrones(lat: number, lng: number, radiusM: number): NearbyLocation[] {
+  try {
+    const rows = JSON.parse(localStorage.getItem(THRONES_CACHE_KEY) ?? '[]') as NearbyLocation[];
+    return rows.filter((r) => haversine(lat, lng, r.lat, r.lng) <= radiusM);
+  } catch {
+    return [];
+  }
+}
+function rememberThrones(rows: NearbyLocation[]): void {
+  if (!rows.length) return;
+  try {
+    const have = JSON.parse(localStorage.getItem(THRONES_CACHE_KEY) ?? '[]') as NearbyLocation[];
+    const m = new Map<string, NearbyLocation>();
+    for (const r of have) m.set(r.id, r);
+    for (const r of rows) m.set(r.id, r);
+    localStorage.setItem(THRONES_CACHE_KEY, JSON.stringify([...m.values()].slice(-THRONES_CACHE_MAX)));
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Same building, several OpenStreetMap objects: keep one pin (mirrors the server's rule). */
@@ -160,6 +169,10 @@ export function MapScreen() {
   kingsRef.current = kings;
   const [loading, setLoading] = useState(false);
   const [netError, setNetError] = useState<string | null>(null);
+  /** 'stale': showing remembered thrones while the server is unreachable; 'empty': nothing to show yet. */
+  const [thronesDown, setThronesDown] = useState<'none' | 'stale' | 'empty'>('none');
+  const retryRef = useRef(0);
+  useEffect(() => () => window.clearTimeout(retryRef.current), []);
   const [selected, setSelected] = useState<OsmPlace | null>(null);
   const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -257,6 +270,48 @@ export function MapScreen() {
     setPlaces([...m.values()]);
   }, []);
 
+  const applyThrones = useCallback(
+    (lat: number, lng: number, rows: NearbyLocation[]) => {
+      setKings((k) => {
+        const m = { ...k };
+        for (const r of rows) m[r.id] = r;
+        return m;
+      });
+      addPlaces(lat, lng, mergePlaces([], rows));
+    },
+    [addPlaces],
+  );
+
+  /**
+   * Thrones from our database. Whatever this phone saw before shows at once;
+   * the live answer replaces it. If the server can't be reached the map keeps
+   * what it has and quietly tries again, never a dead end.
+   */
+  const loadThrones = useCallback(
+    async (lat: number, lng: number) => {
+      window.clearTimeout(retryRef.current);
+      const cached = recallThrones(lat, lng, WIDE_RADIUS_M);
+      if (cached.length) {
+        applyThrones(lat, lng, cached);
+        setLoading(false);
+      }
+      try {
+        const rows = await api.nearby(lat, lng, WIDE_RADIUS_M);
+        applyThrones(lat, lng, rows);
+        rememberThrones(rows);
+        setThronesDown('none');
+      } catch {
+        setThronesDown(cached.length || Object.keys(kingsRef.current).length ? 'stale' : 'empty');
+        retryRef.current = window.setTimeout(() => {
+          const last = lastSearchRef.current;
+          if (last && last.lat === lat && last.lng === lng) void loadThrones(lat, lng);
+        }, THRONES_RETRY_MS);
+      }
+      setLoading(false);
+    },
+    [applyThrones],
+  );
+
   const search = useCallback(
     async (lat: number, lng: number) => {
       lastSearchRef.current = { lat, lng };
@@ -264,22 +319,8 @@ export function MapScreen() {
       setOsmLoading(true);
       setNetError(null);
       setWide(false);
-      // Thrones come from our own database and are fast; show them as soon as they land.
-      const kingsP = withTimeout(api.nearby(lat, lng, WIDE_RADIUS_M), 12000, 'Thrones').then(
-        (rows) => {
-          setKings((k) => {
-            const m = { ...k };
-            for (const r of rows) m[r.id] = r;
-            return m;
-          });
-          addPlaces(lat, lng, mergePlaces([], rows));
-          setLoading(false);
-        },
-        (e: Error) => {
-          setNetError(`Thrones unavailable: ${e.message}`);
-          setLoading(false);
-        },
-      );
+      // Thrones come from our own database: the cached copy first, then the live answer.
+      const kingsP = loadThrones(lat, lng);
       // Bathrooms from OpenStreetMap; widen once if the neighbourhood is thin.
       try {
         let osm = await fetchBathrooms(lat, lng, SEARCH_RADIUS_M);
@@ -296,7 +337,7 @@ export function MapScreen() {
       await kingsP;
       setMoved(false);
     },
-    [addPlaces],
+    [addPlaces, loadThrones],
   );
 
   // Auto-search as the map moves: once the centre is far enough from the last search.
@@ -582,6 +623,7 @@ export function MapScreen() {
 
       <div className="map-tools">
         {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
+        {thronesDown === 'stale' && <div className="map-tool quiet">reconnecting…</div>}
         <button className="map-tool" onClick={closest} title="Closest bathroom">
           🚽 Closest
         </button>
@@ -592,6 +634,12 @@ export function MapScreen() {
 
       {notice && <div className="map-toast">{notice}</div>}
 
+      {thronesDown === 'empty' && !geoError && !netError && !selected && (
+        <div className="map-notice">
+          Can't reach the clubhouse right now. Trying again…
+          {fix && <button onClick={() => void loadThrones(fix.lat, fix.lng)}>Retry</button>}
+        </div>
+      )}
       {(geoError || netError) && !selected && (
         <div className="map-notice">
           {geoError ?? netError}

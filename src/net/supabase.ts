@@ -35,6 +35,30 @@ export async function ensureSession(): Promise<Session> {
   return anon.session;
 }
 
+/**
+ * The access token without waiting on the auth client. supabase-js serialises
+ * every getSession() behind a browser lock, and a stalled token refresh on a
+ * flaky phone connection can hold that lock for a long time. If the client
+ * doesn't answer within `ms`, fall back to the session it persisted to
+ * storage (still valid until `expires_at`), else null.
+ */
+export async function quickToken(ms = 1500): Promise<string | null> {
+  const fromClient = supabase.auth.getSession().then(({ data }) => data.session?.access_token ?? null);
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), ms));
+  const token = await Promise.race([fromClient, timeout]);
+  if (token) return token;
+  try {
+    const ref = new URL(SUPABASE_URL).hostname.split('.')[0];
+    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as { access_token?: string; expires_at?: number };
+    if (stored.access_token && (!stored.expires_at || stored.expires_at * 1000 > Date.now() + 30_000)) return stored.access_token;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export async function currentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user.id ?? null;

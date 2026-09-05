@@ -1,6 +1,6 @@
 import type { Hole, Stroke } from '../sim/types';
-import { FUNCTION_URL } from './config';
-import { ensureSession, supabase } from './supabase';
+import { FUNCTION_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
+import { ensureSession, quickToken, supabase } from './supabase';
 
 export interface NearbyLocation {
   id: string;
@@ -92,16 +92,65 @@ export interface LocationSummary {
   difficulty: string;
 }
 
+const CALL_TIMEOUT_MS = 30000;
+
 async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const session = await ensureSession();
-  const res = await fetch(FUNCTION_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? `request failed (${res.status})`);
-  return data;
+  const token = (await quickToken(2000)) ?? (await ensureSession()).access_token;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), CALL_TIMEOUT_MS);
+  try {
+    const res = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+      signal: ctl.signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+    if (!res.ok) throw new Error(data.error ?? `request failed (${res.status})`);
+    return data;
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new Error('the server is slow to answer');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * A read-only RPC over plain fetch: no auth-client lock to wait on, a hard
+ * timeout per attempt, and retries with backoff. Used for the reads the map
+ * cannot live without.
+ */
+async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { timeoutMs?: number; attempts?: number } = {}): Promise<T> {
+  const timeoutMs = opts.timeoutMs ?? 7000;
+  const attempts = opts.attempts ?? 3;
+  const delays = [1500, 4000];
+  let lastErr: Error = new Error('unreachable');
+  for (let i = 0; i < attempts; i++) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const token = i === 0 ? await quickToken(1000) : null;
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${token ?? SUPABASE_KEY}` },
+        body: JSON.stringify(params),
+        signal: ctl.signal,
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { message?: string };
+        const e = new Error(err.message ?? `request failed (${res.status})`);
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) throw e;
+        lastErr = e;
+      } else return (await res.json()) as T;
+    } catch (e) {
+      lastErr = (e as Error).name === 'AbortError' ? new Error('no answer from the server') : (e as Error);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, delays[Math.min(i, delays.length - 1)]));
+  }
+  throw lastErr;
 }
 
 export const api = {
@@ -123,9 +172,8 @@ export const api = {
     call<{ score: number; par: number; sunk: boolean }>({ action: 'submit', courseSeed, holeIndex, strokes }),
 
   async nearby(lat: number, lng: number, radiusM = 2500): Promise<NearbyLocation[]> {
-    const { data, error } = await supabase.rpc('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: radiusM });
-    if (error) throw new Error(error.message);
-    return (data ?? []) as NearbyLocation[];
+    const rows = await readRpc<NearbyLocation[] | null>('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: radiusM });
+    return rows ?? [];
   },
   submitMatch: (matchId: string, strokes: Stroke[][]) =>
     call<{ score: number; holeScores: number[]; elapsedMs: number; done: boolean; winner: string | null }>({ action: 'submit', matchId, strokes }),
