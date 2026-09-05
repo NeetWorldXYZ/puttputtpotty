@@ -91,7 +91,7 @@ function bandFor(poiType: string, id: string): { theme: string; difficulty: 'eas
 // ---- OpenStreetMap bathrooms (Overpass), fetched server-side and cached per ~500 m cell.
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
 const OSM_TTL_MS = 24 * 3600 * 1000;
-const OSM_TIMEOUT_MS = 14000;
+const OSM_TIMEOUT_MS = 12000;
 
 type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: number };
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
@@ -211,20 +211,32 @@ async function dbFetch(url: string, body: string | null): Promise<string> {
   return row.content;
 }
 
-async function overpassViaDb(q: string): Promise<OsmPlace[]> {
+/** First promise to succeed wins; if all fail, one error carrying every reason. */
+async function firstSuccess<T>(tasks: [string, () => Promise<T>][]): Promise<T> {
   const errors: string[] = [];
-  for (const url of OVERPASS.slice(0, 2)) {
-    try {
-      const text = await dbFetch(url, 'data=' + encodeURIComponent(q));
-      const data = JSON.parse(text) as { elements?: Element[] };
-      if (!Array.isArray(data.elements)) throw new Error('bad response');
-      return parsePlaces(data.elements);
-    } catch (e) {
-      errors.push(`${new URL(url).host}: ${(e as Error).message}`);
-      console.warn('overpass via db failed', url, (e as Error).message);
-    }
-  }
-  throw new Error(errors.join('; '));
+  return await Promise.any(
+    tasks.map(([name, run]) =>
+      run().catch((e: Error) => {
+        errors.push(`${name}: ${e.message}`);
+        console.warn('source failed', name, e.message);
+        throw e;
+      }),
+    ),
+  ).catch(() => {
+    throw new Error(errors.join('; '));
+  });
+}
+
+async function overpassViaDbOne(url: string, q: string): Promise<OsmPlace[]> {
+  const text = await dbFetch(url, 'data=' + encodeURIComponent(q));
+  const data = JSON.parse(text) as { elements?: Element[] };
+  if (!Array.isArray(data.elements)) throw new Error('bad response');
+  return parsePlaces(data.elements);
+}
+
+/** Both database-routed mirrors at once. */
+function overpassViaDb(q: string): Promise<OsmPlace[]> {
+  return firstSuccess(OVERPASS.slice(0, 2).map((url) => [new URL(url).host, () => overpassViaDbOne(url, q)] as [string, () => Promise<OsmPlace[]>]));
 }
 
 async function overpassOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
@@ -267,9 +279,9 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
   if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
   const q = overpassQuery(lat, lng, radius);
+  // Every Overpass route at once (database-routed and direct); Nominatim only if all of them fail.
   const strategies: [string, () => Promise<OsmPlace[]>][] = [
-    ['overpass-db', () => overpassViaDb(q)],
-    ['overpass-edge', () => overpassRace(q)],
+    ['overpass', () => firstSuccess([['overpass-db', () => overpassViaDb(q)], ['overpass-edge', () => overpassRace(q)]])],
     ['nominatim-db', () => nominatimPlaces(lat, lng, radius, dbGet)],
     ['nominatim-edge', () => nominatimPlaces(lat, lng, radius, edgeGet)],
   ];
@@ -286,7 +298,14 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
       console.warn('bathroom source failed', name, (e as Error).message);
     }
   }
-  if (!places) throw new Error(`No bathroom source is answering (${errors.join(' | ')})`);
+  if (!places) {
+    // Nothing is answering: an old answer beats no answer.
+    if (hit && Array.isArray(hit.places) && hit.places.length) {
+      console.warn('bathrooms', key, 'serving stale cache;', errors.join(' | '));
+      return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
+    }
+    throw new Error(`No bathroom source is answering (${errors.join(' | ')})`);
+  }
   places = dedupePlaces(places);
   console.log('bathrooms', key, source, places.length);
   await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
