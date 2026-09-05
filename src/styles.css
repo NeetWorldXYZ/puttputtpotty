@@ -831,7 +831,98 @@ input[type='checkbox'] {
 .map-canvas {
   position: absolute;
   inset: 0;
-  background: #cfe3d6;
+  background: #e9e2d3;
+}
+/* Brand tint over the stock tiles: warm paper, ink-leaning contrast. */
+.map-canvas .leaflet-tile-pane {
+  filter: saturate(0.62) sepia(0.22) contrast(1.02) brightness(1.02);
+}
+.map-tool.quiet {
+  opacity: 0.85;
+  font-weight: 600;
+}
+.you-wrap {
+  background: none;
+  border: none;
+}
+.you-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 3px solid #ffd166;
+  animation: you-pulse 1.6s ease-out infinite;
+}
+.you-ball {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff, #dfe6ee 70%, #b7c3d0);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.you-ball i {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c3ccd6;
+}
+.you-ball i:nth-child(1) {
+  left: 8px;
+  top: 7px;
+}
+.you-ball i:nth-child(2) {
+  left: 15px;
+  top: 12px;
+}
+.you-ball i:nth-child(3) {
+  left: 7px;
+  top: 15px;
+}
+@keyframes you-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.map-screen.z-low .pin {
+  transform: rotate(-45deg) scale(0.62);
+}
+.map-screen.z-low .pin.selected {
+  transform: rotate(-45deg) scale(0.85);
+}
+.map-screen.z-mid .pin {
+  transform: rotate(-45deg) scale(0.82);
+}
+.map-screen.z-mid .pin.selected {
+  transform: rotate(-45deg) scale(1.05);
+}
+.sheet-holes {
+  display: flex;
+  gap: 6px;
+}
+.sheet-hole {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+.sheet-hole .sheet-preview {
+  height: 120px;
+}
+.sheet-hole-label {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(31, 42, 68, 0.85);
+  border-radius: 8px;
+  padding: 2px 6px;
 }
 .leaflet-container {
   font-family: var(--game-font);
@@ -1203,4 +1294,9 @@ input[type='checkbox'] {
   font-size: 12px;
   color: var(--dim);
   margin: 6px 0 10px;
+}
+
+.hud .env .clock {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
 }

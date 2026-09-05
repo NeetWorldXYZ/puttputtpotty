@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Hole } from '../sim/types';
+import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
 import type { GeneratedHole } from '../generator/generator';
-import { api, type King } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King } from '../net/api';
 import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
 import { navigate } from '../router';
@@ -16,19 +16,29 @@ interface Props {
   throne: boolean;
 }
 
-type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; score: number; king: King | null; isKing: boolean } | { state: 'error'; message: string };
+type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; score: number; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean } | { state: 'error'; message: string };
+
+const RAMP: Record<string, ('easy' | 'medium' | 'hard')[]> = {
+  easy: ['easy', 'easy', 'medium'],
+  medium: ['easy', 'medium', 'medium'],
+  hard: ['medium', 'hard', 'hard'],
+};
 
 const toMap = () => navigate('map');
 
 /**
- * One bathroom's hole. The hole comes from the server (which founds the
- * bathroom on first visit); practice falls back to generating the same
- * seed locally when the backend is unreachable.
+ * One bathroom's three-hole course. The holes come from the server (which
+ * founds the bathroom on first visit); practice falls back to generating
+ * locally when the backend is unreachable. A throne run submits all three
+ * stroke lists at the end and the server replays them.
  */
 export function LocationPlay({ locationId, throne }: Props) {
   const place = recallPlace(locationId);
-  const [hole, setHole] = useState<Hole | null>(null);
+  const [holes, setHoles] = useState<Hole[] | null>(null);
   const [king, setKing] = useState<King | null>(null);
+  const strokesRef = useRef<Stroke[][]>([]);
+  const [timerFrom, setTimerFrom] = useState<number | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [submit, setSubmit] = useState<Submit>({ state: 'idle' });
@@ -44,7 +54,7 @@ export function LocationPlay({ locationId, throne }: Props) {
       .hole(place)
       .then((r) => {
         if (cancelled) return;
-        setHole(r.hole);
+        setHoles(r.holes);
         setKing(r.king);
       })
       .catch((e: Error) => {
@@ -53,25 +63,52 @@ export function LocationPlay({ locationId, throne }: Props) {
           setLoadError(e.message);
           return;
         }
-        // Practice without a backend: same seed and band as the server would use.
+        // Practice without a backend: same seeds and band as the server would use (archetypes may differ).
         const band = bandFor(place.poiType, place.id);
         const w = new Worker(new URL('../solver/worker.ts', import.meta.url), { type: 'module' });
-        w.onmessage = (ev: MessageEvent<{ generated?: GeneratedHole; error?: string }>) => {
-          w.terminate();
-          if (cancelled) return;
-          if (ev.data.generated) {
-            const h = ev.data.generated.hole;
-            setHole({ ...h, id: place.id, name: place.name, theme: band.theme });
+        const out: Hole[] = [];
+        const ask = (i: number) => w.postMessage({ kind: 'generate', id: i, options: { seed: `${place.id}:${i}`, difficulty: RAMP[band.difficulty][i] } });
+        w.onmessage = (ev: MessageEvent<{ id: number; generated?: GeneratedHole; error?: string }>) => {
+          if (cancelled) {
+            w.terminate();
+            return;
+          }
+          if (!ev.data.generated) {
+            w.terminate();
+            setLoadError(ev.data.error ?? e.message);
+            return;
+          }
+          const h = ev.data.generated.hole;
+          out.push({ ...h, id: `${place.id}#${ev.data.id + 1}`, name: `${place.name} ${ev.data.id + 1}`, theme: band.theme });
+          if (out.length === HOLES_PER_COURSE) {
+            w.terminate();
+            setHoles(out);
             setOffline(true);
-          } else setLoadError(ev.data.error ?? e.message);
+          } else ask(out.length);
         };
-        w.postMessage({ kind: 'generate', id: 1, options: { seed: place.id, difficulty: band.difficulty } });
+        ask(0);
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationId, throne]);
+
+  useEffect(() => {
+    if (!throne || !holes) return;
+    let cancelled = false;
+    api
+      .start(locationId)
+      .then((r) => {
+        if (!cancelled) setTimerFrom(new Date(r.startedAt).getTime());
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setStartError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [throne, holes, locationId]);
 
   useEffect(() => {
     if (!throne) return;
@@ -84,17 +121,23 @@ export function LocationPlay({ locationId, throne }: Props) {
   }, [throne]);
 
   const onHoleDone = (info: HoleDoneInfo) => {
-    if (!throne) return;
+    strokesRef.current[info.holeIndex] = info.strokes;
+    if (!throne || info.holeIndex !== HOLES_PER_COURSE - 1) return;
     const f = fixRef.current;
     if (!f) {
-      setSubmit({ state: 'error', message: 'No GPS fix. Your run was not submitted.' });
+      setSubmit({ state: 'error', message: 'No GPS fix. Your round was not submitted.' });
+      return;
+    }
+    const lists = strokesRef.current.slice(0, HOLES_PER_COURSE);
+    if (lists.some((l) => !l || !l.length)) {
+      setSubmit({ state: 'error', message: 'A hole was skipped, so the round was not submitted.' });
       return;
     }
     setSubmit({ state: 'sending' });
     api
-      .submitLocation(locationId, info.strokes, f.lat, f.lng, f.accuracy)
+      .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy)
       .then((r) => {
-        setSubmit({ state: 'done', score: r.score, king: r.king, isKing: r.isKing });
+        setSubmit({ state: 'done', score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
         if (r.isKing) {
           sfx.fanfare('ace');
           buzz([30, 40, 30, 40, 80]);
@@ -102,6 +145,8 @@ export function LocationPlay({ locationId, throne }: Props) {
       })
       .catch((e: Error) => setSubmit({ state: 'error', message: e.message }));
   };
+
+  const coursePar = holes ? holes.reduce((a, h) => a + h.par, 0) : 0;
 
   if (!place) return null;
 
@@ -122,7 +167,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     );
   }
 
-  if (!hole) {
+  if (!holes) {
     return (
       <div className="play">
         <div className="overlay" style={{ background: 'var(--page)' }}>
@@ -136,59 +181,76 @@ export function LocationPlay({ locationId, throne }: Props) {
     );
   }
 
+  const throneStatus = (
+    <div className="throne-result">
+      {submit.state === 'sending' && <div className="sub">Submitting to the throne room…</div>}
+      {submit.state === 'error' && <div className="err">{submit.message}</div>}
+      {submit.state === 'idle' && startError && <div className="err">Clock did not start: {startError}</div>}
+      {submit.state === 'done' &&
+        (submit.isKing ? (
+          <div className="king-banner">
+            <div className="king-crown">👑</div>
+            <div className="king-title">King of the Throne</div>
+            <div className="sub">
+              {place.name} · {submit.score} (par {coursePar}) · {submit.holeScores.join('-')}
+              {submit.elapsedMs !== null && ` · ${fmtElapsed(submit.elapsedMs)}`}
+            </div>
+          </div>
+        ) : (
+          <div className="sub">
+            {submit.king ? (
+              <>
+                <strong>{submit.king.display_name}</strong> keeps the throne with <strong>{submit.king.score}</strong>
+                {submit.king.hole_scores && ` (${submit.king.hole_scores.join('-')})`}
+                {submit.king.elapsed_ms !== null && ` in ${fmtElapsed(submit.king.elapsed_ms)}`}. Beat it next visit.
+              </>
+            ) : (
+              'Recorded. The throne stays empty until someone finishes all three holes.'
+            )}
+          </div>
+        ))}
+    </div>
+  );
+
   return (
     <PlayView
-      key={hole.id}
-      holes={[hole]}
+      key={holes[0].id}
+      holes={holes}
       courseSeed={null}
       onExit={toMap}
       exitLabel="Map"
       lockedParams={DEFAULT_PARAMS}
       noRetry={throne}
+      timerFrom={timerFrom}
       onHoleDone={onHoleDone}
+      scorecardExtra={
+        throne ? (
+          throneStatus
+        ) : (
+          <div className="sub" style={{ marginBottom: 10 }}>
+            {offline ? 'Practice (offline) · ' : 'Practice · '}
+            {king ? (
+              <>
+                <strong>{king.display_name}</strong> holds the throne with <strong>{king.score}</strong>
+                {king.hole_scores && ` (${king.hole_scores.join('-')})`}
+                {king.elapsed_ms !== null && ` in ${fmtElapsed(king.elapsed_ms)}`}
+              </>
+            ) : (
+              'nobody holds this throne yet'
+            )}
+          </div>
+        )
+      }
       renderDoneCard={(info, actions) => (
         <>
-          {throne ? (
-            <div className="throne-result">
-              {submit.state === 'sending' && <div className="sub">Submitting to the throne room…</div>}
-              {submit.state === 'error' && <div className="err">{submit.message}</div>}
-              {submit.state === 'done' &&
-                (submit.isKing ? (
-                  <div className="king-banner">
-                    <div className="king-crown">👑</div>
-                    <div className="king-title">King of the Throne</div>
-                    <div className="sub">
-                      {place.name} · {submit.score} (par {info.hole.par})
-                    </div>
-                  </div>
-                ) : (
-                  <div className="sub">
-                    {submit.king ? (
-                      <>
-                        <strong>{submit.king.display_name}</strong> keeps the throne with <strong>{submit.king.score}</strong>. Beat it next visit.
-                      </>
-                    ) : (
-                      'Recorded. The throne stays empty until someone sinks it.'
-                    )}
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <div className="sub">
-              {offline ? 'Practice (offline) · ' : 'Practice · '}
-              {king ? (
-                <>
-                  <strong>{king.display_name}</strong> holds the throne with <strong>{king.score}</strong>
-                </>
-              ) : (
-                'nobody holds this throne yet'
-              )}
-            </div>
-          )}
-          <button className="primary" onClick={toMap}>
-            Back to map
+          <div className="sub">
+            {throne ? 'Throne run' : 'Practice'} · hole {info.holeIndex + 1} of {HOLES_PER_COURSE}
+          </div>
+          <button className="primary" onClick={actions.next}>
+            {info.holeIndex + 1 < HOLES_PER_COURSE ? 'Next hole →' : 'See scorecard'}
           </button>
-          {!throne && <button onClick={actions.retry}>Play again</button>}
+          {!throne && <button onClick={actions.retry}>Retry hole</button>}
+          {!throne && <button onClick={toMap}>Back to map</button>}
         </>
       )}
     />

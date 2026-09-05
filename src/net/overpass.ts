@@ -118,17 +118,17 @@ export async function fetchBathrooms(lat: number, lng: number, radiusM = 3000): 
   const cached = readCache(key);
   if (cached) return cached;
   const around = `(around:${radiusM},${lat},${lng})`;
-  const q = `[out:json][timeout:20];
-(
-  nwr["amenity"="toilets"]${around};
-  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"]${around};
-  nwr["tourism"~"^(hotel|motel)$"]${around};
-  nwr["aeroway"~"^(terminal|aerodrome)$"]${around};
-  nwr["leisure"="stadium"]${around};
-  nwr["shop"~"^(supermarket|mall|department_store)$"]${around};
-  nwr["highway"~"^(rest_area|services)$"]${around};
-);
-out center 200;`;
+  const tags: [string, string[]][] = [
+    ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe']],
+    ['tourism', ['hotel', 'motel']],
+    ['aeroway', ['terminal', 'aerodrome']],
+    ['leisure', ['stadium']],
+    ['shop', ['supermarket', 'mall', 'department_store']],
+    ['highway', ['rest_area', 'services']],
+  ];
+  const clauses: string[] = [];
+  for (const [k, vals] of tags) for (const v of vals) clauses.push(`node["${k}"="${v}"]${around};way["${k}"="${v}"]${around};`);
+  const q = `[out:json][timeout:12];(${clauses.join('')});out center 200;`;
   let places: OsmPlace[];
   try {
     places = (await api.bathrooms(lat, lng, radiusM)).places;

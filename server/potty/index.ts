@@ -42,6 +42,14 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+const HOLES_PER_COURSE = 3;
+/** Difficulty ramp of a bathroom's three holes, by band. */
+const COURSE_RAMP: Record<'easy' | 'medium' | 'hard', ('easy' | 'medium' | 'hard')[]> = {
+  easy: ['easy', 'easy', 'medium'],
+  medium: ['easy', 'medium', 'medium'],
+  hard: ['medium', 'hard', 'hard'],
+};
+
 /** POI type -> environment + difficulty band (design doc section 11). */
 function bandFor(poiType: string, id: string): { theme: string; difficulty: 'easy' | 'medium' | 'hard' } {
   switch (poiType) {
@@ -79,7 +87,7 @@ function bandFor(poiType: string, id: string): { theme: string; difficulty: 'eas
 // ---- OpenStreetMap bathrooms (Overpass), fetched server-side and cached per ~500 m cell.
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
 const OSM_TTL_MS = 24 * 3600 * 1000;
-const OSM_TIMEOUT_MS = 15000;
+const OSM_TIMEOUT_MS = 14000;
 
 type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: number };
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
@@ -113,19 +121,106 @@ function parsePlaces(elements: Element[]): OsmPlace[] {
   return out;
 }
 
+const POI_TAGS: [string, string[]][] = [
+  ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe']],
+  ['tourism', ['hotel', 'motel']],
+  ['aeroway', ['terminal', 'aerodrome']],
+  ['leisure', ['stadium']],
+  ['shop', ['supermarket', 'mall', 'department_store']],
+  ['highway', ['rest_area', 'services']],
+];
+
+/**
+ * Nodes and ways only with exact tag values: `nwr` + regex + `around` makes
+ * Overpass walk relation geometry and skip the value index, which is what
+ * pushed the previous query past every mirror's patience.
+ */
 function overpassQuery(lat: number, lng: number, radius: number): string {
   const around = `(around:${radius},${lat},${lng})`;
-  return `[out:json][timeout:20];
-(
-  nwr["amenity"="toilets"]${around};
-  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"]${around};
-  nwr["tourism"~"^(hotel|motel)$"]${around};
-  nwr["aeroway"~"^(terminal|aerodrome)$"]${around};
-  nwr["leisure"="stadium"]${around};
-  nwr["shop"~"^(supermarket|mall|department_store)$"]${around};
-  nwr["highway"~"^(rest_area|services)$"]${around};
-);
-out center 200;`;
+  const clauses: string[] = [];
+  for (const [k, vals] of POI_TAGS) for (const v of vals) clauses.push(`node["${k}"="${v}"]${around};way["${k}"="${v}"]${around};`);
+  return `[out:json][timeout:12];(${clauses.join('')});out center 200;`;
+}
+
+// ---- Nominatim fallback: one category per request, inside a bounding box.
+const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_CATEGORIES: [string, string][] = [
+  ['amenity', 'toilets'],
+  ['amenity', 'fuel'],
+  ['amenity', 'fast_food'],
+  ['amenity', 'bar'],
+  ['amenity', 'pub'],
+  ['amenity', 'restaurant'],
+  ['amenity', 'cafe'],
+  ['tourism', 'hotel'],
+  ['shop', 'supermarket'],
+];
+
+type TextFetcher = (url: string) => Promise<string>;
+
+const edgeGet: TextFetcher = async (url) => {
+  const res = await fetch(url, { headers: { 'User-Agent': 'PuttPuttPotty/1.0 (bathroom mini golf; contact via github.com/NeetWorldXYZ/puttputtpotty)', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`nominatim ${res.status}`);
+  return await res.text();
+};
+const dbGet: TextFetcher = (url) => dbFetch(url, null);
+
+async function nominatimPlaces(lat: number, lng: number, radius: number, get: TextFetcher): Promise<OsmPlace[]> {
+  const dLat = radius / 111320;
+  const dLng = radius / (111320 * Math.cos((lat * Math.PI) / 180));
+  const viewbox = `${lng - dLng},${lat + dLat},${lng + dLng},${lat - dLat}`;
+  const out: OsmPlace[] = [];
+  const seen = new Set<string>();
+  for (const [k, v] of NOMINATIM_CATEGORIES) {
+    const url = `${NOMINATIM}?q=[${k}=${v}]&viewbox=${viewbox}&bounded=1&format=jsonv2&limit=50`;
+    try {
+      const rows = JSON.parse(await get(url)) as { osm_type: string; osm_id: number; lat: string; lon: string; name?: string; display_name?: string; category?: string; type?: string }[];
+      for (const r of rows) {
+        const id = `osm:${r.osm_type}:${r.osm_id}`;
+        if (seen.has(id)) continue;
+        const c = classify({ [k]: v });
+        if (!c) continue;
+        seen.add(id);
+        out.push({ id, name: r.name || (r.display_name ?? '').split(',')[0] || c.label, poiType: c.poiType, lat: Number(r.lat), lng: Number(r.lon) });
+      }
+    } catch (e) {
+      console.warn('nominatim failed', k, v, (e as Error).message);
+    }
+    // Nominatim's usage policy: at most one request per second.
+    await new Promise((r) => setTimeout(r, 1100));
+  }
+  if (!out.length) throw new Error('Nominatim returned nothing');
+  return out;
+}
+
+/**
+ * Outbound request routed through Postgres (the `http` extension). The edge
+ * runtime's own egress gets "connection refused" / timeouts from the Overpass
+ * mirrors while the database reaches them in about a second.
+ */
+async function dbFetch(url: string, body: string | null): Promise<string> {
+  const { data, error } = await admin.rpc('http_fetch_osm', { url, body });
+  if (error) throw new Error(`db fetch: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as { status: number; content: string } | undefined;
+  if (!row) throw new Error('db fetch: empty');
+  if (row.status !== 200) throw new Error(`db fetch: ${row.status}`);
+  return row.content;
+}
+
+async function overpassViaDb(q: string): Promise<OsmPlace[]> {
+  const errors: string[] = [];
+  for (const url of OVERPASS.slice(0, 2)) {
+    try {
+      const text = await dbFetch(url, 'data=' + encodeURIComponent(q));
+      const data = JSON.parse(text) as { elements?: Element[] };
+      if (!Array.isArray(data.elements)) throw new Error('bad response');
+      return parsePlaces(data.elements);
+    } catch (e) {
+      errors.push(`${new URL(url).host}: ${(e as Error).message}`);
+      console.warn('overpass via db failed', url, (e as Error).message);
+    }
+  }
+  throw new Error(errors.join('; '));
 }
 
 async function overpassOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
@@ -167,7 +262,28 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
   if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: hit.places as OsmPlace[], cached: true };
-  const places = await overpassRace(overpassQuery(lat, lng, radius));
+  const q = overpassQuery(lat, lng, radius);
+  const strategies: [string, () => Promise<OsmPlace[]>][] = [
+    ['overpass-db', () => overpassViaDb(q)],
+    ['overpass-edge', () => overpassRace(q)],
+    ['nominatim-db', () => nominatimPlaces(lat, lng, radius, dbGet)],
+    ['nominatim-edge', () => nominatimPlaces(lat, lng, radius, edgeGet)],
+  ];
+  let places: OsmPlace[] | null = null;
+  let source = '';
+  const errors: string[] = [];
+  for (const [name, run] of strategies) {
+    try {
+      places = await run();
+      source = name;
+      break;
+    } catch (e) {
+      errors.push(`${name}: ${(e as Error).message}`);
+      console.warn('bathroom source failed', name, (e as Error).message);
+    }
+  }
+  if (!places) throw new Error(`No bathroom source is answering (${errors.join(' | ')})`);
+  console.log('bathrooms', key, source, places.length);
   await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
   return { places, cached: false };
 }
@@ -196,23 +312,31 @@ async function ensureProfile(userId: string, displayName?: string): Promise<void
 
 async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string) {
   const { data: existing } = await admin.from('locations').select('*').eq('id', loc.id).maybeSingle();
-  if (existing && existing.hole) return existing;
+  if (existing && Array.isArray(existing.holes) && existing.holes.length === HOLES_PER_COURSE) return existing;
   const band = bandFor(loc.poiType, loc.id);
-  const g = generateHole({ seed: loc.id, difficulty: band.difficulty });
-  g.hole.theme = band.theme;
-  g.hole.id = loc.id;
-  g.hole.name = loc.name;
+  // Three distinct archetypes from the course planner, difficulty from the band, one environment.
+  const slots = courseSlots(loc.id, HOLES_PER_COURSE);
+  const holes = slots.map((slot: { index: number; seed: string; archetype: string; difficulty: string; theme: string }, i: number) => {
+    const g = generateSlot(loc.id, { ...slot, difficulty: COURSE_RAMP[band.difficulty][i], theme: band.theme });
+    g.hole.theme = band.theme;
+    g.hole.id = `${loc.id}#${i + 1}`;
+    g.hole.name = `${loc.name} ${i + 1}`;
+    return g.hole;
+  });
+  const par = holes.reduce((a: number, h: { par: number }) => a + h.par, 0);
   const row = {
     id: loc.id,
-    name: loc.name.slice(0, 80),
-    poi_type: loc.poiType,
-    lat: loc.lat,
-    lng: loc.lng,
+    name: (existing?.name ?? loc.name).slice(0, 80),
+    poi_type: existing?.poi_type ?? loc.poiType,
+    lat: existing?.lat ?? loc.lat,
+    lng: existing?.lng ?? loc.lng,
     theme: band.theme,
     difficulty: band.difficulty,
-    hole: g.hole,
-    hole_par: g.hole.par,
-    founded_by: userId,
+    hole: holes[0],
+    hole_par: holes[0].par,
+    holes,
+    par,
+    founded_by: existing?.founded_by ?? userId,
   };
   const { data, error } = await admin.from('locations').upsert(row).select('*').single();
   if (error) throw new Error(error.message);
@@ -249,7 +373,7 @@ Deno.serve(async (req: Request) => {
       await ensureProfile(user.id);
       const row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
       const { data: throne } = await admin.from('thrones').select('*').eq('location_id', row.id).eq('season', currentSeason()).maybeSingle();
-      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, king: throne });
+      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, holes: row.holes, par: row.par, king: throne });
     }
 
     if (action === 'bathrooms') {
@@ -273,6 +397,17 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, distance: dist });
     }
 
+    if (action === 'start') {
+      // Starts the throne-run clock. Needs a live check-in at this bathroom.
+      const { locationId } = body;
+      if (typeof locationId !== 'string') return json({ error: 'bad start' }, 400);
+      const { data: ci } = await admin.from('checkins').select('at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+      if (!ci) return json({ error: 'check in first' }, 400);
+      const startedAt = new Date().toISOString();
+      await admin.from('checkins').update({ started_at: startedAt }).eq('user_id', user.id).eq('location_id', locationId);
+      return json({ ok: true, startedAt });
+    }
+
     if (action === 'course-hole') {
       const { seed, index } = body;
       if (typeof seed !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(seed) || typeof index !== 'number') return json({ error: 'bad course' }, 400);
@@ -281,26 +416,34 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'submit') {
       const { locationId, courseSeed, holeIndex, strokes, lat, lng, accuracy } = body;
-      if (!validStrokes(strokes)) return json({ error: 'bad strokes' }, 400);
       await ensureProfile(user.id);
-      let hole;
+      let holes: unknown[];
       let par: number;
+      let strokeLists: Stroke[][];
+      let elapsedMs: number | null = null;
       if (typeof locationId === 'string') {
+        if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
+        strokeLists = strokes as Stroke[][];
         const { data: loc } = await admin.from('locations').select('*').eq('id', locationId).maybeSingle();
-        if (!loc || !loc.hole) return json({ error: 'unknown location' }, 404);
-        hole = loc.hole;
-        par = loc.hole_par;
+        if (!loc || !Array.isArray(loc.holes) || loc.holes.length !== HOLES_PER_COURSE) return json({ error: 'unknown location' }, 404);
+        holes = loc.holes;
+        par = loc.par;
         if (typeof lat !== 'number' || typeof lng !== 'number') return json({ error: 'no position' }, 400);
         const acc = typeof accuracy === 'number' ? accuracy : 999;
         if (acc > MAX_ACCURACY_M) return json({ error: 'GPS accuracy too low' }, 400);
         const dist = haversine(lat, lng, loc.lat, loc.lng);
         if (dist > CLAIM_RADIUS_M + Math.min(acc, CLAIM_RADIUS_M)) return json({ error: `too far away (${Math.round(dist)} m)` }, 400);
         // Dwell: a check-in at this location at least DWELL_SECONDS ago and not stale.
-        const { data: ci } = await admin.from('checkins').select('at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+        const { data: ci } = await admin.from('checkins').select('at, started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
         if (!ci) return json({ error: 'check in first' }, 400);
         const age = (Date.now() - new Date(ci.at).getTime()) / 1000;
         if (age < DWELL_SECONDS) return json({ error: `stay a little longer (${Math.ceil(DWELL_SECONDS - age)} s)` }, 400);
         if (age > CHECKIN_MAX_AGE_S) return json({ error: 'check-in expired, check in again' }, 400);
+        // Round time, measured here: from the start action to this submission.
+        if (!ci.started_at) return json({ error: 'round was not started' }, 400);
+        elapsedMs = Date.now() - new Date(ci.started_at).getTime();
+        if (elapsedMs < 0 || elapsedMs > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'round took too long, start again' }, 400);
+        await admin.from('checkins').update({ started_at: null }).eq('user_id', user.id).eq('location_id', locationId);
         // Cooldown per location.
         const { data: last } = await admin.from('runs').select('created_at').eq('user_id', user.id).eq('location_id', locationId).order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (last) {
@@ -315,24 +458,34 @@ Deno.serve(async (req: Request) => {
           if (dt > 0 && d / dt > MAX_SPEED_MPS) return json({ error: 'moved too fast between bathrooms' }, 400);
         }
       } else if (typeof courseSeed === 'string' && typeof holeIndex === 'number') {
-        hole = await courseHole(courseSeed, holeIndex);
+        if (!validStrokes(strokes)) return json({ error: 'bad strokes' }, 400);
+        strokeLists = [strokes];
+        const hole = await courseHole(courseSeed, holeIndex);
+        holes = [hole];
         par = hole.par;
         const { data: dup } = await admin.from('runs').select('id').eq('user_id', user.id).eq('course_seed', courseSeed).eq('hole_index', holeIndex).maybeSingle();
         if (dup) return json({ error: 'already played this hole today' }, 409);
       } else return json({ error: 'nothing to submit to' }, 400);
 
-      // Re-simulate. The client's claimed score is ignored; the server's replay is the record.
-      const seed = 0;
-      const r = replay(hole, seed, strokes, DEFAULT_PARAMS);
-      const st = r.state;
-      if (!st.done) return json({ error: 'run not finished' }, 400);
-      const score = holeScore(st, par);
+      // Re-simulate every hole. The client's claimed score is ignored; the server's replay is the record.
+      const holeScores: number[] = [];
+      let sunk = true;
+      for (let i = 0; i < holes.length; i++) {
+        const st = replay(holes[i], 0, strokeLists[i], DEFAULT_PARAMS).state;
+        if (!st.done) return json({ error: `hole ${i + 1} not finished` }, 400);
+        holeScores.push(holeScore(st, (holes[i] as { par: number }).par));
+        sunk = sunk && st.sunk;
+      }
+      const score = holeScores.reduce((a, b) => a + b, 0);
+      const isLocation = typeof locationId === 'string';
       const { error } = await admin.from('runs').insert({
         user_id: user.id,
-        location_id: typeof locationId === 'string' ? locationId : null,
+        location_id: isLocation ? locationId : null,
         course_seed: typeof courseSeed === 'string' ? courseSeed : null,
         hole_index: typeof holeIndex === 'number' ? holeIndex : 0,
-        strokes,
+        strokes: isLocation ? strokeLists : strokeLists[0],
+        hole_scores: isLocation ? holeScores : null,
+        elapsed_ms: elapsedMs,
         score,
         par,
         season: currentSeason(),
@@ -342,11 +495,11 @@ Deno.serve(async (req: Request) => {
       });
       if (error) return json({ error: error.message }, 500);
       let king = null;
-      if (typeof locationId === 'string') {
+      if (isLocation) {
         const { data } = await admin.from('thrones').select('*').eq('location_id', locationId).eq('season', currentSeason()).maybeSingle();
         king = data;
       }
-      return json({ score, par, sunk: st.sunk, king, isKing: king ? king.user_id === user.id : false });
+      return json({ score, par, sunk, holeScores, elapsedMs, king, isKing: king ? king.user_id === user.id : false });
     }
 
     return json({ error: 'unknown action' }, 400);
