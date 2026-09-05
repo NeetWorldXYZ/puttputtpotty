@@ -56,6 +56,8 @@ export const api = {
     call<{ location: LocationSummary; hole: Hole; king: King | null }>({ action: 'hole', location }),
   checkin: (locationId: string, lat: number, lng: number, accuracy: number) =>
     call<{ ok: true; distance: number }>({ action: 'checkin', locationId, lat, lng, accuracy }),
+  /** Bathrooms near a point, fetched from OpenStreetMap by the server and cached there. */
+  bathrooms: (lat: number, lng: number, radius: number) => call<{ places: { id: string; name: string; poiType: string; lat: number; lng: number }[]; cached: boolean }>({ action: 'bathrooms', lat, lng, radius }),
   courseHole: (seed: string, index: number) => call<{ hole: Hole }>({ action: 'course-hole', seed, index }),
   submitLocation: (locationId: string, strokes: Stroke[], lat: number, lng: number, accuracy: number) =>
     call<{ score: number; par: number; sunk: boolean; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy }),

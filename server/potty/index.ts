@@ -76,6 +76,102 @@ function bandFor(poiType: string, id: string): { theme: string; difficulty: 'eas
   }
 }
 
+// ---- OpenStreetMap bathrooms (Overpass), fetched server-side and cached per ~500 m cell.
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+const OSM_TTL_MS = 24 * 3600 * 1000;
+const OSM_TIMEOUT_MS = 15000;
+
+type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: number };
+type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+
+function classify(tags: Record<string, string>): { poiType: string; label: string } | null {
+  const a = tags.amenity;
+  if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
+  if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };
+  if (a === 'fast_food') return { poiType: 'fast_food', label: 'Fast food' };
+  if (a === 'bar' || a === 'pub' || a === 'nightclub') return { poiType: 'bar', label: a === 'nightclub' ? 'Club' : 'Bar' };
+  if (a === 'restaurant' || a === 'cafe') return { poiType: 'restaurant', label: a === 'cafe' ? 'Cafe' : 'Restaurant' };
+  if (tags.tourism === 'hotel' || tags.tourism === 'motel') return { poiType: 'hotel', label: 'Hotel' };
+  if (tags.aeroway === 'terminal' || tags.aeroway === 'aerodrome') return { poiType: 'airport', label: 'Airport' };
+  if (tags.leisure === 'stadium' || tags.building === 'stadium') return { poiType: 'stadium', label: 'Stadium' };
+  if (tags.shop === 'supermarket' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
+  if (tags.highway === 'rest_area' || tags.highway === 'services') return { poiType: 'park', label: 'Rest stop' };
+  return null;
+}
+
+function parsePlaces(elements: Element[]): OsmPlace[] {
+  const out: OsmPlace[] = [];
+  for (const el of elements) {
+    const tags = el.tags ?? {};
+    const c = classify(tags);
+    if (!c) continue;
+    const lat = el.lat ?? el.center?.lat;
+    const lng = el.lon ?? el.center?.lon;
+    if (lat === undefined || lng === undefined) continue;
+    out.push({ id: `osm:${el.type}:${el.id}`, name: tags.name || tags.brand || c.label, poiType: c.poiType, lat, lng });
+  }
+  return out;
+}
+
+function overpassQuery(lat: number, lng: number, radius: number): string {
+  const around = `(around:${radius},${lat},${lng})`;
+  return `[out:json][timeout:20];
+(
+  nwr["amenity"="toilets"]${around};
+  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"]${around};
+  nwr["tourism"~"^(hotel|motel)$"]${around};
+  nwr["aeroway"~"^(terminal|aerodrome)$"]${around};
+  nwr["leisure"="stadium"]${around};
+  nwr["shop"~"^(supermarket|mall|department_store)$"]${around};
+  nwr["highway"~"^(rest_area|services)$"]${around};
+);
+out center 200;`;
+}
+
+async function overpassOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
+  const res = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'PuttPuttPotty/1.0 (bathroom mini golf)' }, signal });
+  if (!res.ok) throw new Error(`overpass ${res.status}`);
+  const data = (await res.json()) as { elements?: Element[] };
+  if (!Array.isArray(data.elements)) throw new Error('overpass: bad response');
+  return parsePlaces(data.elements);
+}
+
+/** Mirrors are raced; first good answer wins. */
+function overpassRace(q: string): Promise<OsmPlace[]> {
+  const controllers = OVERPASS.map(() => new AbortController());
+  const timers = controllers.map((c) => setTimeout(() => c.abort(), OSM_TIMEOUT_MS));
+  const errors: string[] = [];
+  return new Promise<OsmPlace[]>((resolve, reject) => {
+    let pending = OVERPASS.length;
+    OVERPASS.forEach((url, i) => {
+      overpassOne(url, q, controllers[i].signal).then(
+        (places) => {
+          controllers.forEach((c, j) => j !== i && c.abort());
+          timers.forEach(clearTimeout);
+          resolve(places);
+        },
+        (e: Error) => {
+          errors.push(`${new URL(url).host}: ${e.name === 'AbortError' ? 'timed out' : e.message}`);
+          console.warn('overpass mirror failed', url, e.message);
+          if (--pending === 0) {
+            timers.forEach(clearTimeout);
+            reject(new Error(`OpenStreetMap is not answering (${errors.join('; ')})`));
+          }
+        },
+      );
+    });
+  });
+}
+
+async function bathrooms(lat: number, lng: number, radius: number): Promise<{ places: OsmPlace[]; cached: boolean }> {
+  const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
+  const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
+  if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: hit.places as OsmPlace[], cached: true };
+  const places = await overpassRace(overpassQuery(lat, lng, radius));
+  await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
+  return { places, cached: false };
+}
+
 type Stroke = { angle: number; power: number; t?: number };
 
 function validStrokes(v: unknown): v is Stroke[] {
@@ -154,6 +250,13 @@ Deno.serve(async (req: Request) => {
       const row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
       const { data: throne } = await admin.from('thrones').select('*').eq('location_id', row.id).eq('season', currentSeason()).maybeSingle();
       return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, king: throne });
+    }
+
+    if (action === 'bathrooms') {
+      const { lat, lng, radius } = body;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'bad position' }, 400);
+      const r = Math.min(20000, Math.max(500, typeof radius === 'number' ? Math.round(radius) : 3000));
+      return json(await bathrooms(lat, lng, r));
     }
 
     if (action === 'checkin') {
@@ -248,6 +351,7 @@ Deno.serve(async (req: Request) => {
 
     return json({ error: 'unknown action' }, 400);
   } catch (e) {
+    console.error('potty error', (e as Error).message);
     return json({ error: (e as Error).message }, 500);
   }
 });

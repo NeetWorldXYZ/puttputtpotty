@@ -1,10 +1,13 @@
 /**
- * Bathrooms from OpenStreetMap via the Overpass API: public toilets plus
- * places that have one (gas stations, bars, restaurants, hotels, airports,
- * stadiums, big shops, rest stops). Several public mirrors are raced with a
- * hard timeout each, because any one of them can hang for a minute. Cached
- * per ~500 m cell for 15 minutes so panning around doesn't hammer them.
+ * Bathrooms from OpenStreetMap: public toilets plus places that have one
+ * (gas stations, bars, restaurants, hotels, airports, stadiums, big shops,
+ * rest stops). The server does the Overpass query and caches it (mobile
+ * browsers drop cross-origin Overpass calls surprisingly often); if our
+ * API is unreachable the phone races the public mirrors directly. Cached
+ * locally per ~500 m cell for 15 minutes.
  */
+
+import { api } from './api';
 
 export interface OsmPlace {
   id: string; // osm:node:123
@@ -126,7 +129,16 @@ export async function fetchBathrooms(lat: number, lng: number, radiusM = 3000): 
   nwr["highway"~"^(rest_area|services)$"]${around};
 );
 out center 200;`;
-  const places = await race(q);
+  let places: OsmPlace[];
+  try {
+    places = (await api.bathrooms(lat, lng, radiusM)).places;
+  } catch (serverErr) {
+    try {
+      places = await race(q);
+    } catch (directErr) {
+      throw new Error(`${(serverErr as Error).message}; ${(directErr as Error).message}`);
+    }
+  }
   writeCache(key, places);
   return places;
 }
