@@ -79,7 +79,7 @@ function bandFor(poiType: string, id: string): { theme: string; difficulty: 'eas
 // ---- OpenStreetMap bathrooms (Overpass), fetched server-side and cached per ~500 m cell.
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
 const OSM_TTL_MS = 24 * 3600 * 1000;
-const OSM_TIMEOUT_MS = 15000;
+const OSM_TIMEOUT_MS = 14000;
 
 type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: number };
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
@@ -113,19 +113,69 @@ function parsePlaces(elements: Element[]): OsmPlace[] {
   return out;
 }
 
+const POI_TAGS: [string, string[]][] = [
+  ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe']],
+  ['tourism', ['hotel', 'motel']],
+  ['aeroway', ['terminal', 'aerodrome']],
+  ['leisure', ['stadium']],
+  ['shop', ['supermarket', 'mall', 'department_store']],
+  ['highway', ['rest_area', 'services']],
+];
+
+/**
+ * Nodes and ways only with exact tag values: `nwr` + regex + `around` makes
+ * Overpass walk relation geometry and skip the value index, which is what
+ * pushed the previous query past every mirror's patience.
+ */
 function overpassQuery(lat: number, lng: number, radius: number): string {
   const around = `(around:${radius},${lat},${lng})`;
-  return `[out:json][timeout:20];
-(
-  nwr["amenity"="toilets"]${around};
-  nwr["amenity"~"^(fuel|fast_food|bar|pub|nightclub|restaurant|cafe)$"]${around};
-  nwr["tourism"~"^(hotel|motel)$"]${around};
-  nwr["aeroway"~"^(terminal|aerodrome)$"]${around};
-  nwr["leisure"="stadium"]${around};
-  nwr["shop"~"^(supermarket|mall|department_store)$"]${around};
-  nwr["highway"~"^(rest_area|services)$"]${around};
-);
-out center 200;`;
+  const clauses: string[] = [];
+  for (const [k, vals] of POI_TAGS) for (const v of vals) clauses.push(`node["${k}"="${v}"]${around};way["${k}"="${v}"]${around};`);
+  return `[out:json][timeout:12];(${clauses.join('')});out center 200;`;
+}
+
+// ---- Nominatim fallback: one category per request, inside a bounding box.
+const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_CATEGORIES: [string, string][] = [
+  ['amenity', 'toilets'],
+  ['amenity', 'fuel'],
+  ['amenity', 'fast_food'],
+  ['amenity', 'bar'],
+  ['amenity', 'pub'],
+  ['amenity', 'restaurant'],
+  ['amenity', 'cafe'],
+  ['tourism', 'hotel'],
+  ['shop', 'supermarket'],
+];
+
+async function nominatimPlaces(lat: number, lng: number, radius: number): Promise<OsmPlace[]> {
+  const dLat = radius / 111320;
+  const dLng = radius / (111320 * Math.cos((lat * Math.PI) / 180));
+  const viewbox = `${lng - dLng},${lat + dLat},${lng + dLng},${lat - dLat}`;
+  const out: OsmPlace[] = [];
+  const seen = new Set<string>();
+  for (const [k, v] of NOMINATIM_CATEGORIES) {
+    const url = `${NOMINATIM}?q=[${k}=${v}]&viewbox=${viewbox}&bounded=1&format=jsonv2&limit=50`;
+    try {
+      const res = await fetch(url, { headers: { 'User-Agent': 'PuttPuttPotty/1.0 (bathroom mini golf; contact via github.com/NeetWorldXYZ/puttputtpotty)', Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+      const rows = (await res.json()) as { osm_type: string; osm_id: number; lat: string; lon: string; name?: string; display_name?: string; category?: string; type?: string }[];
+      for (const r of rows) {
+        const id = `osm:${r.osm_type}:${r.osm_id}`;
+        if (seen.has(id)) continue;
+        const c = classify({ [k]: v });
+        if (!c) continue;
+        seen.add(id);
+        out.push({ id, name: r.name || (r.display_name ?? '').split(',')[0] || c.label, poiType: c.poiType, lat: Number(r.lat), lng: Number(r.lon) });
+      }
+    } catch (e) {
+      console.warn('nominatim failed', k, v, (e as Error).message);
+    }
+    // Nominatim's usage policy: at most one request per second.
+    await new Promise((r) => setTimeout(r, 1100));
+  }
+  if (!out.length) throw new Error('Nominatim returned nothing');
+  return out;
 }
 
 async function overpassOne(url: string, q: string, signal: AbortSignal): Promise<OsmPlace[]> {
@@ -167,7 +217,16 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
   if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: hit.places as OsmPlace[], cached: true };
-  const places = await overpassRace(overpassQuery(lat, lng, radius));
+  let places: OsmPlace[];
+  let source = 'overpass';
+  try {
+    places = await overpassRace(overpassQuery(lat, lng, radius));
+  } catch (e) {
+    console.warn('overpass gave up, trying nominatim', (e as Error).message);
+    source = 'nominatim';
+    places = await nominatimPlaces(lat, lng, radius);
+  }
+  console.log('bathrooms', key, source, places.length);
   await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
   return { places, cached: false };
 }
