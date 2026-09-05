@@ -1,4 +1,4 @@
-import { dailySeed } from '../generator/generator';
+import { dailySeed, secondsUntilNextDaily } from '../generator/generator';
 import { navigate } from '../router';
 
 export type CourseChoice = 'handmade' | 'random' | 'daily' | 'title';
@@ -66,4 +66,4 @@ export function recordBest(seed: string, total: number): boolean {
   }
 }
 
-export { dailySeed };
+export { dailySeed, secondsUntilNextDaily };

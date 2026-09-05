@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api, type KingRow } from '../net/api';
 import { currentUserId, getSavedName } from '../net/supabase';
+import { loadProfile } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { dailySeed } from './courses';
 import { navigate } from '../router';
-import { NamePrompt } from './NamePrompt';
+import { AccountSheet } from './AccountSheet';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
@@ -37,6 +38,7 @@ export function LeaderboardScreen() {
 
   useEffect(() => {
     void currentUserId().then(setMe);
+    void loadProfile().then((p) => p?.name && setName(p.name));
   }, []);
 
   useEffect(() => {
@@ -133,12 +135,11 @@ export function LeaderboardScreen() {
       </div>
 
       {askName && (
-        <NamePrompt
-          onDone={(n) => {
+        <AccountSheet
+          onClose={(n) => {
             setName(n);
             setAskName(false);
           }}
-          onCancel={() => setAskName(false)}
         />
       )}
     </div>

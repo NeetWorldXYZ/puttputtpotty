@@ -2083,3 +2083,22 @@ input[type='checkbox'] {
 .map-screen.z-mid .flag.selected {
   transform: scale(1.02);
 }
+
+.field-label {
+  display: block;
+  text-align: left;
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ok-note {
+  color: var(--good);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 6px 0;
+}
+.card.account button {
+  width: 100%;
+}
