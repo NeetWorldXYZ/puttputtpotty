@@ -43,6 +43,10 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
 }
 
 const HOLES_PER_COURSE = 3;
+/** Edge functions get ~2 s of CPU per request, so a course is built one hole (two attempts) per request. */
+const GEN_ATTEMPTS_PER_REQUEST = 2;
+const GEN_MAX_TRIES = 5;
+const GEN_SOLVE = { randomShots: 60, randomPlays: 24, runs: 4, candidatesPerStroke: 10, strongRuns: 1, trapProbeShots: 10 };
 /** Difficulty ramp of a bathroom's three holes, by band. */
 const COURSE_RAMP: Record<'easy' | 'medium' | 'hard', ('easy' | 'medium' | 'hard')[]> = {
   easy: ['easy', 'easy', 'medium'],
@@ -283,6 +287,7 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
     }
   }
   if (!places) throw new Error(`No bathroom source is answering (${errors.join(' | ')})`);
+  places = dedupePlaces(places);
   console.log('bathrooms', key, source, places.length);
   await admin.from('osm_cells').upsert({ key, places, fetched_at: new Date().toISOString() });
   return { places, cached: false };
@@ -310,37 +315,105 @@ async function ensureProfile(userId: string, displayName?: string): Promise<void
   else if (displayName) await admin.from('profiles').update({ display_name: displayName.slice(0, 24) }).eq('id', userId);
 }
 
-async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string) {
+type LocationRow = {
+  id: string;
+  name: string;
+  poi_type: string;
+  lat: number;
+  lng: number;
+  theme: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  holes: unknown[] | null;
+  par: number | null;
+  gen_holes: number;
+  gen_tries: number;
+  founded_by: string | null;
+};
+
+/** Founds the row if needed (no holes yet). */
+async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string): Promise<LocationRow> {
   const { data: existing } = await admin.from('locations').select('*').eq('id', loc.id).maybeSingle();
-  if (existing && Array.isArray(existing.holes) && existing.holes.length === HOLES_PER_COURSE) return existing;
+  if (existing) return existing as LocationRow;
   const band = bandFor(loc.poiType, loc.id);
-  // Three distinct archetypes from the course planner, difficulty from the band, one environment.
-  const slots = courseSlots(loc.id, HOLES_PER_COURSE);
-  const holes = slots.map((slot: { index: number; seed: string; archetype: string; difficulty: string; theme: string }, i: number) => {
-    const g = generateSlot(loc.id, { ...slot, difficulty: COURSE_RAMP[band.difficulty][i], theme: band.theme });
-    g.hole.theme = band.theme;
-    g.hole.id = `${loc.id}#${i + 1}`;
-    g.hole.name = `${loc.name} ${i + 1}`;
-    return g.hole;
-  });
-  const par = holes.reduce((a: number, h: { par: number }) => a + h.par, 0);
   const row = {
     id: loc.id,
-    name: (existing?.name ?? loc.name).slice(0, 80),
-    poi_type: existing?.poi_type ?? loc.poiType,
-    lat: existing?.lat ?? loc.lat,
-    lng: existing?.lng ?? loc.lng,
+    name: loc.name.slice(0, 80),
+    poi_type: loc.poiType,
+    lat: loc.lat,
+    lng: loc.lng,
     theme: band.theme,
     difficulty: band.difficulty,
-    hole: holes[0],
-    hole_par: holes[0].par,
-    holes,
-    par,
-    founded_by: existing?.founded_by ?? userId,
+    hole: null,
+    hole_par: null,
+    holes: [],
+    par: null,
+    gen_holes: 0,
+    gen_tries: 0,
+    founded_by: userId,
   };
-  const { data, error } = await admin.from('locations').upsert(row).select('*').single();
+  const { data, error } = await admin.from('locations').upsert(row, { onConflict: 'id', ignoreDuplicates: true }).select('*').maybeSingle();
   if (error) throw new Error(error.message);
-  return data;
+  if (data) return data as LocationRow;
+  const { data: again } = await admin.from('locations').select('*').eq('id', loc.id).single();
+  return again as LocationRow;
+}
+
+/**
+ * Builds the next hole of a course. Each request runs at most two generator
+ * attempts; a hole that fails both is retried under a new seed suffix next
+ * request, and after GEN_MAX_TRIES the undecorated fallback is accepted.
+ * Deterministic given the request sequence, and the row is the source of truth.
+ */
+async function buildNextHole(row: LocationRow): Promise<LocationRow> {
+  const holes = Array.isArray(row.holes) ? row.holes.slice() : [];
+  const i = holes.length;
+  if (i >= HOLES_PER_COURSE) return row;
+  const k = row.gen_tries;
+  const slot = courseSlots(row.id, HOLES_PER_COURSE)[i] as { seed: string; archetype: string };
+  const seed = k === 0 ? slot.seed : `${slot.seed}:try${k}`;
+  const g = generateHole({ seed, archetype: slot.archetype, difficulty: COURSE_RAMP[row.difficulty][i], maxAttempts: GEN_ATTEMPTS_PER_REQUEST, solve: GEN_SOLVE });
+  const accepted = !g.fallback || k + 1 >= GEN_MAX_TRIES;
+  let patch: Record<string, unknown>;
+  if (accepted) {
+    g.hole.theme = row.theme;
+    g.hole.id = `${row.id}#${i + 1}`;
+    g.hole.name = `${row.name} ${i + 1}`;
+    holes.push(g.hole);
+    const done = holes.length === HOLES_PER_COURSE;
+    patch = {
+      holes,
+      gen_holes: holes.length,
+      gen_tries: 0,
+      hole: holes[0],
+      hole_par: (holes[0] as { par: number }).par,
+      par: done ? holes.reduce((a: number, h) => a + (h as { par: number }).par, 0) : null,
+    };
+  } else patch = { gen_tries: k + 1 };
+  // Optimistic: only apply if nobody else advanced this row meanwhile.
+  const { data } = await admin.from('locations').update(patch).eq('id', row.id).eq('gen_holes', i).eq('gen_tries', k).select('*').maybeSingle();
+  if (data) return data as LocationRow;
+  const { data: fresh } = await admin.from('locations').select('*').eq('id', row.id).single();
+  return fresh as LocationRow;
+}
+
+/** Same building, several OpenStreetMap objects: keep one pin. */
+const POI_PRIORITY = ['fuel', 'restaurant', 'fast_food', 'bar', 'hotel', 'retail', 'stadium', 'airport', 'park', 'toilets'];
+function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
+  const rank = (p: OsmPlace) => {
+    const r = POI_PRIORITY.indexOf(p.poiType);
+    return (r < 0 ? POI_PRIORITY.length : r) * 2 + (p.name && p.name !== 'Public toilet' ? 0 : 1);
+  };
+  const sorted = places.slice().sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+  const kept: OsmPlace[] = [];
+  for (const p of sorted) {
+    const absorbed = kept.some((q) => {
+      const d = haversine(p.lat, p.lng, q.lat, q.lng);
+      // A standalone toilet within a venue's grounds is that venue; two venues merge only when they share a footprint.
+      return p.poiType === 'toilets' ? d < 150 : d < 40;
+    });
+    if (!absorbed) kept.push(p);
+  }
+  return kept;
 }
 
 async function courseHole(seed: string, index: number) {
@@ -371,9 +444,15 @@ Deno.serve(async (req: Request) => {
       if (!loc || typeof loc.id !== 'string' || !/^osm:(node|way|relation):\d+$/.test(loc.id) || typeof loc.lat !== 'number' || typeof loc.lng !== 'number')
         return json({ error: 'bad location' }, 400);
       await ensureProfile(user.id);
-      const row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
+      let row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
+      const have = Array.isArray(row.holes) ? row.holes.length : 0;
+      if (have < HOLES_PER_COURSE) row = await buildNextHole(row);
+      const holes = Array.isArray(row.holes) ? row.holes : [];
+      const ready = holes.length >= HOLES_PER_COURSE;
+      const location = { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty };
+      if (!ready) return json({ location, ready: false, holes, building: holes.length + 1, par: null, king: null });
       const { data: throne } = await admin.from('thrones').select('*').eq('location_id', row.id).eq('season', currentSeason()).maybeSingle();
-      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng, theme: row.theme, difficulty: row.difficulty }, hole: row.hole, holes: row.holes, par: row.par, king: throne });
+      return json({ location, ready: true, holes, par: row.par, hole: holes[0], king: throne });
     }
 
     if (action === 'bathrooms') {

@@ -6,6 +6,7 @@ import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow } from '
 import { currentUserId } from '../net/supabase';
 import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
+import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { sfx } from './sound';
@@ -76,6 +77,7 @@ export function LocationPlay({ locationId, throne }: Props) {
   const strokesRef = useRef<Stroke[][]>([]);
   const [timerFrom, setTimerFrom] = useState<number | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [building, setBuilding] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [submit, setSubmit] = useState<Submit>({ state: 'idle' });
@@ -87,8 +89,8 @@ export function LocationPlay({ locationId, throne }: Props) {
       return;
     }
     let cancelled = false;
-    api
-      .hole(place)
+    const signal = { cancelled: false };
+    loadCourse(place, { signal, onProgress: (n) => !cancelled && setBuilding(n) })
       .then((r) => {
         if (cancelled) return;
         setHoles(r.holes);
@@ -127,6 +129,7 @@ export function LocationPlay({ locationId, throne }: Props) {
       });
     return () => {
       cancelled = true;
+      signal.cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationId, throne]);
@@ -209,8 +212,8 @@ export function LocationPlay({ locationId, throne }: Props) {
       <div className="play">
         <div className="overlay" style={{ background: 'var(--page)' }}>
           <div className="card">
-            <h2>Opening the stall</h2>
-            <div className="sub">{place.name}</div>
+            <h2>{building ? `Building hole ${building} of ${HOLES_PER_COURSE}` : 'Opening the stall'}</h2>
+            <div className="sub">{place.name}{building ? ' · first visit, the course is being laid out' : ''}</div>
             <button onClick={toMap}>Back to map</button>
           </div>
         </div>
