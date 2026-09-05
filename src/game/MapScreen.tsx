@@ -504,7 +504,7 @@ export function MapScreen() {
               </button>
             )}
             {checkinError && <div className="sheet-err">{checkinError}</div>}
-            <button onClick={playPractice}>Practice this hole</button>
+            <button onClick={playPractice}>Practice this course</button>
           </div>
         </div>
       )}
