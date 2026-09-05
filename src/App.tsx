@@ -10,6 +10,7 @@ import { navigate, useLocation } from './router';
 const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
 const LocationPlay = lazy(() => import('./game/LocationPlay').then((m) => ({ default: m.LocationPlay })));
 const LeaderboardScreen = lazy(() => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
+const MatchScreen = lazy(() => import('./game/MatchScreen').then((m) => ({ default: m.MatchScreen })));
 
 function Loading() {
   return (
@@ -30,6 +31,12 @@ export function App() {
     return (
       <Suspense fallback={<Loading />}>
         <MapScreen />
+      </Suspense>
+    );
+  if (loc.route === 'match')
+    return (
+      <Suspense fallback={<Loading />}>
+        <MatchScreen key={loc.match ?? loc.code ?? 'lobby'} code={loc.code} matchId={loc.match} />
       </Suspense>
     );
   if (loc.route === 'leaders')

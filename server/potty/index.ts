@@ -527,17 +527,51 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'course-hole') {
       const { seed, index } = body;
-      if (typeof seed !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(seed) || typeof index !== 'number') return json({ error: 'bad course' }, 400);
+      if (typeof seed !== 'string' || !/^(\d{4}-\d{2}-\d{2}|m-[a-f0-9]{8})$/.test(seed) || typeof index !== 'number' || index < 0 || index > 8) return json({ error: 'bad course' }, 400);
       return json({ hole: await courseHole(seed, index) });
     }
 
     if (action === 'submit') {
-      const { locationId, courseSeed, holeIndex, strokes, lat, lng, accuracy } = body;
+      const { locationId, courseSeed, holeIndex, matchId, strokes, lat, lng, accuracy } = body;
       await ensureProfile(user.id);
       let holes: unknown[];
       let par: number;
       let strokeLists: Stroke[][];
       let elapsedMs: number | null = null;
+      if (typeof matchId === 'string') {
+        // Quick match: three holes of the match seed, timed from when the second player joined.
+        if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
+        const { data: m } = await admin.from('matches').select('*').eq('id', matchId).maybeSingle();
+        if (!m) return json({ error: 'no such match' }, 404);
+        const side = m.p1 === user.id ? 'p1' : m.p2 === user.id ? 'p2' : null;
+        if (!side) return json({ error: 'not your match' }, 403);
+        if (m.status !== 'playing') return json({ error: m.status === 'waiting' ? 'opponent has not joined yet' : 'match is over' }, 400);
+        if (m[`${side}_score`] !== null) return json({ error: 'already submitted' }, 409);
+        const mh: unknown[] = [];
+        for (let i = 0; i < HOLES_PER_COURSE; i++) mh.push(await courseHole(m.seed, i));
+        const scores: number[] = [];
+        for (let i = 0; i < mh.length; i++) {
+          const st = replay(mh[i], 0, (strokes as Stroke[][])[i], DEFAULT_PARAMS).state;
+          if (!st.done) return json({ error: `hole ${i + 1} not finished` }, 400);
+          scores.push(holeScore(st, (mh[i] as { par: number }).par));
+        }
+        const total = scores.reduce((a, b) => a + b, 0);
+        const elapsed = Math.max(0, Date.now() - new Date(m.started_at).getTime());
+        const patch: Record<string, unknown> = { [`${side}_score`]: total, [`${side}_holes`]: scores, [`${side}_elapsed_ms`]: elapsed };
+        const other = side === 'p1' ? 'p2' : 'p1';
+        if (m[`${other}_score`] !== null) {
+          const os = m[`${other}_score`] as number;
+          const oe = m[`${other}_elapsed_ms`] as number;
+          const iWin = total < os || (total === os && elapsed < oe);
+          const tie = total === os && elapsed === oe;
+          patch.status = 'done';
+          patch.finished_at = new Date().toISOString();
+          patch.winner = tie ? null : iWin ? user.id : m[other];
+        }
+        const { error } = await admin.from('matches').update(patch).eq('id', matchId).is(`${side}_score`, null);
+        if (error) return json({ error: error.message }, 500);
+        return json({ score: total, holeScores: scores, elapsedMs: elapsed, done: patch.status === 'done', winner: patch.winner ?? null });
+      }
       if (typeof locationId === 'string') {
         if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
         strokeLists = strokes as Stroke[][];

@@ -41,6 +41,27 @@ export function fmtElapsed(ms: number): string {
 
 export const HOLES_PER_COURSE = 3;
 
+export interface MatchRow {
+  id: string;
+  seed: string;
+  code: string | null;
+  status: 'waiting' | 'playing' | 'done' | 'cancelled';
+  p1: string;
+  p2: string | null;
+  p1_name?: string | null;
+  p2_name?: string | null;
+  p1_score: number | null;
+  p1_holes: number[] | null;
+  p1_elapsed_ms: number | null;
+  p2_score: number | null;
+  p2_holes: number[] | null;
+  p2_elapsed_ms: number | null;
+  winner: string | null;
+  forfeit: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
 export interface KingRow {
   user_id: string;
   display_name: string;
@@ -104,6 +125,35 @@ export const api = {
     const { data, error } = await supabase.rpc('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: radiusM });
     if (error) throw new Error(error.message);
     return (data ?? []) as NearbyLocation[];
+  },
+  submitMatch: (matchId: string, strokes: Stroke[][]) =>
+    call<{ score: number; holeScores: number[]; elapsedMs: number; done: boolean; winner: string | null }>({ action: 'submit', matchId, strokes }),
+
+  async findMatch(): Promise<MatchRow> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('find_match');
+    if (error) throw new Error(error.message);
+    return (Array.isArray(data) ? data[0] : data) as MatchRow;
+  },
+  async createInvite(): Promise<MatchRow> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('create_invite');
+    if (error) throw new Error(error.message);
+    return (Array.isArray(data) ? data[0] : data) as MatchRow;
+  },
+  async joinInvite(code: string): Promise<MatchRow> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('join_invite', { in_code: code });
+    if (error) throw new Error(error.message.replace(/^.*?: /, ''));
+    return (Array.isArray(data) ? data[0] : data) as MatchRow;
+  },
+  async cancelMatch(id: string): Promise<void> {
+    await supabase.rpc('cancel_match', { in_id: id });
+  },
+  async matchState(id: string): Promise<MatchRow> {
+    const { data, error } = await supabase.rpc('match_state', { in_id: id });
+    if (error) throw new Error(error.message);
+    return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },
   async kings(opts: { lat?: number; lng?: number; radiusM?: number; limit?: number } = {}): Promise<KingRow[]> {
     const { data, error } = await supabase.rpc('kings_leaderboard', { in_lat: opts.lat ?? null, in_lng: opts.lng ?? null, radius_m: opts.radiusM ?? null, lim: opts.limit ?? 50 });

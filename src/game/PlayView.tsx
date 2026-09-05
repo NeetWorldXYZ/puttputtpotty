@@ -38,6 +38,8 @@ interface Props {
   noRetry?: boolean;
   /** Epoch ms the round clock started; shows a live timer in the HUD. */
   timerFrom?: number | null;
+  /** Rendered just under the HUD (quick-match opponent strip). */
+  topExtra?: ReactNode;
 }
 
 export interface HoleDoneInfo {
@@ -87,7 +89,7 @@ function relPar(n: number): string {
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom }: Props) {
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom, topExtra }: Props) {
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
@@ -683,6 +685,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
           </div>
         </div>
       </div>
+
+      {topExtra}
 
       {onExit ? (
         <button className="corner-btn tl" onClick={onExit} title={exitLabel ?? 'Back'}>
