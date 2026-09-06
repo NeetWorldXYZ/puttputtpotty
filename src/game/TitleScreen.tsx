@@ -42,8 +42,8 @@ function Mascot() {
 
 /** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
 export const ART = {
-  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.png`,
-  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.png`,
+  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
+  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
 };
 
 /** Resolves to true once the image loads, false if it 404s, null while unknown. */
