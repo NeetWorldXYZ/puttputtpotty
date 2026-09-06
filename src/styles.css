@@ -2474,3 +2474,198 @@ input[type='checkbox'] {
   max-height: 88vh;
   overflow-y: auto;
 }
+
+/* ---- Pin states ---- */
+.flag.mine .flag-base {
+  box-shadow: 0 0 0 3px #ffd447, 0 0 14px 4px rgba(255, 212, 71, 0.75), 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.flag.mine .flag-cloth {
+  background: #ffd447;
+}
+
+/* ---- King banner + facts on the map sheet ---- */
+.king-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 3px solid var(--ink);
+  background: linear-gradient(180deg, #fff4cc, #ffe08a);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+.king-banner.mine {
+  background: linear-gradient(180deg, #fff8d6, #ffd447);
+}
+.king-banner.empty {
+  background: #eef3ff;
+  border-style: dashed;
+  border-color: #9fb3e0;
+  box-shadow: none;
+}
+.kb-avatar {
+  flex: none;
+}
+.kb-empty-icon {
+  font-size: 40px;
+  flex: none;
+  width: 64px;
+  text-align: center;
+}
+.kb-text {
+  flex: 1;
+  min-width: 0;
+}
+.kb-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a5a00;
+}
+.king-banner.empty .kb-label {
+  color: #4a5a80;
+}
+.kb-name {
+  display: block;
+  font-family: var(--game-font);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.kb-name:not(.static) {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.kb-score {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.kb-score strong {
+  font-family: var(--game-font);
+  font-size: 20px;
+}
+.kb-score .dim,
+.kb-since,
+.kb-score.dim {
+  color: #6b6f7a;
+  font-size: 12px;
+}
+.kb-flag {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.fact {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+}
+.fact.you {
+  background: #e6f7ff;
+}
+
+/* ---- Profile page ---- */
+.who.link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.profile-body {
+  padding: 8px 12px 24px;
+}
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0 4px;
+}
+.profile-name {
+  font-family: var(--game-font);
+  font-size: 28px;
+  font-weight: 800;
+}
+.profile-slogan {
+  font-style: italic;
+  opacity: 0.8;
+  text-align: center;
+  max-width: 300px;
+}
+.primary.small {
+  padding: 8px 14px;
+  font-size: 14px;
+  margin-top: 6px;
+}
+.quiet-btn {
+  background: none;
+  border: none;
+  opacity: 0.6;
+  font-weight: 700;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.stat-tile {
+  background: #fff;
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  padding: 10px 4px;
+  text-align: center;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+.stat-tile strong {
+  display: block;
+  font-family: var(--game-font);
+  font-size: 22px;
+}
+.stat-tile .of {
+  font-size: 13px;
+  opacity: 0.6;
+}
+.stat-tile small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.sheet-board .who {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.sheet-board .who .row-avatar {
+  flex: none;
+}

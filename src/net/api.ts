@@ -78,6 +78,21 @@ export interface KingRow {
   last_win: string;
 }
 
+export interface PlayerProfile {
+  id: string;
+  name: string;
+  slogan: string | null;
+  avatar: Avatar | null;
+  since: string;
+  thrones: number;
+  aces: number;
+  runs: number;
+  best_rel: number | null;
+  matches_won: number;
+  matches: number;
+  throne_list: { location_id: string; name: string; poi_type: string; score: number; par: number; elapsed_ms: number | null; since: string }[];
+}
+
 export interface DailyRow {
   user_id: string;
   display_name: string;
@@ -241,6 +256,10 @@ export const api = {
   /** Six digits another phone can enter to take over this account. */
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),
+  /** A player's public page: identity, season stats and thrones held. */
+  async profile(userId: string): Promise<PlayerProfile | null> {
+    return await readRpc<PlayerProfile | null>('player_profile', { in_user: userId });
+  },
   async leaderboard(seed: string): Promise<DailyRow[]> {
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);

@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 
-export type Route = 'play' | 'editor' | 'map' | 'leaders' | 'match';
+export type Route = 'play' | 'editor' | 'map' | 'leaders' | 'match' | 'profile';
 
 export interface Location {
   route: Route;
@@ -24,6 +24,8 @@ export interface Location {
   /** Quick-match invite code or match id. */
   code: string | null;
   match: string | null;
+  /** Player id for the profile page. */
+  user: string | null;
 }
 
 export interface NavigateOptions {
@@ -34,6 +36,7 @@ export interface NavigateOptions {
   n?: number | null;
   code?: string | null;
   match?: string | null;
+  user?: string | null;
   /** Replace the history entry instead of pushing one. */
   replace?: boolean;
 }
@@ -42,17 +45,17 @@ function read(): Location {
   const p = window.location.pathname.replace(/\/+$/, '');
   const h = window.location.hash.replace(/^#\/?/, '');
   const route: Route =
-    p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : p.endsWith('/match') || h === 'match' ? 'match' : 'play';
+    p.endsWith('/editor') || h === 'editor' ? 'editor' : p.endsWith('/map') || h === 'map' ? 'map' : p.endsWith('/leaders') || h === 'leaders' ? 'leaders' : p.endsWith('/match') || h === 'match' ? 'match' : p.endsWith('/profile') || h === 'profile' ? 'profile' : 'play';
   const q = new URLSearchParams(window.location.search);
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
   const nRaw = Number(q.get('n'));
   const n = Number.isInteger(nRaw) && nRaw >= 1 && nRaw <= 36 ? nRaw : null;
-  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n, code: clean(q.get('code')), match: clean(q.get('match')) };
+  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n, code: clean(q.get('code')), match: clean(q.get('match')), user: clean(q.get('user')) };
 }
 
 export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
   const base = import.meta.env.BASE_URL.replace(/\/+$/, '');
-  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : route === 'leaders' ? `${base}/leaders` : route === 'match' ? `${base}/match` : `${base}/`;
+  const path = route === 'editor' ? `${base}/editor` : route === 'map' ? `${base}/map` : route === 'leaders' ? `${base}/leaders` : route === 'match' ? `${base}/match` : route === 'profile' ? `${base}/profile` : `${base}/`;
   const q = new URLSearchParams();
   const s = extra.seed ?? seed;
   const c = extra.course ?? course;
@@ -63,6 +66,7 @@ export function navigate(route: Route, seed: string | null = null, course: strin
   if (extra.n && extra.n !== 9) q.set('n', String(extra.n));
   if (extra.code) q.set('code', extra.code);
   if (extra.match) q.set('match', extra.match);
+  if (extra.user) q.set('user', extra.user);
   const qs = q.toString();
   const url = path + (qs ? `?${qs}` : '');
   if (extra.replace) window.history.replaceState(null, '', url);

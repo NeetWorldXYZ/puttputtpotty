@@ -52,8 +52,10 @@ function LocationBoard({ locationId, refreshKey }: { locationId: string; refresh
         {rows.map((r) => (
           <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
             <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
-            <Avatar av={r.avatar} size={24} className="row-avatar" />
-            <span className="who">{r.display_name}</span>
+            <span className="who">
+              <Avatar av={r.avatar} size={22} className="row-avatar" />
+              {r.display_name}
+            </span>
             <span className="stat">
               {r.score}
               {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}

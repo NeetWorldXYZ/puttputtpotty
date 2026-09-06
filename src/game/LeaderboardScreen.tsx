@@ -108,10 +108,10 @@ export function LeaderboardScreen() {
               <li key={r.user_id} className={`row${r.user_id === me ? ' me' : ''}${i < 3 ? ` top${i + 1}` : ''}`}>
                 <span className="rank">{i === 0 ? '👑' : i + 1}</span>
                 <Avatar av={r.avatar} size={30} className="row-avatar" />
-                <span className="who">
+                <button className="who link" onClick={() => navigate('profile', null, null, { user: r.user_id })}>
                   {r.display_name}
                   {r.user_id === me && <small> · you</small>}
-                </span>
+                </button>
                 {tab === 'daily' ? (
                   <span className="stat">
                     <strong>{(r as DailyRow).total}</strong>
