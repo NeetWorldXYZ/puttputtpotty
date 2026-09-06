@@ -18,8 +18,6 @@ import { TabBar } from './TabBar';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
-const SEASON_EPOCH = Date.UTC(2026, 8, 1);
-const SEASON_MS = 6 * 7 * 24 * 3600 * 1000;
 
 
 function untilTomorrowUtc(): string {
