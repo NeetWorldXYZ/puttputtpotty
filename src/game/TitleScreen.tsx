@@ -40,6 +40,28 @@ function Mascot() {
 }
 
 
+/** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
+export const ART = {
+  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.png`,
+  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.png`,
+};
+
+/** Resolves to true once the image loads, false if it 404s, null while unknown. */
+function useImage(src: string): boolean | null {
+  const [ok, setOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    const img = new Image();
+    img.onload = () => live && setOk(true);
+    img.onerror = () => live && setOk(false);
+    img.src = src;
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  return ok;
+}
+
 /** The daily card's picture: a floating green, a flag, a crowned throne. */
 function DailyArt({ played }: { played: boolean }) {
   return (
@@ -95,6 +117,8 @@ export function TitleScreen() {
   const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
   const [avatar] = useState(getSavedAvatar());
+  const logoArt = useImage(ART.logo) === true;
+  const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
   const [len, setLen] = useState(getPreferredLength());
@@ -250,11 +274,17 @@ export function TitleScreen() {
       <div className="title-inner home2">
         <header className="home-top">
           <div className="brand">
-            <Mascot />
-            <div className="logo big">
-              <span className="logo-top">Putt Putt</span>
-              <span className="logo-bottom">Potty</span>
-            </div>
+            {logoArt ? (
+              <img className="logo-img" src={ART.logo} alt="Putt Putt Potty" />
+            ) : (
+              <>
+                <Mascot />
+                <div className="logo big">
+                  <span className="logo-top">Putt Putt</span>
+                  <span className="logo-bottom">Potty</span>
+                </div>
+              </>
+            )}
           </div>
           <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
             <Avatar av={avatar} size={26} className="chip-avatar" />
@@ -265,12 +295,14 @@ export function TitleScreen() {
         <div className="tagline">Every bathroom is a course.</div>
 
         <button className={`daily-card${played ? ' played' : ''}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-          <DailyArt played={played} />
-          <span className="sign">
-            <span className="sign-top">{played ? 'Your round' : "Today's round"}</span>
-            <span className="sign-main">{played ? (best !== null ? `You shot ${best}` : 'Played') : 'Nine holes.'}</span>
-            <span className="sign-sub">{played ? (dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.') : 'One throne.'}</span>
-          </span>
+          {dailyArt ? <img className="daily-img" src={ART.daily} alt="" /> : <DailyArt played={played} />}
+          {dailyArt && !played ? null : (
+            <span className={`sign${dailyArt ? ' badge' : ''}`}>
+              <span className="sign-top">{played ? 'Your round' : "Today's round"}</span>
+              <span className="sign-main">{played ? (best !== null ? `You shot ${best}` : 'Played') : 'Nine holes.'}</span>
+              <span className="sign-sub">{played ? (dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.') : 'One throne.'}</span>
+            </span>
+          )}
           <span className="daily-edition">{edition === 'morning' ? '🌅 Morning course' : '🌇 Evening course'}</span>
         </button>
         <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
