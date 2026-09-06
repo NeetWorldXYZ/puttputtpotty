@@ -165,7 +165,9 @@ async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { t
 }
 
 export const api = {
-  setProfile: (displayName: string) => call<{ ok: true }>({ action: 'profile', displayName }),
+  setProfile: (displayName?: string, slogan?: string) => call<{ ok: true }>({ action: 'profile', displayName, slogan }),
+  /** Flag a name or slogan; three different reporters reset it. */
+  report: (userId: string, reason: 'name' | 'slogan' | 'cheating' | 'other') => call<{ ok: true; reset: boolean }>({ action: 'report', userId, reason }),
   /** Founds the bathroom if needed and returns its (server-generated) three holes and current king. */
   hole: (location: { id: string; name: string; poiType: string; lat: number; lng: number }) =>
     call<{ location: LocationSummary; ready: boolean; holes: Hole[]; par: number | null; building?: number; king: King | null }>({ action: 'hole', location }),

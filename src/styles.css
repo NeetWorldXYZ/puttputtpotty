@@ -2367,3 +2367,30 @@ input[type='checkbox'] {
   font-size: 12px;
   opacity: 0.75;
 }
+
+/* ---- Reports ---- */
+.flag-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  opacity: 0.35;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.flag-btn:hover,
+.flag-btn:active {
+  opacity: 1;
+}
+.card.report button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.card.report button.quiet {
+  background: none;
+  border: none;
+  opacity: 0.7;
+}
+.slogan-input {
+  font-size: 15px;
+}

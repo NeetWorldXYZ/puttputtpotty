@@ -6,6 +6,7 @@ import { recallFix } from '../net/places';
 import { dailyEdition, dailySeed } from './courses';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
+import { ReportSheet } from './ReportSheet';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
@@ -26,6 +27,8 @@ export function LeaderboardScreen() {
   const [me, setMe] = useState<string | null>(null);
   const [name, setName] = useState(getSavedName());
   const [askName, setAskName] = useState(false);
+  const [report, setReport] = useState<{ id: string; name: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const fix = recallFix();
 
   useEffect(() => {
@@ -122,6 +125,11 @@ export function LeaderboardScreen() {
                   </span>
                 )}
                 <span className="when">{ago(tab === 'daily' ? (r as DailyRow).finished_at : (r as KingRow).last_win)}</span>
+                {r.user_id !== me && (
+                  <button className="flag-btn" title="Report this player" onClick={() => setReport({ id: r.user_id, name: r.display_name })}>
+                    ⚑
+                  </button>
+                )}
               </li>
             ))}
           </ol>
@@ -137,6 +145,20 @@ export function LeaderboardScreen() {
           }}
         />
       )}
+      {report && (
+        <ReportSheet
+          userId={report.id}
+          name={report.name}
+          onClose={(msg) => {
+            setReport(null);
+            if (msg) {
+              setToast(msg);
+              setTimeout(() => setToast(null), 2500);
+            }
+          }}
+        />
+      )}
+      {toast && <div className="map-toast">{toast}</div>}
     </div>
   );
 }

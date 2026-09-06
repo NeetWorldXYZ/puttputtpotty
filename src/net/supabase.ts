@@ -65,14 +65,14 @@ export async function currentUserId(): Promise<string | null> {
 }
 
 /** Your profile as the server knows it. Caches the name locally. */
-export async function loadProfile(): Promise<{ id: string; name: string | null; email: string | null; anonymous: boolean } | null> {
+export async function loadProfile(): Promise<{ id: string; name: string | null; slogan: string | null; email: string | null; anonymous: boolean } | null> {
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   if (!session) return null;
-  const { data: row } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
+  const { data: row } = await supabase.from('profiles').select('display_name, slogan').eq('id', session.user.id).maybeSingle();
   const name = (row?.display_name as string | undefined) ?? null;
   if (name) saveName(name);
-  return { id: session.user.id, name, email: session.user.email ?? null, anonymous: !!session.user.is_anonymous };
+  return { id: session.user.id, name, slogan: (row?.slogan as string | null | undefined) ?? null, email: session.user.email ?? null, anonymous: !!session.user.is_anonymous };
 }
 
 /** Attach an email to the current (anonymous) account so it can be recovered on any phone. Sends a confirmation link. */

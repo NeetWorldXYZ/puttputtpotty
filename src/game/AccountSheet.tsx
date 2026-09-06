@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOut } from '../net/supabase';
+import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
 
 interface Props {
   onClose: (name: string | null) => void;
@@ -18,6 +19,8 @@ export function AccountSheet({ onClose }: Props) {
   const [name, setName] = useState(getSavedName() ?? '');
   const [email, setEmail] = useState('');
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
+  const [slogan, setSlogan] = useState('');
+  const [savedSlogan, setSavedSlogan] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -29,6 +32,8 @@ export function AccountSheet({ onClose }: Props) {
       if (!p) return;
       setCurrent({ name: p.name, email: p.email, anonymous: p.anonymous });
       if (p.name) setName(p.name);
+      setSlogan(p.slogan ?? '');
+      setSavedSlogan(p.slogan ?? '');
     });
   }, []);
 
@@ -46,12 +51,20 @@ export function AccountSheet({ onClose }: Props) {
     }
   };
 
+  const sloganTrim = slogan.trim().slice(0, SLOGAN_MAX);
+  const dirty = (trimmed && trimmed !== current?.name) || sloganTrim !== savedSlogan;
   const saveTheName = () =>
     run(async () => {
-      await api.setProfile(trimmed);
-      saveName(trimmed);
-      setCurrent((c) => (c ? { ...c, name: trimmed } : c));
-      setNote('Saved. That name is yours.');
+      const nameChange = trimmed && trimmed !== current?.name ? trimmed : undefined;
+      const problem = (nameChange && nameProblem(nameChange)) || (sloganTrim && sloganProblem(sloganTrim)) || null;
+      if (problem) throw new Error(problem);
+      await api.setProfile(nameChange, sloganTrim !== savedSlogan ? sloganTrim : undefined);
+      if (nameChange) {
+        saveName(nameChange);
+        setCurrent((c) => (c ? { ...c, name: nameChange } : c));
+      }
+      setSavedSlogan(sloganTrim);
+      setNote(nameChange ? 'Saved. That name is yours.' : 'Saved.');
     });
   const doLink = () =>
     run(async () => {
@@ -91,10 +104,12 @@ export function AccountSheet({ onClose }: Props) {
             </div>
             <label className="field-label">Name on the throne</label>
             <input className="name-input" maxLength={24} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="field-label">Slogan (shows under your name)</label>
+            <input className="name-input slogan-input" maxLength={SLOGAN_MAX} placeholder="Sink it or swim in it" value={slogan} onChange={(e) => setSlogan(e.target.value)} />
             {error && <div className="err">{error}</div>}
             {note && <div className="ok-note">{note}</div>}
-            <button className="primary" disabled={!trimmed || busy || trimmed === current?.name} onClick={() => void saveTheName()}>
-              {busy ? 'Saving…' : 'Save name'}
+            <button className="primary" disabled={!trimmed || busy || !dirty} onClick={() => void saveTheName()}>
+              {busy ? 'Saving…' : 'Save'}
             </button>
             {!current?.email && (
               <button onClick={() => setMode('save')}>

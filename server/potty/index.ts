@@ -4,7 +4,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
-import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/f3921839b455e445b9a2e693b40e17a44ec20002/server/potty/engine.js';
+import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/f3921839b455e445b9a2e693b40e17a44ec20002/server/potty/engine.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -18,6 +18,8 @@ const COOLDOWN_HOURS = 1;
 const MAX_SPEED_MPS = 70;
 const STROKE_CAP = 8;
 const FOUND_PER_DAY = 5;
+const REPORTS_PER_DAY = 10;
+const REPORTS_TO_RESET = 3;
 const LINK_CODE_TTL_MIN = 10;
 const EPOCH = Date.UTC(2026, 8, 1); // 2026-09-01
 
@@ -489,9 +491,15 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'profile') {
       const raw = typeof body.displayName === 'string' ? body.displayName.trim() : undefined;
+      const slogan = typeof body.slogan === 'string' ? body.slogan.trim().replace(/\s+/g, ' ').slice(0, 60) : undefined;
       if (raw !== undefined) {
-        if (!NAME_RE.test(raw)) return json({ error: "Names are 2 to 24 characters: letters, numbers, spaces, _ - . '" }, 400);
+        const problem = nameProblem(raw);
+        if (problem) return json({ error: problem }, 400);
         if (await nameTaken(raw, user.id)) return json({ error: 'That name is taken' }, 409);
+      }
+      if (slogan !== undefined && slogan !== '') {
+        const problem = sloganProblem(slogan);
+        if (problem) return json({ error: problem }, 400);
       }
       try {
         await ensureProfile(user.id, raw);
@@ -499,13 +507,50 @@ Deno.serve(async (req: Request) => {
         if (/profiles_display_name_unique/.test((e as Error).message)) return json({ error: 'That name is taken' }, 409);
         throw e;
       }
+      if (slogan !== undefined) await admin.from('profiles').update({ slogan: slogan || null }).eq('id', user.id);
       return json({ ok: true });
     }
 
     if (action === 'me') {
       await ensureProfile(user.id);
-      const { data: prof } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle();
-      return json({ id: user.id, displayName: prof?.display_name ?? null });
+      const { data: prof } = await admin.from('profiles').select('display_name, slogan').eq('id', user.id).maybeSingle();
+      return json({ id: user.id, displayName: prof?.display_name ?? null, slogan: prof?.slogan ?? null });
+    }
+
+    if (action === 'report') {
+      // A name or slogan that shouldn't be on a throne. Three different reporters reset it.
+      const reported = String(body.userId ?? '');
+      const reason = String(body.reason ?? '').slice(0, 40);
+      if (!/^[0-9a-f-]{36}$/.test(reported)) return json({ error: 'bad report' }, 400);
+      if (reported === user.id) return json({ error: "that's you" }, 400);
+      if (!['name', 'slogan', 'cheating', 'other'].includes(reason)) return json({ error: 'bad reason' }, 400);
+      await ensureProfile(user.id);
+      const day = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count: mine } = await admin.from('reports').select('id', { count: 'exact', head: true }).eq('reporter', user.id).gte('created_at', day);
+      if ((mine ?? 0) >= REPORTS_PER_DAY) return json({ error: 'enough reports for today' }, 429);
+      const month = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+      const { data: dup } = await admin.from('reports').select('id').eq('reporter', user.id).eq('reported', reported).gte('created_at', month).limit(1);
+      if (!dup?.length) {
+        const { error } = await admin.from('reports').insert({ reporter: user.id, reported, reason });
+        if (error) return json({ error: /reports_reported_fkey/.test(error.message) ? 'no such player' : error.message }, 400);
+      }
+      const { data: rows } = await admin.from('reports').select('reporter').eq('reported', reported).gte('created_at', month);
+      const distinct = new Set((rows ?? []).map((r) => r.reporter)).size;
+      let reset = false;
+      if (distinct >= REPORTS_TO_RESET) {
+        const { data: prof } = await admin.from('profiles').select('flagged_at').eq('id', reported).maybeSingle();
+        if (prof && (!prof.flagged_at || new Date(prof.flagged_at).getTime() < Date.now() - 30 * 24 * 3600 * 1000)) {
+          for (const len of [4, 6, 8, 12]) {
+            const fallback = `Golfer ${reported.replace(/-/g, '').slice(0, len).toUpperCase()}`;
+            const { error } = await admin.from('profiles').update({ display_name: fallback, slogan: null, flagged_at: new Date().toISOString() }).eq('id', reported);
+            if (!error) {
+              reset = true;
+              break;
+            }
+          }
+        }
+      }
+      return json({ ok: true, reset });
     }
 
     if (action === 'hole') {

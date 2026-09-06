@@ -18,6 +18,7 @@ import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
+import { ReportSheet } from './ReportSheet';
 import { sfx, unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
@@ -296,6 +297,7 @@ export function MapScreen() {
   const [checkinTick, setCheckinTick] = useState(0);
   const [askName, setAskName] = useState(false);
   const [founding, setFounding] = useState(false);
+  const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
   const searchedRef = useRef(false);
 
@@ -782,6 +784,17 @@ export function MapScreen() {
 
       {notice && <div className="map-toast">{notice}</div>}
 
+      {report && (
+        <ReportSheet
+          userId={report.id}
+          name={report.name}
+          onClose={(msg) => {
+            setReport(null);
+            if (msg) setNotice(msg);
+          }}
+        />
+      )}
+
       {founding && fix && (
         <FoundSheet
           fix={fix}
@@ -858,6 +871,11 @@ export function MapScreen() {
                   {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> in {fmtElapsed(king.king_elapsed_ms)}</span>}
                   {king.king_since && <span className="dim"> · {ago(king.king_since)}</span>}
                 </span>
+                {king.king_user && king.king_user !== me && (
+                  <button className="flag-btn" title="Report this player" onClick={() => setReport({ id: king.king_user!, name: king.king_name! })}>
+                    ⚑
+                  </button>
+                )}
               </>
             ) : (
               <>
