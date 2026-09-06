@@ -2394,3 +2394,83 @@ input[type='checkbox'] {
 .slogan-input {
   font-size: 15px;
 }
+
+/* ---- Avatars ---- */
+.avatar {
+  display: inline-block;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+.chip-avatar {
+  margin-right: 6px;
+}
+.row-avatar {
+  margin-right: 4px;
+}
+.opp-avatar {
+  margin-right: 2px;
+}
+.king-avatar {
+  margin-right: 8px;
+}
+.look-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  margin: 6px 0 10px;
+}
+.look-row span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.look-row small {
+  opacity: 0.7;
+  font-weight: 500;
+}
+.look-row .chev {
+  flex: 0;
+  font-size: 22px;
+  opacity: 0.5;
+}
+.look-preview {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 8px;
+}
+.look-group {
+  margin-bottom: 8px;
+}
+.look-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.look-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.look-chips .chip.active {
+  background: var(--accent);
+}
+.look-chips .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  display: inline-block;
+}
+.card.account {
+  max-height: 88vh;
+  overflow-y: auto;
+}

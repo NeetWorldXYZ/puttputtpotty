@@ -19,6 +19,7 @@ import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
+import { Avatar } from './Avatar';
 import { sfx, unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
@@ -864,7 +865,7 @@ export function MapScreen() {
           <div className={`throne-line${king?.king_name ? ' held' : ''}`}>
             {king?.king_name ? (
               <>
-                <span className="crown">👑</span>
+                <Avatar av={king.king_avatar} size={40} className="king-avatar" />
                 <span>
                   <strong>{king.king_name}</strong> holds the throne with <strong>{king.king_score}</strong>
                   {king.king_holes && <span className="dim"> ({king.king_holes.join('-')})</span>}
@@ -890,6 +891,7 @@ export function MapScreen() {
               {board.rows.map((r) => (
                 <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
                   <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+                  <Avatar av={r.avatar} size={24} className="row-avatar" />
                   <span className="who">{r.display_name}</span>
                   <span className="stat">
                     {r.score}

@@ -4,7 +4,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
-import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/fda49ffd0ac267f60a9f861939dec6e3f746184b/server/potty/engine.js';
+import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem, normalizeAvatar } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/fda49ffd0ac267f60a9f861939dec6e3f746184b/server/potty/engine.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -508,13 +508,14 @@ Deno.serve(async (req: Request) => {
         throw e;
       }
       if (slogan !== undefined) await admin.from('profiles').update({ slogan: slogan || null }).eq('id', user.id);
+      if (body.avatar && typeof body.avatar === 'object') await admin.from('profiles').update({ avatar: normalizeAvatar(body.avatar) }).eq('id', user.id);
       return json({ ok: true });
     }
 
     if (action === 'me') {
       await ensureProfile(user.id);
-      const { data: prof } = await admin.from('profiles').select('display_name, slogan').eq('id', user.id).maybeSingle();
-      return json({ id: user.id, displayName: prof?.display_name ?? null, slogan: prof?.slogan ?? null });
+      const { data: prof } = await admin.from('profiles').select('display_name, slogan, avatar').eq('id', user.id).maybeSingle();
+      return json({ id: user.id, displayName: prof?.display_name ?? null, slogan: prof?.slogan ?? null, avatar: prof?.avatar ?? null });
     }
 
     if (action === 'report') {

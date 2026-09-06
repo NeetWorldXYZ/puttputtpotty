@@ -2,12 +2,24 @@ import { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOut } from '../net/supabase';
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
+import { getSavedAvatar, saveAvatar } from '../net/supabase';
+import { Avatar } from './Avatar';
+import { BALLS, DEFAULT_AVATAR, FACES, HATS, PORCELAIN, SEATS, type Avatar as AvatarSpec } from './avatarParts';
+
+type LookOption = readonly [string, string, string | null];
+const LOOK_GROUPS: readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] = [
+  ['Porcelain', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
+  ['Seat', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
+  ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
+  ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
+  ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
+];
 
 interface Props {
   onClose: (name: string | null) => void;
 }
 
-type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim';
+type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim' | 'look';
 
 /**
  * Your account: change your name (unique, checked by the server), save the
@@ -21,6 +33,8 @@ export function AccountSheet({ onClose }: Props) {
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
   const [slogan, setSlogan] = useState('');
   const [savedSlogan, setSavedSlogan] = useState('');
+  const [avatar, setAvatar] = useState<AvatarSpec>(getSavedAvatar() ?? DEFAULT_AVATAR);
+  const [savedAvatar, setSavedAvatar] = useState<AvatarSpec>(getSavedAvatar() ?? DEFAULT_AVATAR);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -34,6 +48,10 @@ export function AccountSheet({ onClose }: Props) {
       if (p.name) setName(p.name);
       setSlogan(p.slogan ?? '');
       setSavedSlogan(p.slogan ?? '');
+      if (p.avatar) {
+        setAvatar(p.avatar);
+        setSavedAvatar(p.avatar);
+      }
     });
   }, []);
 
@@ -76,6 +94,15 @@ export function AccountSheet({ onClose }: Props) {
       await signInWithEmail(email.trim());
       setNote(`Check ${email.trim()} and tap the link. Come back here afterwards.`);
     });
+  const avatarDirty = JSON.stringify(avatar) !== JSON.stringify(savedAvatar);
+  const saveLook = () =>
+    run(async () => {
+      await api.setProfile(undefined, undefined, avatar);
+      saveAvatar(avatar);
+      setSavedAvatar(avatar);
+      setNote('Looking good.');
+      setMode('name');
+    });
   const showCode = () =>
     run(async () => {
       setCode(null);
@@ -95,13 +122,21 @@ export function AccountSheet({ onClose }: Props) {
   return (
     <div className="overlay" onClick={() => onClose(current?.name ?? getSavedName())}>
       <div className="card pop account" onClick={(e) => e.stopPropagation()}>
-        <h2>{mode === 'name' ? 'Your account' : mode === 'save' ? 'Save your account' : mode === 'code' ? 'Move to another phone' : mode === 'claim' ? 'Bring my account here' : 'Sign in'}</h2>
+        <h2>{mode === 'name' ? 'Your account' : mode === 'save' ? 'Save your account' : mode === 'code' ? 'Move to another phone' : mode === 'claim' ? 'Bring my account here' : mode === 'look' ? 'Your look' : 'Sign in'}</h2>
 
         {mode === 'name' && (
           <>
             <div className="sub">
               {current?.email ? `Saved to ${current.email}` : current?.anonymous === false ? 'Signed in' : 'Guest on this phone only'}
             </div>
+            <button className="look-row" onClick={() => setMode('look')}>
+              <Avatar av={avatar} size={56} />
+              <span>
+                <strong>Customize your toilet</strong>
+                <small>porcelain, seat, hat, face, ball</small>
+              </span>
+              <span className="chev">›</span>
+            </button>
             <label className="field-label">Name on the throne</label>
             <input className="name-input" maxLength={24} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
             <label className="field-label">Slogan (shows under your name)</label>
@@ -139,6 +174,32 @@ export function AccountSheet({ onClose }: Props) {
               </button>
             )}
             <button onClick={() => onClose(current?.name ?? getSavedName())}>Done</button>
+          </>
+        )}
+
+        {mode === 'look' && (
+          <>
+            <div className="look-preview">
+              <Avatar av={avatar} size={120} />
+            </div>
+            {LOOK_GROUPS.map(([title, key, options]) => (
+              <div key={key} className="look-group">
+                <div className="field-label">{title}</div>
+                <div className="look-chips">
+                  {options.map(([id, label, swatch]) => (
+                    <button key={id} className={`chip${avatar[key] === id ? ' active' : ''}`} onClick={() => setAvatar({ ...avatar, [key]: id })}>
+                      {swatch && <span className="swatch" style={{ background: swatch }} />}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {error && <div className="err">{error}</div>}
+            <button className="primary" disabled={busy || !avatarDirty} onClick={() => void saveLook()}>
+              {busy ? 'Saving…' : 'Save my look'}
+            </button>
+            <button onClick={() => setMode('name')}>Back</button>
           </>
         )}
 

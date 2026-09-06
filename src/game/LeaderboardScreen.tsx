@@ -7,6 +7,7 @@ import { dailyEdition, dailySeed } from './courses';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
+import { Avatar } from './Avatar';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
@@ -106,6 +107,7 @@ export function LeaderboardScreen() {
             {rows.map((r, i) => (
               <li key={r.user_id} className={`row${r.user_id === me ? ' me' : ''}${i < 3 ? ` top${i + 1}` : ''}`}>
                 <span className="rank">{i === 0 ? '👑' : i + 1}</span>
+                <Avatar av={r.avatar} size={30} className="row-avatar" />
                 <span className="who">
                   {r.display_name}
                   {r.user_id === me && <small> · you</small>}

@@ -1,6 +1,7 @@
 import type { Hole, Stroke } from '../sim/types';
 import { FUNCTION_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
 import { ensureSession, quickToken, supabase } from './supabase';
+import type { Avatar } from '../game/avatarParts';
 
 export interface NearbyLocation {
   id: string;
@@ -20,10 +21,12 @@ export interface NearbyLocation {
   king_since: string | null;
   king_holes: number[] | null;
   king_elapsed_ms: number | null;
+  king_avatar: Avatar | null;
   run_count: number;
 }
 
 export interface King {
+  avatar?: Avatar | null;
   user_id: string;
   display_name: string;
   score: number;
@@ -61,11 +64,14 @@ export interface MatchRow {
   forfeit: boolean;
   started_at: string | null;
   finished_at: string | null;
+  p1_avatar: Avatar | null;
+  p2_avatar: Avatar | null;
 }
 
 export interface KingRow {
   user_id: string;
   display_name: string;
+  avatar: Avatar | null;
   thrones: number;
   best_rel: number;
   aces: number;
@@ -75,6 +81,7 @@ export interface KingRow {
 export interface DailyRow {
   user_id: string;
   display_name: string;
+  avatar: Avatar | null;
   total: number;
   holes: number;
   /** Simulated rolling time over the round, the tiebreak. */
@@ -86,6 +93,7 @@ export interface LocationRow {
   rank: number;
   user_id: string;
   display_name: string;
+  avatar: Avatar | null;
   score: number;
   par: number;
   hole_scores: number[] | null;
@@ -165,7 +173,7 @@ async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { t
 }
 
 export const api = {
-  setProfile: (displayName?: string, slogan?: string) => call<{ ok: true }>({ action: 'profile', displayName, slogan }),
+  setProfile: (displayName?: string, slogan?: string, avatar?: Avatar) => call<{ ok: true }>({ action: 'profile', displayName, slogan, avatar }),
   /** Flag a name or slogan; three different reporters reset it. */
   report: (userId: string, reason: 'name' | 'slogan' | 'cheating' | 'other') => call<{ ok: true; reset: boolean }>({ action: 'report', userId, reason }),
   /** Founds the bathroom if needed and returns its (server-generated) three holes and current king. */

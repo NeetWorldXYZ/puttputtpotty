@@ -7,6 +7,8 @@ import { seedFromString } from '../sim/rng';
 import { drawHole, drawMinimap, type AimOverlay } from '../render/drawHole';
 import { fitCamera, fitScale, followCamera, type Camera } from '../render/camera';
 import { drawBall } from '../render/objects';
+import { ballLook } from './avatarParts';
+import { getSavedAvatar } from '../net/supabase';
 import { themeById } from '../render/themes';
 import { useTuning } from './paramsStore';
 import { DevPanel } from './DevPanel';
@@ -126,6 +128,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const fxRef = useRef(new Fx());
   const squashRef = useRef({ amt: 0, ang: 0 });
   const introRef = useRef({ t: INTRO_SECONDS + 1 });
+  /** The player's chosen ball, from the avatar this phone saved. */
+  const ballStyleRef = useRef(ballLook(getSavedAvatar()));
   const sinkRef = useRef<{ t: number; x: number; y: number } | null>(null);
   const timeRef = useRef(0);
   const holeParRef = useRef(hole.par);
@@ -477,7 +481,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
               c.save();
               c.translate(sink.x + Math.cos(a) * r, sink.y + Math.sin(a) * r * 0.7);
               c.scale(scale, scale);
-              drawBall(c, 0, 0, params.ballRadius);
+              drawBall(c, 0, 0, params.ballRadius, ballStyleRef.current);
               c.restore();
             } else {
               const sq = squashRef.current;
@@ -488,9 +492,9 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
                 c.translate(bx, by);
                 c.rotate(sq.ang);
                 c.scale(sx, sy);
-                drawBall(c, 0, 0, params.ballRadius);
+                drawBall(c, 0, 0, params.ballRadius, ballStyleRef.current);
                 c.restore();
-              } else drawBall(c, bx, by, params.ballRadius);
+              } else drawBall(c, bx, by, params.ballRadius, ballStyleRef.current);
             }
           }
           fx.draw(c);

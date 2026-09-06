@@ -8,6 +8,7 @@ import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
+import { Avatar } from './Avatar';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { sfx } from './sound';
 import { buzz } from './haptics';
@@ -51,6 +52,7 @@ function LocationBoard({ locationId, refreshKey }: { locationId: string; refresh
         {rows.map((r) => (
           <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
             <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+            <Avatar av={r.avatar} size={24} className="row-avatar" />
             <span className="who">{r.display_name}</span>
             <span className="stat">
               {r.score}
@@ -240,6 +242,7 @@ export function LocationPlay({ locationId, throne }: Props) {
           <div className="sub">
             {submit.king ? (
               <>
+                <Avatar av={submit.king.avatar} size={28} className="row-avatar" />
                 <strong>{submit.king.display_name}</strong> keeps the throne with <strong>{submit.king.score}</strong>
                 {submit.king.hole_scores && ` (${submit.king.hole_scores.join('-')})`}
                 {submit.king.elapsed_ms !== null && ` in ${fmtElapsed(submit.king.elapsed_ms)}`}. Beat it next visit.
@@ -274,6 +277,7 @@ export function LocationPlay({ locationId, throne }: Props) {
             {offline ? 'Practice (offline) · ' : 'Practice · '}
             {king ? (
               <>
+                <Avatar av={king.avatar} size={28} className="row-avatar" />
                 <strong>{king.display_name}</strong> holds the throne with <strong>{king.score}</strong>
                 {king.hole_scores && ` (${king.hole_scores.join('-')})`}
                 {king.elapsed_ms !== null && ` in ${fmtElapsed(king.elapsed_ms)}`}
