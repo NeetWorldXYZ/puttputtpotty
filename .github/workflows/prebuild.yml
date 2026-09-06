@@ -1,0 +1,49 @@
+name: Pre-build courses
+
+# Generates the three holes of every imported bathroom in a region that has
+# no course yet, busiest neighbourhoods first, across parallel shards.
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'Region to build (as imported, e.g. michigan)'
+        default: 'michigan'
+        required: true
+      shards:
+        description: 'Parallel jobs'
+        default: '8'
+        required: true
+      minutes:
+        description: 'Time budget per job'
+        default: '330'
+        required: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        run: echo "shards=$(seq 0 $(( ${{ github.event.inputs.shards }} - 1 )) | jq -sc .)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build courses
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/prebuild.mjs --region "${{ github.event.inputs.region }}" --shard ${{ matrix.shard }} --shards ${{ github.event.inputs.shards }} --minutes ${{ github.event.inputs.minutes }}

@@ -274,7 +274,16 @@ function overpassRace(q: string): Promise<OsmPlace[]> {
   });
 }
 
-async function bathrooms(lat: number, lng: number, radius: number): Promise<{ places: OsmPlace[]; cached: boolean }> {
+async function bathrooms(lat: number, lng: number, radius: number): Promise<{ places: OsmPlace[]; cached: boolean; source?: string }> {
+  // Imported OpenStreetMap data first (scripts/osm-import.mjs): inside a covered region it is the answer.
+  try {
+    const { data, error } = await admin.rpc('bathrooms_near', { in_lat: lat, in_lng: lng, radius_m: radius, lim: 400 });
+    if (error) throw new Error(error.message);
+    const near = data as { covered: boolean; places: OsmPlace[] } | null;
+    if (near?.covered) return { places: dedupePlaces(near.places ?? []), cached: true, source: 'import' };
+  } catch (e) {
+    console.warn('imported places lookup failed', (e as Error).message);
+  }
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
   if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
