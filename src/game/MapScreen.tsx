@@ -8,7 +8,7 @@ import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation } from '../net/api';
-import { currentUserId } from '../net/supabase';
+import { currentUserId, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
@@ -20,6 +20,7 @@ import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
 import { Avatar } from './Avatar';
+import { TabBar } from './TabBar';
 import { sfx, unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
@@ -96,8 +97,8 @@ function ago(iso: string): string {
 function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, mine: boolean): string {
   const icon = POI_ICON[p.poiType] ?? '🚽';
   const claimed = !!king?.king_name;
-  const cloth = claimed ? `👑 ${king!.king_score ?? ''}` : '⛳';
-  return `<div class="flag${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="flag-cloth">${cloth}</span><span class="flag-pole"></span><span class="flag-base">${icon}</span></div>`;
+  const badge = claimed && king!.king_score !== null ? `<span class="pin-score">${king!.king_score}</span>` : '';
+  return `<div class="pin${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="pin-icon">${claimed ? '👑' : icon}</span>${badge}</div>`;
 }
 
 /** Zoomed out past this, nearby flags fold into count bubbles that split apart as you zoom in. */
@@ -302,6 +303,7 @@ export function MapScreen() {
   const [checkinTick, setCheckinTick] = useState(0);
   const [askName, setAskName] = useState(false);
   const [founding, setFounding] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'unclaimed' | 'mine'>('all');
   const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
   const searchedRef = useRef(false);
@@ -514,7 +516,8 @@ export function MapScreen() {
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<string>();
-    const { singles, clusters } = clusterPlaces(places, zoomStep / 2, kings, selected?.id ?? null);
+    const shown = filter === 'all' ? places : places.filter((p) => (filter === 'unclaimed' ? !kings[p.id]?.king_name : !!me && kings[p.id]?.king_user === me));
+    const { singles, clusters } = clusterPlaces(shown, zoomStep / 2, kings, selected?.id ?? null);
     for (const p of singles) {
       seen.add(p.id);
       const html = pinHtml(p, kings[p.id], selected?.id === p.id, !!me && kings[p.id]?.king_user === me);
@@ -569,7 +572,7 @@ export function MapScreen() {
         clustersRef.current.delete(key);
       }
     }
-  }, [places, kings, selected, fix, zoomStep, me]);
+  }, [places, kings, selected, fix, zoomStep, me, filter]);
 
   // Preview + founding on select.
   useEffect(() => {
@@ -748,9 +751,7 @@ export function MapScreen() {
       <div ref={mapEl} className="map-canvas" />
 
       <div className="map-head">
-        <button className="corner-btn" onClick={() => navigate('play')} title="Title screen">
-          ⌂
-        </button>
+        <div className="map-badge">📍</div>
         <div className="map-title">
           <div className="map-title-main">Nearby thrones</div>
           <div className="map-title-sub">
@@ -767,12 +768,24 @@ export function MapScreen() {
                       : 'no bathrooms found here'}
           </div>
         </div>
-        <button className="corner-btn" onClick={() => navigate('leaders')} title="Leaderboard">
-          🏆
-        </button>
-        <button className="name-chip" onClick={() => setAskName(true)} title="Change name">
+        <button className="name-chip" onClick={() => setAskName(true)} title="Your account">
+          <Avatar av={getSavedAvatar()} size={22} className="chip-avatar" />
           {name ?? 'Set name'}
         </button>
+      </div>
+
+      <div className="map-filters">
+        {(
+          [
+            ['all', 'All'],
+            ['unclaimed', 'Unclaimed'],
+            ['mine', 'Yours'],
+          ] as const
+        ).map(([id, label]) => (
+          <button key={id} className={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="map-tools">
@@ -973,6 +986,8 @@ export function MapScreen() {
           </div>
         </div>
       )}
+
+      {!selected && <TabBar active="map" />}
 
       {askName && (
         <AccountSheet

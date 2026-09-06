@@ -14,6 +14,7 @@ import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
+import { TabBar } from './TabBar';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -36,6 +37,57 @@ function untilTomorrowUtc(): string {
 
 function Mascot() {
   return <svg className="mascot" viewBox={MASCOT_VIEWBOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MASCOT_BODY }} />;
+}
+
+
+/** The daily card's picture: a floating green, a flag, a crowned throne. */
+function DailyArt({ played }: { played: boolean }) {
+  return (
+    <svg className="daily-art" viewBox="0 0 360 190" aria-hidden="true">
+      <defs>
+        <linearGradient id="da-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#233258" />
+          <stop offset="1" stopColor="#1a2440" />
+        </linearGradient>
+        <linearGradient id="da-green" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#8fe36b" />
+          <stop offset="1" stopColor="#4fb84a" />
+        </linearGradient>
+        <linearGradient id="da-dirt" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#8a5a3c" />
+          <stop offset="1" stopColor="#5a3a26" />
+        </linearGradient>
+      </defs>
+      <rect width="360" height="190" fill="url(#da-sky)" />
+      {[
+        [30, 24, 1.6],
+        [70, 60, 1.1],
+        [120, 18, 1.3],
+        [300, 30, 1.8],
+        [335, 80, 1.1],
+        [250, 14, 1.2],
+        [20, 120, 1.0],
+        [345, 140, 1.4],
+      ].map(([x, y, r], i) => (
+        <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity="0.8" />
+      ))}
+      <path d="M40 132 C60 108 300 104 320 132 C335 150 300 176 180 180 C60 176 25 150 40 132 Z" fill="url(#da-green)" stroke="#1f2a44" strokeWidth="4" />
+      <path d="M46 140 C60 160 120 178 180 180 C240 178 300 160 314 140 L300 172 C260 190 100 190 60 172 Z" fill="url(#da-dirt)" stroke="#1f2a44" strokeWidth="3" />
+      <ellipse cx="120" cy="148" rx="40" ry="14" fill="#3f9c3a" opacity="0.55" />
+      <circle cx="248" cy="112" r="16" fill="#2f8f3e" stroke="#1f2a44" strokeWidth="3" />
+      <circle cx="268" cy="124" r="12" fill="#3aa347" stroke="#1f2a44" strokeWidth="3" />
+      <rect x="246" y="126" width="4" height="14" fill="#5a3a26" />
+      <circle cx="128" cy="150" r="5" fill="#1f2a44" opacity="0.5" />
+      <rect x="126" y="108" width="3" height="44" fill="#f4f6f7" stroke="#1f2a44" strokeWidth="1.5" />
+      <path d="M129 108 L154 116 L129 124 Z" fill="#ff5f7e" stroke="#1f2a44" strokeWidth="2.5" strokeLinejoin="round" />
+      <circle cx="150" cy="156" r="6" fill="#fff" stroke="#1f2a44" strokeWidth="2.5" />
+      <ellipse cx="205" cy="146" rx="18" ry="6" fill="rgba(0,0,0,0.25)" />
+      <rect x="192" y="96" width="26" height="22" rx="5" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
+      <path d="M186 118 C186 114 194 112 205 112 C216 112 224 114 224 118 L221 132 C219 140 212 144 205 144 C198 144 191 140 189 132 Z" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
+      <ellipse cx="205" cy="118" rx="14" ry="5" fill="#4db8ff" stroke="#1f2a44" strokeWidth="2.5" />
+      <path d="M193 96 L196 84 L201 90 L205 80 L209 90 L214 84 L217 96 Z" fill={played ? '#c9d8ff' : '#ffc63a'} stroke="#1f2a44" strokeWidth="3" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 export function TitleScreen() {
@@ -182,7 +234,6 @@ export function TitleScreen() {
     setLen(n);
     setPreferredLength(n);
   };
-  const lenInfo = COURSE_LENGTHS.find((l) => l.n === len) ?? COURSE_LENGTHS[1];
 
   const season = seasonInfo();
 
@@ -196,104 +247,92 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home">
-        <div className="home-stack">
-          <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
-            <Avatar av={avatar} size={26} className="chip-avatar" />
-            <span className="player-name">{name ?? 'Set your name'}</span>
-            <span className="player-thrones">👑 {thrones ?? '–'}</span>
-          </button>
-
-          <header className="hero-head">
+      <div className="title-inner home2">
+        <header className="home-top">
+          <div className="brand">
             <Mascot />
             <div className="logo big">
               <span className="logo-top">Putt Putt</span>
               <span className="logo-bottom">Potty</span>
             </div>
-            <div className="tagline">Every bathroom is a course. Every course has a king.</div>
-            <div className="season-pill">
-              Season {season.n} · {season.daysLeft} days left
-            </div>
-          </header>
-
-          <button className="play-btn thrones" onClick={() => go(() => navigate('map'), 'whoosh')}>
-            <span className="pb-icon">👑</span>
-            <span className="pb-text">
-              <span className="pb-title">Thrones</span>
-              <span className="pb-sub">{nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms near you. Take the throne.'}</span>
-            </span>
-            <span className="pb-go">Map</span>
-          </button>
-
-          <button className="play-btn daily" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            <span className="pb-icon">{edition === 'morning' ? '🌅' : '🌇'}</span>
-            <span className="pb-text">
-              <span className="pb-title">
-                {edition === 'morning' ? 'Morning' : 'Evening'} course <span className={`pill${played ? ' done' : ''}`}>{played ? '1/1' : '0/1'}</span>
-              </span>
-              <span className="pb-sub">
-                {played
-                  ? `${best !== null ? `You shot ${best}` : 'Played'}${dailyRank ? ` · #${dailyRank.rank} of ${dailyRank.of}` : ''} · next course in ${untilTomorrowUtc()}`
-                  : `Nine holes, one shot at it · ${edition === 'morning' ? 'evening' : 'morning'} course in ${untilTomorrowUtc()}`}
-              </span>
-            </span>
-            <span className="pb-go">{played ? 'Leaderboard' : 'Play'}</span>
-          </button>
-
-          <button className="play-btn versus" onClick={() => go(() => navigate('match'), 'whoosh')}>
-            <span className="pb-icon">⚔️</span>
-            <span className="pb-text">
-              <span className="pb-title">Quick match</span>
-              <span className="pb-sub">A friend or a stranger, same three holes, live</span>
-            </span>
-            <span className="pb-go">Play</span>
-          </button>
-
-          <div className="play-btn custom">
-            <span className="pb-icon">🎲</span>
-            <span className="pb-text">
-              <span className="pb-title">Custom game</span>
-              <span className="pb-sub">
-                {len} holes · {lenInfo.blurb}
-              </span>
-              <span className="len-chips">
-                {COURSE_LENGTHS.map((l) => (
-                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
-                    {l.label}
-                  </button>
-                ))}
-                <span className="len-word">holes</span>
-              </span>
-            </span>
-            <button className="pb-go" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
-              Tee off
-            </button>
           </div>
+          <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
+            <Avatar av={avatar} size={26} className="chip-avatar" />
+            <span className="player-name">{name ?? 'Set your name'}</span>
+            <span className="player-thrones">👑 {thrones ?? '–'}</span>
+          </button>
+        </header>
+        <div className="tagline">Every bathroom is a course.</div>
 
-          <div className="home-row">
-            <button className="menu-small" onClick={() => go(() => navigate('leaders'))}>
-              🏆 Leaderboard
-            </button>
-            <button
-              className="menu-small"
-              onClick={() =>
-                go(() => {
-                  const m = !muted;
-                  setMuted(m);
-                  setMutedState(m);
-                  if (m) stopTheme();
-                  else theme();
-                })
-              }
-            >
-              {muted ? '🔇 Sound off' : '🔊 Sound on'}
-            </button>
-            <button className="menu-small" onClick={() => go(() => setHelp(true))}>
-              ❓ How to play
+        <button className={`daily-card${played ? ' played' : ''}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+          <DailyArt played={played} />
+          <span className="sign">
+            <span className="sign-top">{played ? 'Your round' : "Today's round"}</span>
+            <span className="sign-main">{played ? (best !== null ? `You shot ${best}` : 'Played') : 'Nine holes.'}</span>
+            <span className="sign-sub">{played ? (dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.') : 'One throne.'}</span>
+          </span>
+          <span className="daily-edition">{edition === 'morning' ? '🌅 Morning course' : '🌇 Evening course'}</span>
+        </button>
+        <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+          {played ? `🏆 Daily leaderboard · next course in ${untilTomorrowUtc()}` : '▶  Play daily course'}
+        </button>
+
+        <div className="duo">
+          <button className="tile pink" onClick={() => go(() => navigate('match'), 'whoosh')}>
+            <span className="tile-icon">🪠</span>
+            <span className="tile-title">Quick match</span>
+            <span className="tile-sub">Same nine holes. Live.</span>
+          </button>
+          <div className="tile mint">
+            <span className="tile-icon">🎲</span>
+            <span className="tile-title">Custom game</span>
+            <span className="tile-sub">Pick 3–27 holes.</span>
+            <span className="len-chips">
+              {COURSE_LENGTHS.map((l) => (
+                <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
+                  {l.label}
+                </button>
+              ))}
+            </span>
+            <button className="tile-go" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
+              Tee off · {len} holes
             </button>
           </div>
         </div>
+
+        <button className="row-card" onClick={() => go(() => navigate('map'), 'whoosh')}>
+          <span className="rc-icon">👑</span>
+          <span className="rc-text">
+            <strong>Nearby thrones</strong>
+            <small>{nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Find real courses near you.'}</small>
+          </span>
+          <span className="rc-chev">›</span>
+        </button>
+
+        <div className="home-foot">
+          <button
+            className="foot-btn"
+            onClick={() =>
+              go(() => {
+                const m = !muted;
+                setMuted(m);
+                setMutedState(m);
+                if (m) stopTheme();
+                else theme();
+              })
+            }
+          >
+            {muted ? '🔇 Sound off' : '🔊 Sound on'}
+          </button>
+          <button className="foot-btn" onClick={() => go(() => setHelp(true))}>
+            ❓ How to play
+          </button>
+          <span className="foot-season">
+            Season {season.n} · {season.daysLeft}d left
+          </span>
+        </div>
       </div>
+      <TabBar active="play" />
 
       {askName && (
         <AccountSheet

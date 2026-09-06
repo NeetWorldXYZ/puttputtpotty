@@ -8,6 +8,7 @@ import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
 import { Avatar } from './Avatar';
+import { TabBar } from './TabBar';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
@@ -161,6 +162,7 @@ export function LeaderboardScreen() {
         />
       )}
       {toast && <div className="map-toast">{toast}</div>}
+      <TabBar active="leaders" />
     </div>
   );
 }

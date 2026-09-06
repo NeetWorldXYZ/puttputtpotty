@@ -138,6 +138,9 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const introRef = useRef({ t: INTRO_SECONDS + 1 });
   /** The player's chosen ball, from the avatar this phone saved. */
   const ballStyleRef = useRef(ballLook(getSavedAvatar()));
+  /** Bottom aim bar: filled to the drag power each frame without re-rendering. */
+  const aimBarRef = useRef<HTMLDivElement>(null);
+  const aimFillRef = useRef<HTMLDivElement>(null);
   const sinkRef = useRef<{ t: number; x: number; y: number } | null>(null);
   const timeRef = useRef(0);
   const holeParRef = useRef(hole.par);
@@ -460,6 +463,9 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         }
       }
 
+      if (aimFillRef.current) aimFillRef.current.style.width = `${aim ? Math.round(aim.power * 100) : 0}%`;
+      if (aimBarRef.current) aimBarRef.current.dataset.state = s.done ? 'done' : aim ? (aim.cancelling ? 'cancel' : 'aiming') : 'idle';
+
       // --- draw
       const { dpr, w, h } = sizeRef.current;
       const sh = fx.shakeOffset();
@@ -674,6 +680,19 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   return (
     <div className="play" ref={wrapRef} style={{ background: theme.page }}>
       <canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} />
+
+      <div className="aim-bar" ref={aimBarRef} data-state="idle" aria-hidden="true">
+        <span className="aim-hint">
+          <span className="h-idle">Drag to aim. Release to putt.</span>
+          <span className="h-aiming">Release to putt.</span>
+          <span className="h-cancel">Let go here to cancel.</span>
+        </span>
+        <span className="aim-meter">
+          <span className="aim-fill" ref={aimFillRef}>
+            <span className="aim-ball" />
+          </span>
+        </span>
+      </div>
 
       {timerFrom ? (
         <div className={`race-clock${raceMs !== null && raceMs !== undefined ? (clockMs <= raceMs ? ' ahead' : ' behind') : ''}`}>

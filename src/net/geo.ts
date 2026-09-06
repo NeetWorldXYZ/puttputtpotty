@@ -27,7 +27,16 @@ export function watchPosition(onFix: (f: Fix) => void, onError: (msg: string) =>
   return () => navigator.geolocation.clearWatch(id);
 }
 
+/** US phones read feet and miles; everyone else metres and kilometres. */
+export const IMPERIAL = typeof navigator !== 'undefined' && /^en-US$/i.test(navigator.language ?? '');
+
 export function fmtDistance(m: number): string {
+  if (IMPERIAL) {
+    const ft = m * 3.28084;
+    if (ft < 1000) return `${Math.round(ft / 10) * 10} ft`;
+    const mi = m / 1609.344;
+    return `${mi < 10 ? mi.toFixed(1) : Math.round(mi)} mi`;
+  }
   if (m < 1000) return `${Math.round(m)} m`;
   return `${(m / 1000).toFixed(1)} km`;
 }
