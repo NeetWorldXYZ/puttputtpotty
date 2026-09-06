@@ -230,6 +230,12 @@ export function LocationPlay({ locationId, throne }: Props) {
       {submit.state === 'sending' && <div className="sub">Submitting to the throne room…</div>}
       {submit.state === 'error' && <div className="err">{submit.message}</div>}
       {submit.state === 'idle' && startError && <div className="err">Clock did not start: {startError}</div>}
+      {submit.state === 'done' && submit.elapsedMs !== null && (
+        <div className={`race-result${submit.king && submit.king.elapsed_ms !== null && !submit.isKing ? (submit.elapsedMs <= submit.king.elapsed_ms ? ' ahead' : ' behind') : ''}`}>
+          ⏱ Your round {fmtElapsed(submit.elapsedMs)}
+          {submit.king && submit.king.elapsed_ms !== null && !submit.isKing ? ` · ${submit.king.display_name} ${fmtElapsed(submit.king.elapsed_ms)}` : ''}
+        </div>
+      )}
       {submit.state === 'done' &&
         (submit.isKing ? (
           <div className="king-banner">
@@ -267,6 +273,8 @@ export function LocationPlay({ locationId, throne }: Props) {
       lockedParams={DEFAULT_PARAMS}
       noRetry={throne}
       timerFrom={timerFrom}
+      raceMs={throne ? (king?.elapsed_ms ?? null) : null}
+      raceLabel={king?.display_name ?? null}
       onHoleDone={onHoleDone}
       scorecardExtra={
         throne ? (

@@ -2669,3 +2669,53 @@ input[type='checkbox'] {
 .sheet-board .who .row-avatar {
   flex: none;
 }
+
+/* ---- Race clock (throne runs, matches) ---- */
+.race-clock {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
+  transform: translateX(-50%);
+  background: var(--ink);
+  border: 2px solid #ffffff;
+  border-radius: 14px;
+  padding: 4px 14px 5px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  z-index: 5;
+}
+.race-time {
+  font-family: var(--game-font);
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+.race-clock.ahead .race-time {
+  color: var(--good);
+}
+.race-clock.behind .race-time {
+  color: var(--danger);
+}
+.race-target {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c9d8ff;
+}
+.race-result {
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #eef3ff;
+}
+.race-result.ahead {
+  background: #e3f7e6;
+}
+.race-result.behind {
+  background: #ffe6e6;
+}

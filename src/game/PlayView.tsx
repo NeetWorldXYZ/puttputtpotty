@@ -40,6 +40,9 @@ interface Props {
   noRetry?: boolean;
   /** Epoch ms the round clock started; shows a live timer in the HUD. */
   timerFrom?: number | null;
+  /** The time to beat (the king's round), shown against the running clock. */
+  raceMs?: number | null;
+  raceLabel?: string | null;
   /** Rendered just under the HUD (quick-match opponent strip). */
   topExtra?: ReactNode;
 }
@@ -91,7 +94,12 @@ function relPar(n: number): string {
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom, topExtra }: Props) {
+function fmtClock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
@@ -667,16 +675,19 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     <div className="play" ref={wrapRef} style={{ background: theme.page }}>
       <canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} />
 
+      {timerFrom ? (
+        <div className={`race-clock${raceMs !== null && raceMs !== undefined ? (clockMs <= raceMs ? ' ahead' : ' behind') : ''}`}>
+          <div className="race-time">⏱ {fmtClock(clockMs)}</div>
+          <div className="race-target">{raceMs !== null && raceMs !== undefined ? `${raceLabel ?? 'the king'} did it in ${fmtClock(raceMs)}` : 'your time'}</div>
+        </div>
+      ) : null}
       <div className="hud">
         <div>
           <div className="name">
             HOLE {holeIndex + 1}/{holes.length} · PAR {par}
           </div>
           <div className="hole-name">{hole.name}</div>
-          <div className="env">
-            {theme.name}
-            {timerFrom ? <span className="clock"> · ⏱ {Math.floor(clockMs / 60000)}:{String(Math.floor((clockMs % 60000) / 1000)).padStart(2, '0')}</span> : null}
-          </div>
+          <div className="env">{theme.name}</div>
         </div>
         <div className="right">
           <div className="name">STROKES</div>
