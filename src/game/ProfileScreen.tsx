@@ -5,6 +5,7 @@ import { POI_ICON } from '../net/places';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { Avatar } from './Avatar';
+import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 
 function since(iso: string): string {
@@ -148,6 +149,7 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
         />
       )}
       {toast && <div className="map-toast">{toast}</div>}
+      <TabBar active="leaders" />
     </div>
   );
 }
