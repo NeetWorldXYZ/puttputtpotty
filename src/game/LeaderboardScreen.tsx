@@ -6,6 +6,8 @@ import { recallFix } from '../net/places';
 import { dailyEdition, dailySeed } from './courses';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
+import { ReportSheet } from './ReportSheet';
+import { Avatar } from './Avatar';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
@@ -26,6 +28,8 @@ export function LeaderboardScreen() {
   const [me, setMe] = useState<string | null>(null);
   const [name, setName] = useState(getSavedName());
   const [askName, setAskName] = useState(false);
+  const [report, setReport] = useState<{ id: string; name: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const fix = recallFix();
 
   useEffect(() => {
@@ -103,10 +107,11 @@ export function LeaderboardScreen() {
             {rows.map((r, i) => (
               <li key={r.user_id} className={`row${r.user_id === me ? ' me' : ''}${i < 3 ? ` top${i + 1}` : ''}`}>
                 <span className="rank">{i === 0 ? '👑' : i + 1}</span>
-                <span className="who">
+                <Avatar av={r.avatar} size={30} className="row-avatar" />
+                <button className="who link" onClick={() => navigate('profile', null, null, { user: r.user_id })}>
                   {r.display_name}
                   {r.user_id === me && <small> · you</small>}
-                </span>
+                </button>
                 {tab === 'daily' ? (
                   <span className="stat">
                     <strong>{(r as DailyRow).total}</strong>
@@ -122,6 +127,11 @@ export function LeaderboardScreen() {
                   </span>
                 )}
                 <span className="when">{ago(tab === 'daily' ? (r as DailyRow).finished_at : (r as KingRow).last_win)}</span>
+                {r.user_id !== me && (
+                  <button className="flag-btn" title="Report this player" onClick={() => setReport({ id: r.user_id, name: r.display_name })}>
+                    ⚑
+                  </button>
+                )}
               </li>
             ))}
           </ol>
@@ -137,6 +147,20 @@ export function LeaderboardScreen() {
           }}
         />
       )}
+      {report && (
+        <ReportSheet
+          userId={report.id}
+          name={report.name}
+          onClose={(msg) => {
+            setReport(null);
+            if (msg) {
+              setToast(msg);
+              setTimeout(() => setToast(null), 2500);
+            }
+          }}
+        />
+      )}
+      {toast && <div className="map-toast">{toast}</div>}
     </div>
   );
 }

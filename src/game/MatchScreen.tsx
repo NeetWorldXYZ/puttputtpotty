@@ -7,6 +7,7 @@ import { api, fmtElapsed, type MatchRow } from '../net/api';
 const INVITE_LENGTHS = [3, 9, 18] as const;
 import { ensureSession, getSavedName, loadProfile, supabase } from '../net/supabase';
 import { navigate } from '../router';
+import { Avatar } from './Avatar';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { NamePrompt } from './NamePrompt';
 import { sfx, unlockAudio } from './sound';
@@ -274,7 +275,9 @@ export function MatchScreen({ code, matchId }: Props) {
   if (phase === 'playing' && holes && match) {
     const strip = (
       <div className={`opp-strip${oppOnline ? ' online' : ''}`}>
-        <span className="opp-name">⚔️ {oppName}</span>
+        <span className="opp-name">
+          <Avatar av={match[`${other}_avatar`]} size={22} className="opp-avatar" /> {oppName}
+        </span>
         <span className="opp-prog">{opp ? (opp.done ? `finished · ${opp.total}` : `hole ${opp.hole} done · ${opp.total} so far`) : oppOnline ? 'on hole 1' : 'connecting…'}</span>
       </div>
     );

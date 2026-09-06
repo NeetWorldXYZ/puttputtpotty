@@ -9,10 +9,11 @@ import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
 import { startTheme, stopTheme } from './music';
 import { navigate } from '../router';
 import { api } from '../net/api';
-import { ensureSession, getSavedName, loadProfile } from '../net/supabase';
+import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
+import { Avatar } from './Avatar';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -41,6 +42,7 @@ export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
+  const [avatar] = useState(getSavedAvatar());
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
   const [len, setLen] = useState(getPreferredLength());
@@ -197,6 +199,7 @@ export function TitleScreen() {
       <div className="title-inner home">
         <div className="home-stack">
           <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
+            <Avatar av={avatar} size={26} className="chip-avatar" />
             <span className="player-name">{name ?? 'Set your name'}</span>
             <span className="player-thrones">👑 {thrones ?? '–'}</span>
           </button>

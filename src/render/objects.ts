@@ -836,10 +836,37 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
   ctx.restore();
 }
 
-export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+export interface BallStyle {
+  color: string;
+  pattern: 'plain' | 'stripe' | 'dots';
+  accent: string;
+}
+
+export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null): void {
   dropShadow(ctx, x, y, r * 1.05, r * 0.75);
   circle(ctx, x, y, r);
-  chunky(ctx, COLORS.ball, Math.max(0.12, r * 0.36));
+  chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.12, r * 0.36));
+  if (style && style.pattern !== 'plain') {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.86, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = style.accent;
+    if (style.pattern === 'stripe') ctx.fillRect(x - r, y - r * 0.26, r * 2, r * 0.52);
+    else
+      for (const [dx, dy] of [
+        [-0.45, -0.35],
+        [0.4, -0.45],
+        [-0.1, 0.15],
+        [0.45, 0.35],
+        [-0.5, 0.4],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(x + dx * r, y + dy * r, r * 0.17, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    ctx.restore();
+  }
   highlight(ctx, x - r * 0.32, y - r * 0.32, r * 0.28, r * 0.2, 0.95);
 }
 

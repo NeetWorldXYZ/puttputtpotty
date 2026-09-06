@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../net/api';
 import { getSavedName, saveName } from '../net/supabase';
+import { nameProblem } from '../net/wordfilter';
 
 interface Props {
   title?: string;
@@ -18,6 +19,11 @@ export function NamePrompt({ title, sub, onDone, onCancel }: Props) {
 
   const submit = async () => {
     if (!trimmed) return;
+    const problem = nameProblem(trimmed);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {

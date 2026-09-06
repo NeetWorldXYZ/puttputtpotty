@@ -1,9 +1,29 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config';
+import { normalizeAvatar, type Avatar } from '../game/avatarParts';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
 const NAME_KEY = 'ppp.name.v1';
+const AVATAR_KEY = 'ppp.avatar.v1';
+
+/** The avatar this phone last saw for its player (drives the ball look in play). */
+export function getSavedAvatar(): Avatar | null {
+  try {
+    const raw = localStorage.getItem(AVATAR_KEY);
+    return raw ? normalizeAvatar(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+export function saveAvatar(av: Avatar | null): void {
+  try {
+    if (av) localStorage.setItem(AVATAR_KEY, JSON.stringify(normalizeAvatar(av)));
+    else localStorage.removeItem(AVATAR_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getSavedName(): string | null {
   try {
@@ -65,14 +85,16 @@ export async function currentUserId(): Promise<string | null> {
 }
 
 /** Your profile as the server knows it. Caches the name locally. */
-export async function loadProfile(): Promise<{ id: string; name: string | null; email: string | null; anonymous: boolean } | null> {
+export async function loadProfile(): Promise<{ id: string; name: string | null; slogan: string | null; avatar: Avatar | null; email: string | null; anonymous: boolean } | null> {
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   if (!session) return null;
-  const { data: row } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
+  const { data: row } = await supabase.from('profiles').select('display_name, slogan, avatar').eq('id', session.user.id).maybeSingle();
   const name = (row?.display_name as string | undefined) ?? null;
   if (name) saveName(name);
-  return { id: session.user.id, name, email: session.user.email ?? null, anonymous: !!session.user.is_anonymous };
+  const avatar = row?.avatar ? normalizeAvatar(row.avatar) : null;
+  if (avatar) saveAvatar(avatar);
+  return { id: session.user.id, name, slogan: (row?.slogan as string | null | undefined) ?? null, avatar, email: session.user.email ?? null, anonymous: !!session.user.is_anonymous };
 }
 
 /** Attach an email to the current (anonymous) account so it can be recovered on any phone. Sends a confirmation link. */

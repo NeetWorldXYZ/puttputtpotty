@@ -18,6 +18,8 @@ import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
+import { ReportSheet } from './ReportSheet';
+import { Avatar } from './Avatar';
 import { sfx, unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
@@ -87,11 +89,15 @@ function ago(iso: string): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
-function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, holeNo: number | null): string {
+/**
+ * A pin says one thing at a glance: empty throne (white), taken (gold with
+ * the king's score), or yours (gold with a glow).
+ */
+function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, mine: boolean): string {
   const icon = POI_ICON[p.poiType] ?? '🚽';
   const claimed = !!king?.king_name;
-  const cloth = claimed ? `👑 ${king!.king_score ?? ''}` : holeNo !== null ? String(holeNo) : '⛳';
-  return `<div class="flag${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}"><span class="flag-cloth">${cloth}</span><span class="flag-pole"></span><span class="flag-base">${icon}</span></div>`;
+  const cloth = claimed ? `👑 ${king!.king_score ?? ''}` : '⛳';
+  return `<div class="flag${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="flag-cloth">${cloth}</span><span class="flag-pole"></span><span class="flag-base">${icon}</span></div>`;
 }
 
 /** Zoomed out past this, nearby flags fold into count bubbles that split apart as you zoom in. */
@@ -296,6 +302,7 @@ export function MapScreen() {
   const [checkinTick, setCheckinTick] = useState(0);
   const [askName, setAskName] = useState(false);
   const [founding, setFounding] = useState(false);
+  const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
   const searchedRef = useRef(false);
 
@@ -367,9 +374,11 @@ export function MapScreen() {
     for (const p of incoming) m.set(p.id, p);
     // Claimed bathrooms must never be absorbed: keep them ahead of anything else.
     const claimedIds = new Set(Object.values(kingsRef.current).filter((k) => k.king_name).map((k) => k.id));
-    const deduped = dedupePlaces([...m.values()].filter((p) => !claimedIds.has(p.id)));
+    const all = [...m.values()];
+    const claimed = all.filter((p) => claimedIds.has(p.id));
+    const deduped = dedupePlaces(all.filter((p) => !claimedIds.has(p.id)));
     m.clear();
-    for (const p of incoming) if (claimedIds.has(p.id)) m.set(p.id, p);
+    for (const p of claimed) m.set(p.id, p);
     for (const p of deduped) if (!m.has(p.id)) m.set(p.id, p);
     if (m.size > MAX_PINS) {
       const sorted = [...m.values()].sort((a, b) => haversine(lat, lng, a.lat, a.lng) - haversine(lat, lng, b.lat, b.lng));
@@ -500,18 +509,15 @@ export function MapScreen() {
     }
   }, [fix, search, mapLoaded]);
 
-  // Markers: every bathroom is a flag; hole numbers count outward from you.
+  // Markers: every bathroom is a flag coloured by throne state.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<string>();
-    const ranked = fix ? places.slice().sort((a, b) => haversine(fix.lat, fix.lng, a.lat, a.lng) - haversine(fix.lat, fix.lng, b.lat, b.lng)) : [];
-    const holeNo = new Map<string, number>();
-    ranked.forEach((p, i) => holeNo.set(p.id, i + 1));
     const { singles, clusters } = clusterPlaces(places, zoomStep / 2, kings, selected?.id ?? null);
     for (const p of singles) {
       seen.add(p.id);
-      const html = pinHtml(p, kings[p.id], selected?.id === p.id, holeNo.get(p.id) ?? null);
+      const html = pinHtml(p, kings[p.id], selected?.id === p.id, !!me && kings[p.id]?.king_user === me);
       let m = markersRef.current.get(p.id);
       if (!m) {
         const el = document.createElement('div');
@@ -563,7 +569,7 @@ export function MapScreen() {
         clustersRef.current.delete(key);
       }
     }
-  }, [places, kings, selected, fix, zoomStep]);
+  }, [places, kings, selected, fix, zoomStep, me]);
 
   // Preview + founding on select.
   useEffect(() => {
@@ -730,6 +736,11 @@ export function MapScreen() {
   const king = selected ? kings[selected.id] : undefined;
   const band = selected ? bandFor(selected.poiType, selected.id) : null;
   const themeName = selected ? themeById(king?.theme ?? band!.theme).name : '';
+  const difficulty = (king?.difficulty ?? band?.difficulty ?? 'medium') as 'easy' | 'medium' | 'hard';
+  const difficultyRolls = difficulty === 'easy' ? 1 : difficulty === 'hard' ? 3 : 2;
+  const difficultyLabel = difficulty === 'easy' ? 'Easy' : difficulty === 'hard' ? 'Hard' : 'Medium';
+  const coursePar = preview && selected && preview.id === selected.id ? preview.par : (king?.par ?? null);
+  const myBest = board && selected && board.id === selected.id ? (board.rows.find((r) => r.user_id === me)?.score ?? null) : null;
   const claimedCount = Object.values(kings).filter((k) => k.king_name).length;
 
   return (
@@ -781,6 +792,17 @@ export function MapScreen() {
       </div>
 
       {notice && <div className="map-toast">{notice}</div>}
+
+      {report && (
+        <ReportSheet
+          userId={report.id}
+          name={report.name}
+          onClose={(msg) => {
+            setReport(null);
+            if (msg) setNotice(msg);
+          }}
+        />
+      )}
 
       {founding && fix && (
         <FoundSheet
@@ -848,23 +870,49 @@ export function MapScreen() {
             </div>
           )}
 
-          <div className={`throne-line${king?.king_name ? ' held' : ''}`}>
+          <div className={`king-banner${king?.king_name ? (king.king_user === me ? ' mine' : ' held') : ' empty'}`}>
             {king?.king_name ? (
               <>
-                <span className="crown">👑</span>
-                <span>
-                  <strong>{king.king_name}</strong> holds the throne with <strong>{king.king_score}</strong>
-                  {king.king_holes && <span className="dim"> ({king.king_holes.join('-')})</span>}
-                  {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> in {fmtElapsed(king.king_elapsed_ms)}</span>}
-                  {king.king_since && <span className="dim"> · {ago(king.king_since)}</span>}
-                </span>
+                <Avatar av={king.king_avatar} size={76} className="kb-avatar" />
+                <div className="kb-text">
+                  <div className="kb-label">👑 {king.king_user === me ? 'You are King of the Throne' : 'King of the Throne'}</div>
+                  <button className="kb-name" onClick={() => navigate('profile', null, null, { user: king.king_user ?? undefined })}>
+                    {king.king_name}
+                  </button>
+                  <div className="kb-score">
+                    <strong>{king.king_score}</strong>
+                    {king.par ? <span> on par {king.par}</span> : null}
+                    {king.king_holes && <span className="dim"> · {king.king_holes.join('-')}</span>}
+                    {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> · ⏱ {fmtElapsed(king.king_elapsed_ms)}</span>}
+                  </div>
+                  {king.king_since && <div className="kb-since">holding it {ago(king.king_since)}</div>}
+                </div>
+                {king.king_user && king.king_user !== me && (
+                  <button className="flag-btn kb-flag" title="Report this player" onClick={() => setReport({ id: king.king_user!, name: king.king_name! })}>
+                    ⚑
+                  </button>
+                )}
               </>
             ) : (
               <>
-                <span className="crown">🪑</span>
-                <span>The throne is empty. Fewest strokes over three holes wins; ties go to the faster round.</span>
+                <span className="kb-empty-icon">🪑</span>
+                <div className="kb-text">
+                  <div className="kb-label">No king yet</div>
+                  <div className="kb-name static">The throne is empty</div>
+                  <div className="kb-score dim">Three holes. Fewest strokes takes it; ties go to the faster round.</div>
+                </div>
               </>
             )}
+          </div>
+
+          <div className="facts">
+            <span className="fact" title="Difficulty">
+              {'🧻'.repeat(difficultyRolls)} {difficultyLabel}
+            </span>
+            {coursePar !== null && <span className="fact">Par {coursePar}</span>}
+            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact">Record {king.king_score}</span>}
+            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact">{king.run_count} {king.run_count === 1 ? 'run' : 'runs'}</span>}
+            {myBest !== null && <span className="fact you">You {myBest}</span>}
           </div>
 
           {board?.id === selected.id && board.rows.length > 0 && (
@@ -872,7 +920,10 @@ export function MapScreen() {
               {board.rows.map((r) => (
                 <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
                   <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
-                  <span className="who">{r.display_name}</span>
+                  <span className="who">
+                    <Avatar av={r.avatar} size={22} className="row-avatar" />
+                    {r.display_name}
+                  </span>
                   <span className="stat">
                     {r.score}
                     {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}
@@ -902,7 +953,7 @@ export function MapScreen() {
               </button>
             ) : !inRange ? (
               <button className="primary" disabled>
-                Get within {CLAIM_RADIUS_M} m to play for the throne
+                Get within {CLAIM_RADIUS_M} m · you&apos;re {distance !== null ? fmtDistance(distance) : '?'} away
               </button>
             ) : !checkinFresh ? (
               <button className="primary" disabled={checkinBusy} onClick={() => void doCheckin()}>
@@ -914,7 +965,7 @@ export function MapScreen() {
               </button>
             ) : (
               <button className="primary throne" onClick={playThrone}>
-                👑 Play for the throne
+                {king?.king_name ? (king.king_user === me ? '👑 Defend your throne' : `⚔️ Challenge ${king.king_name}`) : '👑 Claim the empty throne'}
               </button>
             )}
             {checkinError && <div className="sheet-err">{checkinError}</div>}

@@ -11,6 +11,7 @@ const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: 
 const LocationPlay = lazy(() => import('./game/LocationPlay').then((m) => ({ default: m.LocationPlay })));
 const LeaderboardScreen = lazy(() => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
 const MatchScreen = lazy(() => import('./game/MatchScreen').then((m) => ({ default: m.MatchScreen })));
+const ProfileScreen = lazy(() => import('./game/ProfileScreen').then((m) => ({ default: m.ProfileScreen })));
 
 function Loading() {
   return (
@@ -37,6 +38,12 @@ export function App() {
     return (
       <Suspense fallback={<Loading />}>
         <MatchScreen key={loc.match ?? loc.code ?? 'lobby'} code={loc.code} matchId={loc.match} />
+      </Suspense>
+    );
+  if (loc.route === 'profile')
+    return (
+      <Suspense fallback={<Loading />}>
+        <ProfileScreen key={loc.user ?? 'me'} userId={loc.user} />
       </Suspense>
     );
   if (loc.route === 'leaders')
