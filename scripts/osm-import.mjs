@@ -17,6 +17,31 @@ if (args.filters) {
   console.log(OSMIUM_FILTER.join(' '));
   process.exit(0);
 }
+/** Proves the secrets work before anything is downloaded. */
+async function preflight() {
+  const { createClient } = await import('@supabase/supabase-js');
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+  if (!/^https:\/\/[a-z]{20}\.supabase\.co\/?$/.test(url.trim())) throw new Error(`SUPABASE_URL should look like https://<project-ref>.supabase.co (got ${url.replace(/[a-z]/g, 'x')})`);
+  const client = createClient(url.trim(), key.trim(), { auth: { persistSession: false } });
+  const { error } = await client.from('osm_coverage').select('region').limit(1);
+  if (error) {
+    const hint = /invalid api key/i.test(error.message)
+      ? 'The key is not one this project recognises. In Supabase: Project Settings > API keys, copy the whole "service_role" (legacy) key or a "secret" key, not the publishable/anon key.'
+      : /permission denied|row-level security/i.test(error.message)
+        ? 'That key is not the service role: it cannot bypass row security. Use the "service_role" or a "secret" key.'
+        : '';
+    throw new Error(`database check failed: ${error.message}. ${hint}`);
+  }
+  return client;
+}
+if (args.check) {
+  await preflight();
+  console.log('secrets ok');
+  process.exit(0);
+}
+
 const region = args.region;
 const file = args.file;
 const dryRun = !!args['dry-run'];
@@ -28,16 +53,7 @@ if (!region || !file) {
 const BATCH = 1000;
 const startedAt = new Date().toISOString();
 let supabase = null;
-if (!dryRun) {
-  const { createClient } = await import('@supabase/supabase-js');
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
-    process.exit(2);
-  }
-  supabase = createClient(url, key, { auth: { persistSession: false } });
-}
+if (!dryRun) supabase = await preflight();
 
 const bbox = { min_lat: 90, min_lng: 180, max_lat: -90, max_lng: -180 };
 const byType = {};

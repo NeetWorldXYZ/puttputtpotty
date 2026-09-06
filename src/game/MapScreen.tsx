@@ -94,6 +94,56 @@ function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolea
   return `<div class="flag${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}"><span class="flag-cloth">${cloth}</span><span class="flag-pole"></span><span class="flag-base">${icon}</span></div>`;
 }
 
+/** Zoomed out past this, nearby flags fold into count bubbles that split apart as you zoom in. */
+const CLUSTER_MAX_ZOOM = 14.5;
+const CLUSTER_CELL_PX = 56;
+
+type Cluster = { key: string; lat: number; lng: number; members: OsmPlace[]; claimed: number };
+
+/**
+ * Grid clustering in world-pixel space at the current zoom: stable while
+ * panning, re-bucketed when the zoom changes. Singles come back as-is.
+ */
+function clusterPlaces(places: OsmPlace[], zoom: number, kings: Record<string, NearbyLocation>, keepId: string | null): { singles: OsmPlace[]; clusters: Cluster[] } {
+  if (zoom >= CLUSTER_MAX_ZOOM) return { singles: places, clusters: [] };
+  const scale = (512 * Math.pow(2, zoom)) / CLUSTER_CELL_PX;
+  const buckets = new Map<string, OsmPlace[]>();
+  const singles: OsmPlace[] = [];
+  for (const p of places) {
+    if (p.id === keepId) {
+      singles.push(p);
+      continue;
+    }
+    const m = maplibregl.MercatorCoordinate.fromLngLat([p.lng, p.lat]);
+    const key = `${Math.floor(m.x * scale)}:${Math.floor(m.y * scale)}`;
+    const b = buckets.get(key);
+    if (b) b.push(p);
+    else buckets.set(key, [p]);
+  }
+  const clusters: Cluster[] = [];
+  for (const [key, members] of buckets) {
+    if (members.length < 2) {
+      singles.push(...members);
+      continue;
+    }
+    let lat = 0;
+    let lng = 0;
+    let claimed = 0;
+    for (const p of members) {
+      lat += p.lat;
+      lng += p.lng;
+      if (kings[p.id]?.king_name) claimed++;
+    }
+    clusters.push({ key: `${Math.round(zoom * 2)}:${key}`, lat: lat / members.length, lng: lng / members.length, members, claimed });
+  }
+  return { singles, clusters };
+}
+
+function clusterHtml(c: Cluster): string {
+  const big = c.members.length >= 10;
+  return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${c.claimed ? '👑' : '🚽'}</span></div>`;
+}
+
 /** Hole preview drawn once per hole into a small canvas. */
 function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -153,6 +203,9 @@ export function MapScreen() {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const loadedRef = useRef(false);
   const markersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
+  const clustersRef = useRef<Map<string, { marker: maplibregl.Marker; el: HTMLElement }>>(new Map());
+  /** Zoom in half steps; markers re-cluster when it changes. */
+  const [zoomStep, setZoomStep] = useState(30);
   const userRef = useRef<maplibregl.Marker | null>(null);
   const lastFixRef = useRef<Fix | null>(null);
   const lastSearchRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -230,6 +283,7 @@ export function MapScreen() {
       console.warn('map', (e as { error?: Error }).error?.message ?? e);
     });
     mapRef.current = map;
+    if (import.meta.env.DEV) (window as unknown as { __pppMap?: maplibregl.Map }).__pppMap = map; // headless tests drive the zoom
     return () => {
       map.remove();
       mapRef.current = null;
@@ -355,10 +409,14 @@ export function MapScreen() {
         void search(c.lat, c.lng);
       }, 500);
     };
+    const onZoom = () => setZoomStep(Math.round(map.getZoom() * 2));
     map.on('moveend', onMove);
+    map.on('zoomend', onZoom);
+    onZoom();
     return () => {
       window.clearTimeout(timer);
       map.off('moveend', onMove);
+      map.off('zoomend', onZoom);
     };
   }, [search]);
 
@@ -395,7 +453,8 @@ export function MapScreen() {
     const ranked = fix ? places.slice().sort((a, b) => haversine(fix.lat, fix.lng, a.lat, a.lng) - haversine(fix.lat, fix.lng, b.lat, b.lng)) : [];
     const holeNo = new Map<string, number>();
     ranked.forEach((p, i) => holeNo.set(p.id, i + 1));
-    for (const p of places) {
+    const { singles, clusters } = clusterPlaces(places, zoomStep / 2, kings, selected?.id ?? null);
+    for (const p of singles) {
       seen.add(p.id);
       const html = pinHtml(p, kings[p.id], selected?.id === p.id, holeNo.get(p.id) ?? null);
       let m = markersRef.current.get(p.id);
@@ -420,7 +479,36 @@ export function MapScreen() {
         markersRef.current.delete(id);
       }
     }
-  }, [places, kings, selected, fix]);
+    // Count bubbles: tap one to zoom into it.
+    const seenClusters = new Set<string>();
+    for (const c of clusters) {
+      seenClusters.add(c.key);
+      const html = clusterHtml(c);
+      let m = clustersRef.current.get(c.key);
+      if (!m) {
+        const el = document.createElement('div');
+        el.className = 'pin-wrap';
+        el.innerHTML = html;
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          unlockAudio();
+          const b = new maplibregl.LngLatBounds();
+          for (const p of c.members) b.extend([p.lng, p.lat]);
+          map.fitBounds(b, { padding: 90, maxZoom: Math.max(map.getZoom() + 2, CLUSTER_MAX_ZOOM + 0.5), duration: 500 });
+        });
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([c.lng, c.lat]).addTo(map);
+        m = { marker, el };
+        clustersRef.current.set(c.key, m);
+      } else if (m.el.innerHTML !== html) m.el.innerHTML = html;
+      m.el.style.zIndex = c.claimed ? '21' : '11';
+    }
+    for (const [key, m] of clustersRef.current) {
+      if (!seenClusters.has(key)) {
+        m.marker.remove();
+        clustersRef.current.delete(key);
+      }
+    }
+  }, [places, kings, selected, fix, zoomStep]);
 
   // Preview + founding on select.
   useEffect(() => {

@@ -33,13 +33,20 @@ const shards = Number(args.shards ?? 1);
 const minutes = Number(args.minutes ?? 300);
 const batch = Number(args.batch ?? 100);
 const { createClient } = await import('@supabase/supabase-js');
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const url = (process.env.SUPABASE_URL ?? '').trim();
+const key = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim();
 if (!url || !key) {
   console.error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
   process.exit(2);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
+{
+  const { error } = await supabase.from('osm_coverage').select('region').limit(1);
+  if (error) {
+    console.error(`database check failed: ${error.message}. Use the project's service_role (or a "secret") key, not the publishable key.`);
+    process.exit(2);
+  }
+}
 const deadline = Date.now() + minutes * 60_000;
 let built = 0;
 let fallbackHoles = 0;

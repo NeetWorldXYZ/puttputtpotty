@@ -41,6 +41,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Check secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/osm-import.mjs --check
       - name: Install osmium
         run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
       - name: Download ${{ matrix.region }}
