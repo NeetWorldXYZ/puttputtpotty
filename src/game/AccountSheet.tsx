@@ -146,33 +146,32 @@ export function AccountSheet({ onClose }: Props) {
             <button className="primary" disabled={!trimmed || busy || !dirty} onClick={() => void saveTheName()}>
               {busy ? 'Saving…' : 'Save'}
             </button>
-            {!current?.email && (
-              <button onClick={() => setMode('save')}>
-                Save account with email
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setMode('code');
-                void showCode();
-              }}
-            >
-              Move to another phone
-            </button>
-            <button onClick={() => setMode('claim')}>I have a code from my other phone</button>
-            <button onClick={() => setMode('signin')}>Sign in on this phone</button>
-            {current?.email && (
+            <div className="field-label">Account</div>
+            <div className="acct-links">
+              {!current?.email && <button onClick={() => setMode('save')}>💾 Save by email</button>}
               <button
-                onClick={() =>
-                  run(async () => {
-                    await signOut();
-                    onClose(null);
-                  })
-                }
+                onClick={() => {
+                  setMode('code');
+                  void showCode();
+                }}
               >
-                Sign out
+                📲 Move phones
               </button>
-            )}
+              <button onClick={() => setMode('claim')}>🔑 Enter a code</button>
+              <button onClick={() => setMode('signin')}>👤 Sign in</button>
+              {current?.email && (
+                <button
+                  onClick={() =>
+                    run(async () => {
+                      await signOut();
+                      onClose(null);
+                    })
+                  }
+                >
+                  🚪 Sign out
+                </button>
+              )}
+            </div>
             <button onClick={() => onClose(current?.name ?? getSavedName())}>Done</button>
           </>
         )}
