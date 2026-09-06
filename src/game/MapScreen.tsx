@@ -18,7 +18,7 @@ import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
-import { unlockAudio } from './sound';
+import { sfx, unlockAudio } from './sound';
 
 const SEARCH_RADIUS_M = 3000;
 const WIDE_RADIUS_M = 12000;
@@ -144,6 +144,60 @@ function clusterHtml(c: Cluster): string {
   return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${c.claimed ? '👑' : '🚽'}</span></div>`;
 }
 
+const FOUND_TYPES: [string, string][] = [
+  ['toilets', 'Public toilet'],
+  ['fuel', 'Gas station'],
+  ['bar', 'Bar'],
+  ['fast_food', 'Fast food'],
+  ['restaurant', 'Restaurant'],
+  ['hotel', 'Hotel'],
+  ['retail', 'Store'],
+  ['park', 'Rest stop'],
+];
+
+/** "Found a bathroom here": name it, say what it is, and it goes on the map at your feet. */
+function FoundSheet({ fix, onClose, onFound }: { fix: { lat: number; lng: number; accuracy: number }; onClose: () => void; onFound: (p: OsmPlace) => void }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('toilets');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const trimmed = name.trim();
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { location } = await api.found(trimmed, type, fix.lat, fix.lng, fix.accuracy);
+      sfx.jingle();
+      onFound(location);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="card pop found" onClick={(e) => e.stopPropagation()}>
+        <h2>Found a bathroom?</h2>
+        <div className="sub">It goes on the map right where you're standing{fix.accuracy > 100 ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}.</div>
+        <input className="name-input" maxLength={40} placeholder="What's it called?" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <div className="found-types">
+          {FOUND_TYPES.map(([id, label]) => (
+            <button key={id} className={`chip${type === id ? ' active' : ''}`} onClick={() => setType(id)}>
+              {POI_ICON[id] ?? '🚽'} {label}
+            </button>
+          ))}
+        </div>
+        {error && <div className="err">{error}</div>}
+        <button className="primary" disabled={trimmed.length < 2 || busy || fix.accuracy > 100} onClick={() => void submit()}>
+          {busy ? 'Adding…' : 'Put it on the map'}
+        </button>
+        <button onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 /** Hole preview drawn once per hole into a small canvas. */
 function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -241,6 +295,7 @@ export function MapScreen() {
   const [checkinError, setCheckinError] = useState<string | null>(null);
   const [checkinTick, setCheckinTick] = useState(0);
   const [askName, setAskName] = useState(false);
+  const [founding, setFounding] = useState(false);
   const [name, setName] = useState(getSavedName());
   const searchedRef = useRef(false);
 
@@ -715,12 +770,30 @@ export function MapScreen() {
         <button className="map-tool" onClick={closest} title="Closest bathroom">
           🚽 Closest
         </button>
+        {fix && !selected && (
+          <button className="map-tool" onClick={() => setFounding(true)} title="Add a bathroom at your location">
+            ➕ Found one
+          </button>
+        )}
         <button className="map-tool round" onClick={recentre} title="Recentre">
           ◎
         </button>
       </div>
 
       {notice && <div className="map-toast">{notice}</div>}
+
+      {founding && fix && (
+        <FoundSheet
+          fix={fix}
+          onClose={() => setFounding(false)}
+          onFound={(p) => {
+            setFounding(false);
+            addPlaces(p.lat, p.lng, [p]);
+            setSelected(p);
+            setNotice(`${p.name} is on the map. First to sink it takes the throne.`);
+          }}
+        />
+      )}
 
       {thronesDown === 'empty' && !geoError && !netError && !selected && (
         <div className="map-notice">
