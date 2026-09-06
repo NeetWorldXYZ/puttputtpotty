@@ -68,7 +68,18 @@ export interface KingRow {
   display_name: string;
   thrones: number;
   best_rel: number;
+  aces: number;
   last_win: string;
+}
+
+export interface DailyRow {
+  user_id: string;
+  display_name: string;
+  total: number;
+  holes: number;
+  /** Simulated rolling time over the round, the tiebreak. */
+  elapsed_ms: number;
+  finished_at: string;
 }
 
 export interface LocationRow {
@@ -214,7 +225,13 @@ export const api = {
     if (error) throw new Error(error.message);
     return (data ?? []) as LocationRow[];
   },
-  async leaderboard(seed: string): Promise<{ user_id: string; display_name: string; total: number; holes: number; finished_at: string }[]> {
+  /** A bathroom the map doesn't know about, at your feet. */
+  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number) =>
+    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number } }>({ action: 'found', name, poiType, lat, lng, accuracy }),
+  /** Six digits another phone can enter to take over this account. */
+  linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
+  linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),
+  async leaderboard(seed: string): Promise<DailyRow[]> {
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);
     return data ?? [];

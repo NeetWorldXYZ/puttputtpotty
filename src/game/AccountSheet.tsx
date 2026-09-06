@@ -6,7 +6,7 @@ interface Props {
   onClose: (name: string | null) => void;
 }
 
-type Mode = 'name' | 'save' | 'signin';
+type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim';
 
 /**
  * Your account: change your name (unique, checked by the server), save the
@@ -21,6 +21,8 @@ export function AccountSheet({ onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [claim, setClaim] = useState('');
 
   useEffect(() => {
     void loadProfile().then((p) => {
@@ -61,11 +63,26 @@ export function AccountSheet({ onClose }: Props) {
       await signInWithEmail(email.trim());
       setNote(`Check ${email.trim()} and tap the link. Come back here afterwards.`);
     });
+  const showCode = () =>
+    run(async () => {
+      setCode(null);
+      const r = await api.linkCode();
+      setCode(r.code);
+    });
+  const doClaim = () =>
+    run(async () => {
+      const r = await api.linkClaim(claim);
+      saveName(r.displayName);
+      setName(r.displayName);
+      setCurrent((c) => (c ? { ...c, name: r.displayName } : { name: r.displayName, email: null, anonymous: true }));
+      setNote(`Welcome back, ${r.displayName}. Your thrones are on this phone now.`);
+      setMode('name');
+    });
 
   return (
     <div className="overlay" onClick={() => onClose(current?.name ?? getSavedName())}>
       <div className="card pop account" onClick={(e) => e.stopPropagation()}>
-        <h2>{mode === 'name' ? 'Your account' : mode === 'save' ? 'Save your account' : 'Sign in'}</h2>
+        <h2>{mode === 'name' ? 'Your account' : mode === 'save' ? 'Save your account' : mode === 'code' ? 'Move to another phone' : mode === 'claim' ? 'Bring my account here' : 'Sign in'}</h2>
 
         {mode === 'name' && (
           <>
@@ -84,6 +101,15 @@ export function AccountSheet({ onClose }: Props) {
                 Save account with email
               </button>
             )}
+            <button
+              onClick={() => {
+                setMode('code');
+                void showCode();
+              }}
+            >
+              Move to another phone
+            </button>
+            <button onClick={() => setMode('claim')}>I have a code from my other phone</button>
             <button onClick={() => setMode('signin')}>Sign in on this phone</button>
             {current?.email && (
               <button
@@ -101,7 +127,28 @@ export function AccountSheet({ onClose }: Props) {
           </>
         )}
 
-        {mode !== 'name' && (
+        {mode === 'code' && (
+          <>
+            <div className="sub">On your other phone, open Putt Putt Potty, tap your name, choose &ldquo;I have a code&rdquo; and type this in. Good for ten minutes.</div>
+            {code ? <div className="link-code">{code.slice(0, 3)} {code.slice(3)}</div> : <div className="lb-note">{error ?? 'Getting a code…'}</div>}
+            <div className="sub small">That phone becomes this account; this one goes back to being a guest.</div>
+            <button onClick={() => setMode('name')}>Back</button>
+          </>
+        )}
+
+        {mode === 'claim' && (
+          <>
+            <div className="sub">Type the six digits showing on your other phone under &ldquo;Move to another phone&rdquo;.</div>
+            <input className="name-input code-input" inputMode="numeric" pattern="[0-9]*" maxLength={7} placeholder="123 456" value={claim} onChange={(e) => setClaim(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} autoFocus />
+            {error && <div className="err">{error}</div>}
+            <button className="primary" disabled={claim.length !== 6 || busy} onClick={() => void doClaim()}>
+              {busy ? 'Moving…' : 'Move my account here'}
+            </button>
+            <button onClick={() => setMode('name')}>Back</button>
+          </>
+        )}
+
+        {(mode === 'save' || mode === 'signin') && (
           <>
             <div className="sub">
               {mode === 'save'

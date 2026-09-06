@@ -12,11 +12,13 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: 
 
 const CLAIM_RADIUS_M = 50;
 const MAX_ACCURACY_M = 150;
-const DWELL_SECONDS = 60;
+const DWELL_SECONDS = 20;
 const CHECKIN_MAX_AGE_S = 45 * 60;
-const COOLDOWN_HOURS = 4;
+const COOLDOWN_HOURS = 1;
 const MAX_SPEED_MPS = 70;
 const STROKE_CAP = 8;
+const FOUND_PER_DAY = 5;
+const LINK_CODE_TTL_MIN = 10;
 const EPOCH = Date.UTC(2026, 8, 1); // 2026-09-01
 
 const cors = {
@@ -508,7 +510,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'hole') {
       const loc = body.location;
-      if (!loc || typeof loc.id !== 'string' || !/^osm:(node|way|relation):\d+$/.test(loc.id) || typeof loc.lat !== 'number' || typeof loc.lng !== 'number')
+      if (!loc || typeof loc.id !== 'string' || !/^(osm:(node|way|relation):\d+|ppp:[a-f0-9]{12})$/.test(loc.id) || typeof loc.lat !== 'number' || typeof loc.lng !== 'number')
         return json({ error: 'bad location' }, 400);
       await ensureProfile(user.id);
       let row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
@@ -651,12 +653,16 @@ Deno.serve(async (req: Request) => {
       // Re-simulate every hole. The client's claimed score is ignored; the server's replay is the record.
       const holeScores: number[] = [];
       let sunk = true;
+      let simMs = 0;
       for (let i = 0; i < holes.length; i++) {
         const st = replay(holes[i], 0, strokeLists[i], DEFAULT_PARAMS).state;
         if (!st.done) return json({ error: `hole ${i + 1} not finished` }, 400);
         holeScores.push(holeScore(st, (holes[i] as { par: number }).par));
         sunk = sunk && st.sunk;
+        simMs += Math.round((st.totalTime ?? 0) * 1000);
       }
+      // Daily/custom holes are timed by the simulation itself (ball rolling time): deterministic and unfakeable.
+      if (elapsedMs === null && typeof locationId !== 'string') elapsedMs = simMs;
       const score = holeScores.reduce((a, b) => a + b, 0);
       const isLocation = typeof locationId === 'string';
       const { error } = await admin.from('runs').insert({
@@ -681,6 +687,56 @@ Deno.serve(async (req: Request) => {
         king = data;
       }
       return json({ score, par, sunk, holeScores, elapsedMs, king, isKing: king ? king.user_id === user.id : false });
+    }
+
+    if (action === 'found') {
+      // A bathroom the map doesn't know about, at the player's feet.
+      const { name, poiType, lat, lng, accuracy } = body;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'no position' }, 400);
+      const acc = typeof accuracy === 'number' ? accuracy : 999;
+      if (acc > 100) return json({ error: `GPS accuracy too low (${Math.round(acc)} m); step outside or wait a moment` }, 400);
+      const cleanName = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+      if (cleanName.length < 2) return json({ error: 'give it a name' }, 400);
+      const type = typeof poiType === 'string' && ['toilets', 'fuel', 'fast_food', 'bar', 'restaurant', 'hotel', 'retail', 'park', 'stadium', 'airport'].includes(poiType) ? poiType : 'toilets';
+      await ensureProfile(user.id);
+      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count } = await admin.from('locations').select('id', { count: 'exact', head: true }).eq('founded_by', user.id).like('id', 'ppp:%').gte('created_at', since);
+      if ((count ?? 0) >= FOUND_PER_DAY) return json({ error: `that's ${FOUND_PER_DAY} new bathrooms today; more tomorrow` }, 429);
+      // Not on top of one we already have.
+      const { data: near } = await admin.rpc('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: 40 });
+      if (Array.isArray(near) && near.length) return json({ error: `${near[0].name} is already here`, existing: near[0] }, 409);
+      const { data: imported } = await admin.rpc('bathrooms_near', { in_lat: lat, in_lng: lng, radius_m: 40, lim: 1 });
+      const importedPlaces = (imported as { places?: OsmPlace[] } | null)?.places ?? [];
+      if (importedPlaces.length) return json({ error: `${importedPlaces[0].name} is already here`, existing: importedPlaces[0] }, 409);
+      const id = `ppp:${Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
+      const row = await ensureLocation({ id, name: cleanName, poiType: type, lat, lng }, user.id);
+      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng } });
+    }
+
+    if (action === 'link-code') {
+      // Six digits that let another phone take over this account for ten minutes.
+      await ensureProfile(user.id);
+      await admin.from('link_codes').delete().eq('user_id', user.id);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+        const expires = new Date(Date.now() + LINK_CODE_TTL_MIN * 60000).toISOString();
+        const { error } = await admin.from('link_codes').insert({ code, user_id: user.id, expires_at: expires });
+        if (!error) return json({ code, expiresAt: expires });
+      }
+      return json({ error: 'try again' }, 500);
+    }
+
+    if (action === 'link-claim') {
+      const code = String(body.code ?? '').replace(/\D/g, '');
+      if (code.length !== 6) return json({ error: 'codes are six digits' }, 400);
+      await admin.from('link_codes').delete().lt('expires_at', new Date().toISOString());
+      const { data: lc } = await admin.from('link_codes').select('user_id').eq('code', code).maybeSingle();
+      if (!lc) return json({ error: 'that code is wrong or expired' }, 404);
+      if (lc.user_id === user.id) return json({ error: 'that is this phone' }, 400);
+      await ensureProfile(user.id);
+      const { data: name, error } = await admin.rpc('move_account', { old_id: lc.user_id, new_id: user.id });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true, displayName: name });
     }
 
     return json({ error: 'unknown action' }, 400);

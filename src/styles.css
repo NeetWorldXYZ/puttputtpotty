@@ -2324,3 +2324,46 @@ input[type='checkbox'] {
   background: var(--accent);
   color: var(--ink);
 }
+
+/* ---- Found a bathroom / move account ---- */
+.found-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.found-types .chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.found-types .chip.active {
+  background: var(--accent);
+}
+.link-code {
+  font-family: var(--game-font);
+  font-size: 40px;
+  letter-spacing: 4px;
+  text-align: center;
+  margin: 14px 0;
+  padding: 10px;
+  border: 3px dashed var(--ink);
+  border-radius: 14px;
+  background: #fff;
+}
+.code-input {
+  text-align: center;
+  font-size: 26px;
+  letter-spacing: 6px;
+}
+.sub.small {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.lb-time {
+  font-size: 12px;
+  opacity: 0.75;
+}

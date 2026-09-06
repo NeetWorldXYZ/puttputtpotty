@@ -1,14 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../net/api';
+import { api, fmtElapsed, type DailyRow as Row } from '../net/api';
 import { currentUserId } from '../net/supabase';
-
-interface Row {
-  user_id: string;
-  display_name: string;
-  total: number;
-  holes: number;
-  finished_at: string;
-}
 
 /** Today's course leaderboard (server-verified totals over all nine holes). */
 export function DailyBoard({ seed, refreshKey }: { seed: string; refreshKey?: number }) {
@@ -39,6 +31,7 @@ export function DailyBoard({ seed, refreshKey }: { seed: string; refreshKey?: nu
               <td>{i + 1}.</td>
               <td style={{ textAlign: 'left' }}>{r.display_name}</td>
               <td>{r.total}</td>
+              <td className="lb-time">{r.elapsed_ms ? fmtElapsed(r.elapsed_ms) : ''}</td>
             </tr>
           ))}
         </tbody>

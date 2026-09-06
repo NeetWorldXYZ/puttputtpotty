@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, type KingRow } from '../net/api';
+import { api, fmtElapsed, type DailyRow, type KingRow } from '../net/api';
 import { currentUserId, getSavedName } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { recallFix } from '../net/places';
@@ -9,14 +9,6 @@ import { AccountSheet } from './AccountSheet';
 
 type Tab = 'nearby' | 'world' | 'daily';
 const NEARBY_RADIUS_M = 25000;
-
-interface DailyRow {
-  user_id: string;
-  display_name: string;
-  total: number;
-  holes: number;
-  finished_at: string;
-}
 
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -118,12 +110,15 @@ export function LeaderboardScreen() {
                 {tab === 'daily' ? (
                   <span className="stat">
                     <strong>{(r as DailyRow).total}</strong>
-                    <small>strokes</small>
+                    <small>{(r as DailyRow).elapsed_ms ? `strokes · ${fmtElapsed((r as DailyRow).elapsed_ms)}` : 'strokes'}</small>
                   </span>
                 ) : (
                   <span className="stat">
                     <strong>{(r as KingRow).thrones}</strong>
-                    <small>{(r as KingRow).thrones === 1 ? 'throne' : 'thrones'}</small>
+                    <small>
+                      {(r as KingRow).thrones === 1 ? 'throne' : 'thrones'}
+                      {(r as KingRow).aces > 0 ? ` · 🎯 ${(r as KingRow).aces} ${(r as KingRow).aces === 1 ? 'ace' : 'aces'}` : ''}
+                    </small>
                   </span>
                 )}
                 <span className="when">{ago(tab === 'daily' ? (r as DailyRow).finished_at : (r as KingRow).last_win)}</span>

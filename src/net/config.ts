@@ -4,4 +4,4 @@ export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY ?? 'sb_publishable
 export const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/potty`;
 
 export const CLAIM_RADIUS_M = 50;
-export const DWELL_SECONDS = 60;
+export const DWELL_SECONDS = 20;
