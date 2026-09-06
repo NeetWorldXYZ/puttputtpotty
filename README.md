@@ -423,3 +423,22 @@ Setup:
   repo. After changing anything under `src/sim`, `src/solver` or
   `src/generator`, run `npm run build:engine`, commit, and bump the commit
   hash in `server/potty/index.ts` before redeploying.
+
+## Bathroom data and pre-built courses
+
+Map search reads imported OpenStreetMap data first (`osm_places`), and only
+asks the public Overpass mirrors live for areas that have not been imported.
+
+- **Import** (`.github/workflows/osm-import.yml`): weekly, or run it by hand
+  with a region list (`michigan,ohio`) or `usa` for every state. It downloads
+  each state's extract from Geofabrik, filters it with osmium, and loads it
+  with `scripts/osm-import.mjs`. Stale places are removed and the region's
+  bounding box goes into `osm_coverage`.
+- **Pre-build** (`.github/workflows/prebuild.yml`): builds the three holes of
+  every imported bathroom in a region that has none yet, busiest
+  neighbourhoods first, across parallel shards (`scripts/prebuild.mjs`).
+  About 2 s per bathroom; eight shards cover a state in a few hours.
+
+Both need repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+Dry runs need nothing: `node scripts/osm-import.mjs --region x --file f.geojsonseq --dry-run`
+and `node scripts/prebuild.mjs --dry-run`.

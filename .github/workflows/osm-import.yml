@@ -1,0 +1,57 @@
+name: Import OpenStreetMap bathrooms
+
+# Loads bathrooms (and venues with one) for whole US states into the database,
+# so map search never depends on public Overpass mirrors. Weekly, or on demand.
+on:
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: 'Geofabrik region names, comma separated (e.g. michigan,ohio), or "usa" for every state'
+        default: 'usa'
+        required: true
+  schedule:
+    - cron: '0 9 * * 1' # Mondays 09:00 UTC
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      regions: ${{ steps.plan.outputs.regions }}
+    steps:
+      - id: plan
+        run: |
+          USA="alabama alaska arizona arkansas california colorado connecticut delaware district-of-columbia florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada new-hampshire new-jersey new-mexico new-york north-carolina north-dakota ohio oklahoma oregon pennsylvania puerto-rico rhode-island south-carolina south-dakota tennessee texas utah vermont virginia washington west-virginia wisconsin wyoming"
+          IN="${{ github.event.inputs.regions || 'usa' }}"
+          if [ "$IN" = "usa" ]; then LIST="$USA"; else LIST="$(echo "$IN" | tr ',' ' ')"; fi
+          echo "regions=$(echo $LIST | tr ' ' '\n' | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+
+  import:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        region: ${{ fromJson(needs.plan.outputs.regions) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install osmium
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+      - name: Download ${{ matrix.region }}
+        run: curl -fsSL --retry 5 --retry-delay 10 -o region.pbf "https://download.geofabrik.de/north-america/us/${{ matrix.region }}-latest.osm.pbf"
+      - name: Filter and export
+        run: |
+          osmium tags-filter region.pbf $(node scripts/osm-import.mjs --filters) -o filtered.pbf
+          osmium export filtered.pbf -f geojsonseq --add-unique-id=type_id -o places.geojsonseq
+          wc -l places.geojsonseq
+      - name: Import
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/osm-import.mjs --region "${{ matrix.region }}" --file places.geojsonseq
