@@ -3,7 +3,7 @@ file is missing the built-in SVG version shows instead.
 
 - logo.webp        the wordmark with the crowned toilet, transparent background
 - daily-card.webp  the "Today's round" island, transparent background; it is shown
-                   whole inside a 3:2 navy card, so roughly 3:2 art fills it best
+                   whole inside a 16:10 navy card, so roughly 16:10 art fills it best
 
 Keep them under ~300 KB each (1000 px wide is plenty). Export with a real alpha
 channel: a baked-in checkerboard is not transparency.

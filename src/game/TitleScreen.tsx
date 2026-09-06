@@ -21,12 +21,6 @@ const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠',
 const SEASON_EPOCH = Date.UTC(2026, 8, 1);
 const SEASON_MS = 6 * 7 * 24 * 3600 * 1000;
 
-function seasonInfo(): { n: number; daysLeft: number } {
-  const t = Date.now() - SEASON_EPOCH;
-  const n = Math.floor(t / SEASON_MS) + 1;
-  const daysLeft = Math.max(0, Math.ceil((n * SEASON_MS - t) / 86400000));
-  return { n, daysLeft };
-}
 
 function untilTomorrowUtc(): string {
   const s = secondsUntilNextDaily();
@@ -45,6 +39,34 @@ export const ART = {
   logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
   daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
 };
+
+/** Little map illustration for the home card: roads, pins, and a crowned pin when you hold a throne. */
+function MapArt({ mine }: { mine: number }) {
+  return (
+    <svg className="map-art" viewBox="0 0 150 120" aria-hidden="true">
+      <rect x="0" y="0" width="150" height="120" rx="16" fill="#dff8ec" />
+      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#fff" strokeWidth="9" fill="none" />
+      <path d="M20 130 C 30 80, 80 110, 95 70 S 130 50, 155 75" stroke="#fff" strokeWidth="9" fill="none" />
+      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#a9e6c8" strokeWidth="2" strokeDasharray="6 5" fill="none" />
+      <circle cx="95" cy="92" r="10" fill="#9ad1ff" opacity="0.6" />
+      <circle cx="95" cy="92" r="4" fill="#3a8dff" stroke="#fff" strokeWidth="2" />
+      <g transform="translate(38 44)">
+        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
+        <circle cx="0" cy="-12" r="5" fill="#fff" />
+      </g>
+      <g transform="translate(118 62)">
+        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
+        <circle cx="0" cy="-12" r="5" fill="#fff" />
+      </g>
+      <g transform="translate(72 30)">
+        <path d="M0 -22 a15 15 0 1 1 0.01 0 L0 6 Z" fill={mine > 0 ? '#ffd447' : '#1f2a44'} stroke="#1f2a44" strokeWidth="2" />
+        <text x="0" y="-9" textAnchor="middle" fontSize="15">
+          👑
+        </text>
+      </g>
+    </svg>
+  );
+}
 
 /** Resolves to true once the image loads, false if it 404s, null while unknown. */
 function useImage(src: string): boolean | null {
@@ -259,7 +281,6 @@ export function TitleScreen() {
     setPreferredLength(n);
   };
 
-  const season = seasonInfo();
 
   return (
     <div className="title" onPointerDown={wake} onPointerUp={wake} onClick={wake}>
@@ -273,25 +294,45 @@ export function TitleScreen() {
       </div>
       <div className="title-inner home2">
         <header className="home-top">
-          <div className="brand">
-            {logoArt ? (
-              <img className="logo-img" src={ART.logo} alt="Putt Putt Potty" />
-            ) : (
-              <>
-                <Mascot />
-                <div className="logo big">
-                  <span className="logo-top">Putt Putt</span>
-                  <span className="logo-bottom">Potty</span>
-                </div>
-              </>
-            )}
-          </div>
+          <span className="home-icons">
+            <button
+              className="icon-btn"
+              aria-label={muted ? 'Sound off' : 'Sound on'}
+              onClick={() =>
+                go(() => {
+                  const m = !muted;
+                  setMuted(m);
+                  setMutedState(m);
+                  if (m) stopTheme();
+                  else theme();
+                })
+              }
+            >
+              {muted ? '🔇' : '🔊'}
+            </button>
+            <button className="icon-btn" aria-label="How to play" onClick={() => go(() => setHelp(true))}>
+              ❓
+            </button>
+          </span>
           <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
             <Avatar av={avatar} size={26} className="chip-avatar" />
             <span className="player-name">{name ?? 'Set your name'}</span>
             <span className="player-thrones">👑 {thrones ?? '–'}</span>
           </button>
         </header>
+        <div className="brand hero">
+          {logoArt ? (
+            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" />
+          ) : (
+            <>
+              <Mascot />
+              <div className="logo big">
+                <span className="logo-top">Putt Putt</span>
+                <span className="logo-bottom">Potty</span>
+              </div>
+            </>
+          )}
+        </div>
         <div className="tagline">Every bathroom is a course.</div>
 
         <button className={`daily-card${played ? ' played' : ''}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
@@ -303,10 +344,16 @@ export function TitleScreen() {
               <span className="sign-sub">{played ? (dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.') : 'One throne.'}</span>
             </span>
           )}
-          <span className="daily-edition">{edition === 'morning' ? '🌅 Morning course' : '🌇 Evening course'}</span>
+          <span className="cta in-card">{played ? `🏆 Leaderboard · next in ${untilTomorrowUtc()}` : `${edition === 'morning' ? '🌅' : '🌇'}  Play the ${edition} course`}</span>
         </button>
-        <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-          {played ? `🏆 Daily leaderboard · next course in ${untilTomorrowUtc()}` : '▶  Play daily course'}
+        <button className="map-card" onClick={() => go(() => navigate('map'), 'whoosh')}>
+          <span className="mc-text">
+            <span className="mc-kicker">📍 Real bathrooms</span>
+            <strong>Nearby thrones</strong>
+            <small>{nearby ? `${nearby.total} bathrooms · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Three holes each. One throne to win.'}</small>
+            <span className="mc-go">Open the map ›</span>
+          </span>
+          <MapArt mine={nearby?.mine ?? 0} />
         </button>
 
         <div className="duo">
@@ -318,7 +365,7 @@ export function TitleScreen() {
           <div className="tile mint">
             <span className="tile-icon">🎲</span>
             <span className="tile-title">Custom game</span>
-            <span className="tile-sub">Pick 3–27 holes.</span>
+            <span className="tile-sub">Pick your holes.</span>
             <span className="len-chips">
               {COURSE_LENGTHS.map((l) => (
                 <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
@@ -332,37 +379,6 @@ export function TitleScreen() {
           </div>
         </div>
 
-        <button className="row-card" onClick={() => go(() => navigate('map'), 'whoosh')}>
-          <span className="rc-icon">👑</span>
-          <span className="rc-text">
-            <strong>Nearby thrones</strong>
-            <small>{nearby ? `${nearby.total} bathrooms near you · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Find real courses near you.'}</small>
-          </span>
-          <span className="rc-chev">›</span>
-        </button>
-
-        <div className="home-foot">
-          <button
-            className="foot-btn"
-            onClick={() =>
-              go(() => {
-                const m = !muted;
-                setMuted(m);
-                setMutedState(m);
-                if (m) stopTheme();
-                else theme();
-              })
-            }
-          >
-            {muted ? '🔇 Sound off' : '🔊 Sound on'}
-          </button>
-          <button className="foot-btn" onClick={() => go(() => setHelp(true))}>
-            ❓ How to play
-          </button>
-          <span className="foot-season">
-            Season {season.n} · {season.daysLeft}d left
-          </span>
-        </div>
       </div>
       <TabBar active="play" />
 

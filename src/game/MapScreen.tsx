@@ -987,7 +987,7 @@ export function MapScreen() {
         </div>
       )}
 
-      {!selected && <TabBar active="map" />}
+      {!selected && !askName && <TabBar active="map" />}
 
       {askName && (
         <AccountSheet
