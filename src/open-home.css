@@ -45,3 +45,29 @@
 @keyframes home-button-shine{0%,72%{left:-65%}92%,100%{left:140%}}
 @media(hover:hover){.arcade-play:hover,.arcade-modes button:hover{filter:brightness(1.06);transform:translateY(-2px)}}
 @media(prefers-reduced-motion:reduce){.home-throne,.open-home .arcade-green:before,.open-home .arcade-green:after,.arcade-play:after{animation:none}.arcade-play:after{display:none}.arcade-play,.arcade-modes button{transition:none}}
+
+/* Bathroom clubhouse Home: illustrated centerpiece and arcade ticket controls. */
+.title:has(.home-remix) .arcade-backdrop{background:linear-gradient(#07324488,#0b3f3cb8),url('/art/arcade-course.webp') center/cover no-repeat}
+.home-remix.home2{gap:10px;padding-left:20px;padding-right:20px}
+.home-remix .arcade-brand{height:clamp(84px,15dvh,132px)}
+.home-remix .bathroom-green{min-height:104px;flex:1 1 0;margin:0 -8px;isolation:isolate}
+.home-remix .bathroom-green svg{filter:drop-shadow(0 8px 7px #08293666)}
+.home-remix .bathroom-green:before,.home-remix .bathroom-green:after{display:none}
+.home-remix .arcade-daily{padding-top:18px}
+.home-remix .challenge-label{font-family:var(--game-font);font-size:11px;border:2px solid #092b3d;padding:5px 17px 13px;top:0;z-index:1;background:#fdf2d2}
+.home-remix .arcade-play{z-index:2;border-radius:20px;min-height:92px;display:grid;grid-template-columns:48px minmax(0,1fr) 20px;grid-template-rows:auto auto;gap:1px 9px;text-align:left;padding:14px 15px;background:linear-gradient(120deg,#ffeaa0,#ffd039);box-shadow:inset 0 0 0 2px #fff4c9,inset 0 -6px 0 #eeb633,0 6px 0 #08233c;transform:rotate(-1deg)}
+.home-remix .arcade-play strong{font-size:clamp(25px,7.2vw,36px);grid-column:2;grid-row:1;letter-spacing:-.5px;white-space:nowrap}
+.home-remix .arcade-play small{grid-column:2;grid-row:2;font-family:var(--game-font);font-size:11px}
+.daily-ticket-icon{grid-column:1;grid-row:1/3;display:grid;place-items:center;width:46px;height:51px;border-right:2px dashed #b9822b;padding-right:9px}.daily-ticket-icon svg{width:36px;height:40px;color:#ff9b35}
+.daily-ticket-arrow{grid-column:3;grid-row:1/3;font:900 36px system-ui,sans-serif}
+.home-remix .arcade-modes{gap:12px;margin-top:7px}
+.home-remix .arcade-modes button{position:relative;display:flex;flex-direction:column;gap:3px;min-height:127px;justify-content:flex-end;overflow:visible;padding:10px 5px 12px;border-radius:22px;background:linear-gradient(135deg,#6cdb98,#31b577);color:#082c3e;box-shadow:inset 0 0 0 2px #a4edb6,inset 0 -5px 0 #1c9563,0 6px 0 #08233c}
+.home-remix .arcade-modes .arcade-match{background:linear-gradient(135deg,#ffc297,#ff896a);box-shadow:inset 0 0 0 2px #ffe0b5,inset 0 -5px 0 #db6c56,0 6px 0 #08233c}
+.home-remix .arcade-modes span:not(.mode-illustration){font-size:clamp(17px,4.6vw,23px);text-align:center;line-height:1.1}
+.home-remix .arcade-modes small{font:600 10px/1.2 var(--game-font);color:#153f43}
+.home-remix .mode-illustration{position:relative;display:block;height:56px;width:100%;text-align:center}
+.home-remix .mode-illustration>.game-icon{width:60px;height:56px;transform:rotate(-8deg);filter:drop-shadow(0 3px 0 #0b384733)}
+.duel-plungers img{width:66px;height:66px;object-fit:contain;position:absolute;top:-6px;left:calc(50% - 54px);transform:rotate(-17deg)}.duel-plungers img:last-child{left:calc(50% - 10px);transform:scaleX(-1) rotate(-17deg)}
+.home-remix .arcade-custom{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:3px solid #092c3d;background:#fff2d4;color:#123744;text-shadow:none;min-height:44px;border-radius:14px;box-shadow:0 4px 0 #092c3d;font-size:14px;padding:5px 14px;margin-top:4px}.home-remix .arcade-custom .game-icon{width:25px;height:25px;transform:rotate(-10deg)}.home-remix .arcade-custom>span{margin-left:auto;font-size:22px}
+@media(max-height:740px){.home-remix.home2{gap:7px}.home-remix .arcade-brand{height:82px}.home-remix .arcade-play{min-height:78px;padding:10px 12px}.home-remix .arcade-modes button{min-height:108px;padding-bottom:9px}.home-remix .mode-illustration{height:43px}.home-remix .mode-illustration>.game-icon{height:44px}.duel-plungers img{height:55px}.home-remix .arcade-custom{min-height:39px}.home-remix .bathroom-green{min-height:75px}}
+@media(max-width:360px){.home-remix.home2{padding-left:12px;padding-right:12px}.home-remix .arcade-play{grid-template-columns:35px minmax(0,1fr) 15px;gap:1px 6px}.daily-ticket-icon{width:34px;padding-right:5px}.daily-ticket-icon svg{width:28px}.home-remix .arcade-play strong{font-size:24px}.home-remix .arcade-modes small{font-size:9px}}
