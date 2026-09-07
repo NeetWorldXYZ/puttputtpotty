@@ -1,0 +1,33 @@
+/* Approved arcade Home. Artwork decorates; every action remains native UI. */
+.title:has(.open-home){background:#20563b}
+.title:has(.open-home) .title-bg,.title:has(.open-home) .floaters{display:none}
+.arcade-backdrop{position:absolute;inset:0;background:linear-gradient(#06283b25,#06283b30),url('/art/arcade-course.webp') center/cover no-repeat;pointer-events:none}
+.open-home.home2{display:flex;gap:12px;width:100%;max-width:500px;height:100dvh;overflow:hidden;padding:calc(env(safe-area-inset-top,0px) + 12px) 22px calc(env(safe-area-inset-bottom,0px) + 80px)}
+.open-home .home-top{min-height:38px;gap:8px}.open-home .home-icons{gap:5px}
+.open-home .icon-btn{width:36px;height:36px;background:#062039;border:1px solid #85bf9e;border-radius:50%;font-size:18px}
+.open-home .player-chip{background:#062039;border:1px solid #76b39c;border-radius:30px;min-height:36px;padding:6px 10px;font-size:12px;gap:6px}
+.open-home .player-name{max-width:110px}.open-home .player-thrones{white-space:nowrap}
+.arcade-brand{height:clamp(95px,18dvh,155px);display:flex;justify-content:center;flex-shrink:0}.arcade-brand img{width:100%;height:100%;object-fit:contain}
+.open-home .arcade-green{flex:1 1 0;min-height:55px;position:relative}.arcade-green svg{position:absolute;width:100%;height:100%;inset:0;overflow:visible}
+.putt-trail{animation:putt-flow 5s linear infinite}@keyframes putt-flow{to{stroke-dashoffset:-46}}
+.arcade-daily{position:relative;padding-top:21px;flex-shrink:0}
+.challenge-label{position:absolute;top:0;left:50%;transform:translateX(-50%);padding:7px 18px 10px;white-space:nowrap;background:#fff1cc;color:#09233d;border-radius:22px;font:900 12px system-ui,sans-serif;letter-spacing:.4px}
+.arcade-play{position:relative;width:100%;min-height:96px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:4px solid #08233c;border-radius:40px;background:linear-gradient(150deg,#ffe997,#ffce31 65%,#ffc52b);box-shadow:inset 0 0 0 3px #fff0a3,inset 0 -6px 0 #edac23,0 6px 0 #08233c;color:#08233c}
+.arcade-play:before{content:'';position:absolute;left:15px;top:10px;width:55px;height:17px;border-top:4px solid #fff8;border-radius:50%;transform:rotate(-20deg)}
+.arcade-play strong{font-family:Impact,'Arial Narrow',system-ui,sans-serif;font-size:clamp(29px,8.5vw,43px);font-weight:950;line-height:1.12;letter-spacing:-.7px}
+.arcade-play small{font:750 12px system-ui,sans-serif}
+.arcade-modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex-shrink:0;margin-top:3px}
+.arcade-modes button{display:flex;align-items:center;justify-content:center;gap:9px;min-height:82px;border:4px solid #08233c;border-radius:22px;padding:10px 7px;box-shadow:inset 0 0 0 2px #ffffff55,inset 0 -5px 0 #0002,0 5px 0 #08233c;color:#fffbed}
+.arcade-map{background:linear-gradient(140deg,#33d575,#159b4f)}.arcade-match{background:linear-gradient(140deg,#ff9b73,#ff7059)}
+.arcade-modes span{font-family:Impact,'Arial Narrow',system-ui,sans-serif;font-size:clamp(18px,5vw,25px);font-weight:900;line-height:1.05;text-align:left}
+.arcade-modes svg,.arcade-modes .game-icon{width:38px;height:42px;flex-shrink:0}
+.arcade-custom{align-self:center;min-height:44px;padding:6px 12px;background:transparent;border:0;border-bottom:3px solid #58d08a;border-radius:0;color:#fff9dd;font:750 16px system-ui,sans-serif;text-shadow:0 2px 3px #09283c}.arcade-custom span{font-size:24px;margin-left:8px}
+.arcade-play:active,.arcade-modes button:active{transform:translateY(3px)}
+.open-home button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+/* Safe area belongs inside the dock, so map and Home reach the bottom edge. */
+.tabbar{left:0;right:0;bottom:0;transform:none;width:100%;max-width:none;margin:0;height:calc(66px + env(safe-area-inset-bottom,0px));padding:6px max(10px,calc((100vw - 500px)/2)) calc(6px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid #60899a;border-radius:0;background:linear-gradient(#0d2940,#06192c);box-shadow:none}
+.tabbar button{border-radius:0;font:700 10px system-ui,sans-serif}.tabbar button.on{background:transparent;color:#ffd447;box-shadow:inset 0 -3px #ffd447}.map-sheet{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+@media(max-height:700px){.open-home.home2{gap:8px;padding-top:calc(env(safe-area-inset-top,0px) + 6px)}.arcade-brand{height:90px}.arcade-play{min-height:80px}.arcade-modes button{min-height:67px}.arcade-modes span{font-size:20px}.arcade-custom{min-height:38px;font-size:14px}}
+@media(max-width:360px){.open-home.home2{padding-left:12px;padding-right:12px}.arcade-modes{gap:7px}.arcade-modes button{gap:5px}.arcade-modes svg{width:30px}.open-home .player-name{max-width:85px}.arcade-play small{font-size:11px}}
+@media(max-height:500px) and (min-width:600px){.open-home.home2{max-width:900px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:36px 1fr auto auto;gap:8px 18px}.home-top{grid-column:1/-1}.arcade-brand{grid-column:1;grid-row:2;height:100%;min-height:0}.open-home .arcade-green{grid-column:1;grid-row:3/5;min-height:65px}.arcade-daily{grid-column:2;grid-row:2;align-self:end}.arcade-modes{grid-column:2;grid-row:3}.arcade-custom{grid-column:2;grid-row:4;justify-self:center}}
+@media(prefers-reduced-motion:reduce){.putt-trail{animation:none}}
