@@ -5,6 +5,7 @@
 
 import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, SurfaceZone, Wall } from '../sim/types';
 import { compassVector } from '../sim/geometry';
+import { drawSprite } from './sprites';
 import { OUTLINE, type Theme } from './themes';
 import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, polygonCentroid, roundRectPath, roundedPolygonPath, hashString } from './shapes';
 
@@ -37,7 +38,7 @@ export const COLORS = {
   curb: '#ffd60a',
   bumper: '#ffffff',
   bumperCore: '#ffcf48',
-  plunger: '#ff4966',
+  plunger: '#f15450',
   plungerHandle: '#d9a066',
   pipe: '#2ec4b6',
   toilet: '#ffffff',
@@ -413,6 +414,7 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
     }
     case 'post': {
       if (s.kind !== 'circle') return;
+      if (drawSprite(ctx, 'plunger', s.x - 1.64 * s.r, s.y - 2.41 * s.r, 3.85 * s.r, 3.85 * s.r)) return;
       // plunger: rubber cup + handle stub
       dropShadow(ctx, s.x, s.y, s.r, s.r * 0.8);
       ctx.strokeStyle = OUTLINE;
@@ -427,11 +429,19 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
       ctx.stroke();
       circle(ctx, s.x, s.y, s.r);
       chunky(ctx, COLORS.plunger, 0.22);
+      ctx.save();
+      circle(ctx, s.x, s.y, s.r * 0.83);
+      ctx.clip();
+      ellipse(ctx, s.x, s.y + s.r * 0.65, s.r, s.r * 0.45);
+      ctx.fillStyle = '#bd3341';
+      ctx.fill();
+      ctx.restore();
       highlight(ctx, s.x - s.r * 0.35, s.y - s.r * 0.35, s.r * 0.28, s.r * 0.2);
       return;
     }
     case 'bumper': {
       if (s.kind !== 'circle') return;
+      if (drawSprite(ctx, 'paper-roll', s.x - 1.2 * s.r, s.y - 1.225 * s.r, 2.5 * s.r, 2.5 * s.r)) return;
       // toilet-paper roll seen from above
       dropShadow(ctx, s.x, s.y, s.r, s.r * 0.85);
       circle(ctx, s.x, s.y, s.r);
@@ -440,8 +450,13 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
       ctx.lineWidth = 0.12;
       circle(ctx, s.x, s.y, s.r * 0.72);
       ctx.stroke();
+      circle(ctx, s.x, s.y, s.r * 0.54);
+      ctx.stroke();
       circle(ctx, s.x, s.y, s.r * 0.36);
       chunky(ctx, COLORS.bumperCore, 0.14);
+      circle(ctx, s.x, s.y, s.r * 0.2);
+      ctx.fillStyle = '#815d39';
+      ctx.fill();
       // loose sheet
       ctx.beginPath();
       ctx.moveTo(s.x + s.r * 0.95, s.y - s.r * 0.25);
@@ -537,6 +552,18 @@ export function drawTee(ctx: CanvasRenderingContext2D, x: number, y: number, bal
 }
 
 export function drawCup(ctx: CanvasRenderingContext2D, x: number, y: number, cupR: number, flash = 0): void {
+  if (drawSprite(ctx, 'toilet', x - 2.5 * cupR, y - 3.584 * cupR, 5 * cupR, 5.6 * cupR)) {
+    // Keep the exact simulation capture circle readable, independent of painted water.
+    circle(ctx, x, y, cupR);
+    ctx.fillStyle = OUTLINE;
+    ctx.fill();
+    if (flash > 0) {
+      ctx.save(); ctx.globalAlpha = flash;
+      ctx.strokeStyle = COLORS.aim; ctx.lineWidth = 0.22;
+      circle(ctx, x, y, cupR + (1 - flash) * 0.6); ctx.stroke(); ctx.restore();
+    }
+    return;
+  }
   const rx = cupR * 2.1;
   const ry = cupR * 2.5;
   // tank behind (toward -y)
@@ -553,12 +580,39 @@ export function drawCup(ctx: CanvasRenderingContext2D, x: number, y: number, cup
   ctx.fill();
   ellipse(ctx, x, y + 0.15, rx, ry);
   chunky(ctx, COLORS.toilet, 0.22);
+  // Inset cel shading: unchanged outer silhouette and capture radius.
+  ctx.save();
+  ellipse(ctx, x, y + 0.15, rx - 0.12, ry - 0.12);
+  ctx.clip();
+  ellipse(ctx, x + rx * 0.5, y + ry * 0.65, rx, ry * 0.65);
+  ctx.fillStyle = '#c6dce9';
+  ctx.fill();
+  ctx.restore();
   ellipse(ctx, x, y + 0.25, rx * 0.66, ry * 0.7);
   chunky(ctx, flash > 0 ? COLORS.aim : COLORS.toiletWater, 0.14);
+  // Glazed rim highlight leaves the dark capture circle fully visible.
+  ctx.save();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = cupR * 0.2;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 0.15, rx * 0.84, ry * 0.84, 0, Math.PI, Math.PI * 1.65);
+  ctx.stroke();
+  ctx.restore();
   // the actual capture radius: the dark hole
   circle(ctx, x, y, cupR);
   ctx.fillStyle = OUTLINE;
   ctx.fill();
+  // A small gold crown emblem sits on the existing tank, not over the goal.
+  ctx.save();
+  ctx.translate(x, y - ry - cupR * 0.35);
+  ctx.scale(cupR * 0.5, cupR * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(-0.7, 0.25); ctx.lineTo(-0.9, -0.5);
+  ctx.lineTo(-0.3, -0.1); ctx.lineTo(0, -0.75);
+  ctx.lineTo(0.3, -0.1); ctx.lineTo(0.9, -0.5); ctx.lineTo(0.7, 0.25);
+  ctx.closePath();
+  chunky(ctx, '#ffd34c', 0.16);
+  ctx.restore();
   if (flash > 0) {
     ctx.save();
     ctx.globalAlpha = flash;
@@ -846,6 +900,13 @@ export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r:
   dropShadow(ctx, x, y, r * 1.05, r * 0.75);
   circle(ctx, x, y, r);
   chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.12, r * 0.36));
+  ctx.save();
+  circle(ctx, x, y, r * 0.88);
+  ctx.clip();
+  ellipse(ctx, x + r * 0.65, y + r * 0.65, r, r * 0.8);
+  ctx.fillStyle = 'rgba(32,67,99,0.16)';
+  ctx.fill();
+  ctx.restore();
   // Inset dimples add depth without changing the ball's visible radius.
   ctx.save();
   ctx.fillStyle = 'rgba(39,73,109,0.18)';
