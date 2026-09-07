@@ -3205,24 +3205,11 @@ input[type='checkbox'] {
   object-fit: contain;
   background: #1a2440;
 }
-.daily-card .sign.badge {
-  left: 12px;
-  top: auto;
-  bottom: 12px;
-  transform: none;
-  background: rgba(31, 42, 68, 0.92);
-  border-color: #fff;
-  border-radius: 12px;
-  max-width: 60%;
-}
-.daily-card .sign.badge::after {
-  display: none;
-}
 
 /* ---- Smooth home: no outlines, soft depth, buttons do the navigating ---- */
 .home2 .icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(255, 255, 255, 0.1);
@@ -3236,7 +3223,8 @@ input[type='checkbox'] {
   border: none;
   background: rgba(255, 255, 255, 0.1);
   box-shadow: none;
-  padding: 4px 12px 4px 4px;
+  min-height: 44px;
+  padding: 4px 12px 4px 6px;
   border-radius: 999px;
   max-width: 62vw;
   min-width: 0;
@@ -3274,29 +3262,86 @@ input[type='checkbox'] {
   cursor: default;
   overflow: visible;
 }
-.home2 .daily-img {
-  width: 100%;
-  padding: 0;
+.daily-art-wrap {
+  position: relative;
   height: clamp(170px, 25vh, 230px);
+  aspect-ratio: 1000 / 845;
+  max-width: 100%;
+  margin: 0 auto;
+  /* the result board's type is sized off the image height */
+  font-size: calc(clamp(170px, 25vh, 230px) / 22);
+}
+.home2 .daily-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
   aspect-ratio: auto;
   object-fit: contain;
   background: transparent;
   filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
 }
+/* Covers the painted "Today's round" board once the round is played: same spot, same tilt. */
+.result-sign {
+  position: absolute;
+  left: 3%;
+  top: 7.5%;
+  width: 44%;
+  height: 30%;
+  transform: rotate(-9deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15em;
+  text-align: center;
+  line-height: 1.05;
+  color: #fff;
+  font-family: var(--game-font);
+  background: linear-gradient(180deg, #c98f58 0%, #b47c4b 32%, #9f6c40 33%, #b8804e 34%, #ad7546 65%, #94633a 66%, #b17849 67%, #a36f43 100%);
+  border: 0.32em solid #5a3a22;
+  border-radius: 0.6em;
+  box-shadow: 0 0.3em 0 rgba(0, 0, 0, 0.35), inset 0 0.15em 0 rgba(255, 255, 255, 0.18);
+}
+.result-sign::before,
+.result-sign::after {
+  content: '';
+  position: absolute;
+  top: 0.5em;
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: #4a3020;
+  box-shadow: inset 0 0.1em 0 rgba(255, 255, 255, 0.35);
+}
+.result-sign::before {
+  left: 0.6em;
+}
+.result-sign::after {
+  right: 0.6em;
+}
+.result-sign > span {
+  white-space: nowrap;
+}
+.result-sign .sign-top {
+  font-size: 1em;
+  letter-spacing: 0.08em;
+  color: #ffe9c9;
+}
+.result-sign .sign-main {
+  font-size: 3.4em;
+  line-height: 0.95;
+  font-weight: 800;
+  text-shadow: 0 0.06em 0 rgba(0, 0, 0, 0.35);
+}
+.result-sign .sign-sub {
+  font-size: 1.4em;
+  color: #ffe9c9;
+}
 .home2 .daily-art {
   width: auto;
   height: clamp(170px, 25vh, 230px);
   align-self: center;
-}
-.home2 .sign.badge {
-  position: absolute;
-  left: 14px;
-  top: 12px;
-  bottom: auto;
-  border: none;
-  border-radius: 14px;
-  background: rgba(20, 28, 50, 0.85);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 .home2 .cta {
   border: none;
@@ -3349,22 +3394,20 @@ input[type='checkbox'] {
   line-height: 1.1;
 }
 .mrow.feature .mrow-text strong {
-  font-size: 17px;
+  font-size: 16px;
   white-space: nowrap;
 }
 .mrow-text small {
   font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.65);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .mbtn {
   flex: none;
   border: none;
   border-radius: 999px;
-  padding: 9px 14px;
+  min-height: 44px;
+  padding: 10px 14px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
   font-family: var(--game-font);
@@ -3372,25 +3415,26 @@ input[type='checkbox'] {
   font-size: 13px;
 }
 .mbtn.primary {
-  padding: 9px 12px;
+  padding: 10px 11px;
   background: linear-gradient(180deg, #ffe08a, #ffc93c);
   color: var(--ink);
   box-shadow: 0 6px 16px rgba(255, 201, 60, 0.25);
 }
 .mrow .map-art {
-  width: 70px;
-  height: 56px;
+  width: 56px;
+  height: 46px;
   flex: none;
   border-radius: 12px;
 }
 .mrow .len-chips {
   display: flex;
-  gap: 4px;
-  margin-top: 3px;
+  gap: 6px;
+  margin-top: 2px;
 }
 .mrow .len-chips button {
-  min-width: 30px;
-  height: 24px;
+  position: relative;
+  min-width: 40px;
+  height: 44px;
   padding: 0 6px;
   border-radius: 8px;
   border: none;
@@ -3399,6 +3443,12 @@ input[type='checkbox'] {
   font-family: var(--game-font);
   font-weight: 800;
   font-size: 12px;
+}
+/* hit slop so the segments meet the 44px target side to side too */
+.mrow .len-chips button::before {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
 }
 .mrow .len-chips button.active {
   background: #fff;

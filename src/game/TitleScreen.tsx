@@ -12,6 +12,7 @@ import { api } from '../net/api';
 import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
+import { TabBar } from './TabBar';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
 
@@ -333,13 +334,21 @@ export function TitleScreen() {
         <div className="tagline">Every bathroom is a course.</div>
 
         <section className={`daily-card${played ? ' played' : ''}`}>
-          {dailyArt ? <img className="daily-img" src={ART.daily} alt="" draggable={false} /> : <DailyArt played={played} />}
-          {played && (
-            <span className="sign badge">
-              <span className="sign-top">Your round</span>
-              <span className="sign-main">{best !== null ? `You shot ${best}` : 'Played'}</span>
-              <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.'}</span>
-            </span>
+          {dailyArt ? (
+            <div className="daily-art-wrap">
+              <img className="daily-img" src={ART.daily} alt="" draggable={false} />
+              {played && (
+                // The painted sign and the result share one slot: once the round is played,
+                // this board covers the painted one exactly, so only one of them ever shows.
+                <span className="result-sign" role="status">
+                  <span className="sign-top">{best !== null ? 'You shot' : 'Your round'}</span>
+                  <span className="sign-main">{best !== null ? best : 'Played'}</span>
+                  <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board'}</span>
+                </span>
+              )}
+            </div>
+          ) : (
+            <DailyArt played={played} />
           )}
           <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
             {played ? `🏆 Daily leaderboard · next in ${untilTomorrowUtc()}` : `▶  Play the ${edition} course`}
@@ -351,7 +360,7 @@ export function TitleScreen() {
             <MapArt mine={nearby?.mine ?? 0} />
             <div className="mrow-text">
               <strong>Nearby thrones</strong>
-              <small>{nearby ? `${nearby.total} bathrooms · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms, three holes each.'}</small>
+              <small>{nearby ? `${nearby.total} nearby · ${nearby.claimed} claimed` : 'Real bathrooms near you'}</small>
             </div>
             <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
               Open map
@@ -361,7 +370,7 @@ export function TitleScreen() {
             <span className="mrow-icon">🪠</span>
             <div className="mrow-text">
               <strong>Quick match</strong>
-              <small>Same nine holes, live against someone.</small>
+              <small>Same nine holes, live.</small>
             </div>
             <button className="mbtn" onClick={() => go(() => navigate('match'), 'whoosh')}>
               Play
@@ -387,7 +396,7 @@ export function TitleScreen() {
             <span className="mrow-icon">🏆</span>
             <div className="mrow-text">
               <strong>Leaderboards</strong>
-              <small>Today&apos;s round, thrones and kings.</small>
+              <small>Daily, thrones and kings.</small>
             </div>
             <button className="mbtn" onClick={() => go(() => navigate('leaders'), 'tap')}>
               Open
@@ -395,6 +404,7 @@ export function TitleScreen() {
           </div>
         </section>
       </div>
+      <TabBar active="play" />
 
       {askName && (
         <AccountSheet
