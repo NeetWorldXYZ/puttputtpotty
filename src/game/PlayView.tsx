@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Hole, Rect, Stroke } from '../sim/types';
+import type { Hole, Stroke } from '../sim/types';
 import { FIXED_DT, cupRadius, type PhysicsParams } from '../sim/params';
 import { compileHole, type World } from '../sim/world';
 import { applyStroke, createSimState, holeScore, step, totalStrokes, type SimEvent, type SimState, STROKE_CAP } from '../sim/sim';
 import { seedFromString } from '../sim/rng';
-import { drawMinimap, getFloorLayer, type AimOverlay } from '../render/drawHole';
-import { wallLoops } from '../render/region';
-import { PITCH, floorMatrix, followView, unproject, viewRect, type View } from '../render/view';
-import { drawScene } from '../render/scene';
+import { drawHole, drawMinimap, type AimOverlay } from '../render/drawHole';
+import { fitCamera, fitScale, followCamera, type Camera } from '../render/camera';
+import { drawBall } from '../render/objects';
 import { ballLook } from './avatarParts';
 import { getSavedAvatar } from '../net/supabase';
 import { themeById } from '../render/themes';
@@ -65,58 +64,14 @@ interface Drag {
 }
 
 const HUD_TOP = 92;
-const HUD_BOTTOM = 104;
+const HUD_BOTTOM = 48;
 const SIDE_PAD = 8;
+const MIN_FIT_SCALE = 10;
 const CANCEL_POWER = 0.08;
 /** Holding the screen while the ball rolls runs the sim this many times faster. */
 const FAST_FORWARD = 3;
 const MAX_FRAME = 0.1;
 const INTRO_SECONDS = 1.4;
-/** Bounding box of the walled-in floor, or the bounds when the walls do not close. */
-function playRect(hole: Hole): Rect {
-  const r = wallLoops(hole);
-  if (r.fallback) return hole.bounds;
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const loop of r.loops)
-    for (const p of loop) {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
-    }
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-}
-
-/** Camera zoom limits (css px per world unit) and how much floor to leave beside the walls. */
-const MIN_SCALE = 11;
-const MAX_SCALE = 20;
-const PLAY_MARGIN = 1.5;
-/** The camera looks this many px past the ball toward the cup. */
-const LOOK_AHEAD = 40;
-
-/**
- * Direction of a screen drag as seen on the tilted floor: both ends of the
- * drag are dropped onto the floor plane and the pull is reversed (or not).
- * Falls back to the raw screen delta when a point lands above the horizon.
- */
-function dragDirection(view: View | null, d: { startX: number; startY: number; curX: number; curY: number }, invert: boolean): { x: number; y: number } {
-  const sign = invert ? 1 : -1;
-  let dx = d.curX - d.startX;
-  let dy = d.curY - d.startY;
-  if (view) {
-    const a = unproject(view, d.startX, d.startY);
-    const b = unproject(view, d.curX, d.curY);
-    if (a && b) {
-      dx = b.x - a.x;
-      dy = b.y - a.y;
-    }
-  }
-  const len = Math.hypot(dx, dy) || 1;
-  return { x: (dx / len) * sign, y: (dy / len) * sign };
-}
 
 function scoreTerm(strokes: number, par: number, sunk: boolean): string {
   if (!sunk) return 'Stroke cap';
@@ -168,7 +123,6 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
 
   // --- simulation refs (never React state: the loop mutates them at 120Hz)
   const worldRef = useRef<World>(compileHole(hole));
-  const playRectRef = useRef<Rect>(playRect(hole));
   const stateRef = useRef<SimState>(createSimState(hole, seed));
   const prevBallRef = useRef({ x: hole.tee.x, y: hole.tee.y });
   const accRef = useRef(0);
@@ -211,7 +165,6 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     (h: Hole, idx: number) => {
       const sd = seedFromString(h.id);
       worldRef.current = compileHole(h);
-      playRectRef.current = playRect(h);
       stateRef.current = createSimState(h, sd);
       prevBallRef.current = { x: h.tee.x, y: h.tee.y };
       camTargetRef.current = { x: h.tee.x, y: h.tee.y };
@@ -253,9 +206,6 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
 
   // --- canvas + loop
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const floorRef = useRef<HTMLCanvasElement>(null);
-  const floorKeyRef = useRef('');
-  const viewRef = useRef<View | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const sizeRef = useRef({ w: 390, h: 844, dpr: 1 });
   const [, setSizeTick] = useState(0);
@@ -278,19 +228,19 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     return () => ro.disconnect();
   }, []);
 
-  const computeView = useCallback((bx: number, by: number, scaleMul = 1): { view: View; follow: boolean } => {
+  const computeCamera = useCallback((bx: number, by: number, scaleMul = 1): { cam: Camera; follow: boolean } => {
     const { w, h } = sizeRef.current;
     const b = worldRef.current.hole.bounds;
-    const region = { x0: SIDE_PAD, y0: HUD_TOP, w: w - SIDE_PAD * 2, h: h - HUD_TOP - HUD_BOTTOM };
-    // Fill the width with the playable part of the hole; the camera follows the ball down its length.
-    const play = playRectRef.current;
-    const scaleW = region.w / (play.w + PLAY_MARGIN * 2);
-    // Zoom no further than what still shows the whole hole, and never so far out it gets fiddly.
-    const scaleH = region.h / ((play.h + PLAY_MARGIN * 2) * Math.sin(PITCH));
-    const scale = Math.min(MAX_SCALE, Math.min(scaleW, Math.max(scaleH, MIN_SCALE))) * scaleMul;
-    const view = followView(region, b, scale, bx, by - LOOK_AHEAD / scale);
-    const shown = region.h / (scale * Math.sin(view.pitch));
-    return { view, follow: play.h + PLAY_MARGIN * 2 > shown * 1.08 };
+    const viewW = w - SIDE_PAD * 2;
+    const viewH = h - HUD_TOP - HUD_BOTTOM;
+    const fs = fitScale(b, viewW, viewH);
+    if (fs >= MIN_FIT_SCALE && scaleMul === 1) {
+      const cam = fitCamera(b, viewW, viewH);
+      return { cam: { scale: cam.scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + HUD_TOP }, follow: false };
+    }
+    const scale = (fs >= MIN_FIT_SCALE ? fs : Math.max(viewW / b.w, 12)) * scaleMul;
+    const cam = followCamera(b, viewW, viewH, scale, bx, by);
+    return { cam: { scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + HUD_TOP }, follow: fs < MIN_FIT_SCALE };
   }, []);
 
   const handleEvent = useCallback(
@@ -488,26 +438,28 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       const k = Math.min(1, frame * 7);
       ct.x += (bx - ct.x) * k;
       ct.y += (by - ct.y) * k;
-      const base = computeView(ct.x, ct.y);
-      let view = base.view;
+      const base = computeCamera(ct.x, ct.y);
+      let cam = base.cam;
       const it = introRef.current.t;
       if (it < INTRO_SECONDS) {
         const u = easeInOut(Math.min(1, it / INTRO_SECONDS));
-        const zoom = computeView(world.hole.cup.x, world.hole.cup.y, 1.7).view;
-        const mix = (a: number, b: number) => a + (b - a) * u;
-        view = { ...base.view, scale: mix(zoom.scale, base.view.scale), tx: mix(zoom.tx, base.view.tx), ty: mix(zoom.ty, base.view.ty), f: mix(zoom.f, base.view.f) };
+        const zoom = computeCamera(world.hole.cup.x, world.hole.cup.y, 1.7).cam;
+        cam = { scale: zoom.scale + (base.cam.scale - zoom.scale) * u, ox: zoom.ox + (base.cam.ox - zoom.ox) * u, oy: zoom.oy + (base.cam.oy - zoom.oy) * u };
       }
-      viewRef.current = view;
 
       // --- aim overlay
       let aim: AimOverlay | null = null;
       const d = dragRef.current;
       if (d && s.resting && !s.done) {
-        const dist = Math.hypot(d.curX - d.startX, d.curY - d.startY);
+        let dx = d.curX - d.startX;
+        let dy = d.curY - d.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > 0.5) {
           const power = Math.min(1, dist / prefs.maxDragPx);
-          const dir = dragDirection(view, d, prefs.invertDrag);
-          aim = { x: s.ball.x, y: s.ball.y, dx: dir.x, dy: dir.y, power, lengthUnits: prefs.aimLineLength, cancelling: power < CANCEL_POWER };
+          const sign = prefs.invertDrag ? 1 : -1;
+          dx = (dx / dist) * sign;
+          dy = (dy / dist) * sign;
+          aim = { x: s.ball.x, y: s.ball.y, dx, dy, power, lengthUnits: prefs.aimLineLength, cancelling: power < CANCEL_POWER };
         }
       }
 
@@ -517,46 +469,57 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       // --- draw
       const { dpr, w, h } = sizeRef.current;
       const sh = fx.shakeOffset();
-      const sv: View = { ...view, shakeX: sh.x, shakeY: sh.y };
-      const floor = getFloorLayer(world.hole, view.scale * dpr, cupRadius(params), params.ballRadius);
-      const floorEl = floorRef.current;
-      if (floorEl) {
-        if (floorKeyRef.current !== floor.key) {
-          floorKeyRef.current = floor.key;
-          floorEl.width = floor.canvas.width;
-          floorEl.height = floor.canvas.height;
-          floorEl.style.width = `${floor.canvas.width / dpr}px`;
-          floorEl.style.height = `${floor.canvas.height / dpr}px`;
-          floorEl.getContext('2d')?.drawImage(floor.canvas as CanvasImageSource, 0, 0);
-        }
-        floorEl.style.transform = floorMatrix(sv, floor.rect, floor.ppu / dpr);
-      }
+      ctx.setTransform(dpr, 0, 0, dpr, sh.x * dpr, sh.y * dpr);
       const sink = sinkRef.current;
       const showBall = !s.sunk || (sink !== null && sink.t < 0.75);
-      drawScene(ctx, world.hole, sv, {
+      drawHole(ctx, world.hole, cam, {
         ballRadius: params.ballRadius,
         cupRadius: cupRadius(params),
-        dpr,
-        floor,
-        ball: showBall ? { x: bx, y: by } : null,
-        ballStyle: ballStyleRef.current,
-        squash: squashRef.current,
-        sink: showBall && sink && s.sunk ? sink : null,
+        ball: null,
         trail: prefs.showTrail ? trailRef.current : undefined,
         trailOld: prefs.showTrail ? lastTrailRef.current : undefined,
         aim,
         cupFlash: cupFlashRef.current,
         zoneLabels: prefs.showZoneLabels,
+        dpr,
         time: timeRef.current,
         clock: s.clock,
-        fx: (c) => fx.draw(c),
+        extra: (c) => {
+          if (showBall) {
+            if (sink && s.sunk) {
+              // flush spiral into the cup
+              const u = Math.min(1, sink.t / 0.75);
+              const r = (1 - u) * 1.1;
+              const a = u * Math.PI * 5;
+              const scale = 1 - u * 0.85;
+              c.save();
+              c.translate(sink.x + Math.cos(a) * r, sink.y + Math.sin(a) * r * 0.7);
+              c.scale(scale, scale);
+              drawBall(c, 0, 0, params.ballRadius, ballStyleRef.current);
+              c.restore();
+            } else {
+              const sq = squashRef.current;
+              if (sq.amt > 0.02) {
+                const sx = 1 - 0.32 * sq.amt;
+                const sy = 1 + 0.32 * sq.amt;
+                c.save();
+                c.translate(bx, by);
+                c.rotate(sq.ang);
+                c.scale(sx, sy);
+                drawBall(c, 0, 0, params.ballRadius, ballStyleRef.current);
+                c.restore();
+              } else drawBall(c, bx, by, params.ballRadius, ballStyleRef.current);
+            }
+          }
+          fx.draw(c);
+        },
       });
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       if (base.follow) {
         const mmW = 64;
         const mmH = Math.min(180, (mmW * world.hole.bounds.h) / world.hole.bounds.w);
-        drawMinimap(ctx, world.hole, w - mmW - 12, h - mmH - HUD_BOTTOM - 4, mmW, mmH, viewRect(view), s.sunk ? null : { x: bx, y: by });
+        drawMinimap(ctx, world.hole, w - mmW - 12, h - mmH - HUD_BOTTOM - 4, mmW, mmH, { x: -cam.ox / cam.scale, y: -cam.oy / cam.scale, w: w / cam.scale, h: h / cam.scale }, s.sunk ? null : { x: bx, y: by });
       }
 
       // drag origin joystick
@@ -581,7 +544,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [computeView, handleEvent, paramsRef, prefsRef, syncHud]);
+  }, [computeCamera, handleEvent, paramsRef, prefsRef, syncHud]);
 
   // --- low-rate React re-render for power meter/toasts
   const [uiTick, setUiTick] = useState(0);
@@ -628,11 +591,15 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     const s = stateRef.current;
     if (!s.resting || s.done) return;
     const prefs = prefsRef.current;
-    const dist = Math.hypot(d.curX - d.startX, d.curY - d.startY);
+    let dx = d.curX - d.startX;
+    let dy = d.curY - d.startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
     const power = Math.min(1, dist / prefs.maxDragPx);
     if (power < CANCEL_POWER) return;
-    const dir = dragDirection(viewRef.current, d, prefs.invertDrag);
-    const angle = Math.atan2(dir.y, dir.x);
+    const sign = prefs.invertDrag ? 1 : -1;
+    dx *= sign;
+    dy *= sign;
+    const angle = Math.atan2(dy, dx);
     if (applyStroke(s, paramsRef.current, { angle, power })) {
       trailRef.current = [s.ball.x, s.ball.y];
       accRef.current = 0;
@@ -712,8 +679,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
 
   return (
     <div className="play" ref={wrapRef} style={{ background: theme.page }}>
-      <canvas ref={floorRef} className="floor" aria-hidden="true" />
-      <canvas ref={canvasRef} className="scene" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} />
+      <canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel} />
 
       <div className="aim-bar" ref={aimBarRef} data-state="idle" aria-hidden="true">
         <span className="aim-hint">
