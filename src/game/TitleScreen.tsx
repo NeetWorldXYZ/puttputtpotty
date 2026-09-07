@@ -114,6 +114,7 @@ export function TitleScreen() {
   const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
+  const [custom, setCustom] = useState(false);
   const [len, setLen] = useState(getPreferredLength());
   const [tick, setTick] = useState(0);
   const [thrones, setThrones] = useState<number | null>(null);
@@ -263,7 +264,7 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home2">
+      <div className="title-inner home2 compact-home">
         <header className="home-top">
           <div className="home-icons">
             <button
@@ -345,45 +346,25 @@ export function TitleScreen() {
             <div className="kingdom-title"><GameIcon kind="crown" /> YOUR KINGDOM</div>
             <div className="kingdom-stats"><span><b>{thrones ?? '—'}</b>Thrones held</span><span><b>{nearby?.total ?? '—'}</b>Nearby</span><span><b>{nearby?.claimed ?? '—'}</b>Claimed nearby</span></div>
           </div>
-          <div className="mrow">
-            <span className="mrow-icon"><GameIcon kind="flag" /></span>
-            <div className="mrow-text">
-              <strong>Quick match</strong>
-              <small>Same nine holes, live.</small>
-            </div>
-            <button className="mbtn" onClick={() => go(() => navigate('match'), 'whoosh')}>
-              Play
-            </button>
-          </div>
-          <div className="mrow">
-            <span className="mrow-icon"><GameIcon kind="dice" /></span>
-            <div className="mrow-text">
-              <strong>Custom game</strong>
-              <span className="len-chips">
-                {COURSE_LENGTHS.map((l) => (
-                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
-                    {l.label}
-                  </button>
-                ))}
-              </span>
-            </div>
-            <button className="mbtn" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
-              Tee off
-            </button>
-          </div>
-          <div className="mrow">
-            <span className="mrow-icon"><GameIcon kind="trophy" /></span>
-            <div className="mrow-text">
-              <strong>Leaderboards</strong>
-              <small>Daily, thrones and kings.</small>
-            </div>
-            <button className="mbtn" onClick={() => go(() => navigate('leaders'), 'tap')}>
-              Open
-            </button>
-          </div>
+          <button className="custom-launch" onClick={() => go(() => setCustom(true))}>
+            <GameIcon kind="dice" /> Custom game <span>Choose your holes ›</span>
+          </button>
         </section>
       </div>
       <TabBar active="play" />
+      {custom && (
+        <div className="overlay" onClick={() => setCustom(false)}>
+          <div className="card pop custom-sheet" role="dialog" aria-modal="true" aria-label="Custom game" onClick={(e) => e.stopPropagation()}>
+            <h2>Make it your round</h2>
+            <p>How many holes?</p>
+            <div className="custom-lengths">
+              {COURSE_LENGTHS.map((l) => <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-pressed={l.n === len}>{l.label}</button>)}
+            </div>
+            <button className="primary" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>Tee off · {len} holes</button>
+            <button onClick={() => setCustom(false)}>Back to home</button>
+          </div>
+        </div>
+      )}
 
       {askName && (
         <AccountSheet
