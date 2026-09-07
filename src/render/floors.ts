@@ -26,9 +26,16 @@ export function drawFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed
           ctx.fillStyle = alt ? f.a : f.b;
           roundRectPath(ctx, x + g / 2, y + g / 2, s - g, s - g, 0.35);
           ctx.fill();
-          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.fillStyle = 'rgba(255,255,255,0.13)';
           roundRectPath(ctx, x + g / 2 + 0.15, y + g / 2 + 0.15, s - g - 0.3, (s - g) * 0.28, 0.25);
           ctx.fill();
+          ctx.strokeStyle = 'rgba(18,42,65,0.18)';
+          ctx.lineWidth = 0.09;
+          ctx.beginPath();
+          ctx.moveTo(x + g + 0.15, y + s - g - 0.1);
+          ctx.lineTo(x + s - g - 0.1, y + s - g - 0.1);
+          ctx.lineTo(x + s - g - 0.1, y + g + 0.15);
+          ctx.stroke();
         }
       }
       ctx.strokeStyle = f.grout;
