@@ -4,7 +4,7 @@ import { api, fmtElapsed, type DailyRow, type KingRow } from '../net/api';
 import { currentUserId, getSavedName, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { recallFix } from '../net/places';
-import { dailyEdition, dailySeed } from './courses';
+import { dailySeed } from './courses';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
@@ -69,12 +69,8 @@ export function LeaderboardScreen() {
 
   return (
     <div className="leaders">
-      <div className="map-head">
+      <div className="map-head menu-controls-only">
         <MenuVolume />
-        <div className="map-title">
-          <div className="map-title-main">Ranks</div>
-          <div className="map-title-sub">{tab === 'daily' ? `${dailyEdition()} course · ${dailySeed().slice(0, 10)}` : tab === 'nearby' ? 'thrones within 25 km of you' : 'thrones across the whole world'}</div>
-        </div>
         <button className="name-chip menu-golfer" onClick={() => setAskName(true)} title="Change name">
           <Avatar av={getSavedAvatar()} size={24}/><span>{name ?? 'Set name'}</span>
         </button>

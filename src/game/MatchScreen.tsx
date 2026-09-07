@@ -327,12 +327,8 @@ export function MatchScreen({ code, matchId }: Props) {
 
   return (
     <div className="leaders match-screen">
-      <div className="map-head">
+      <div className="map-head menu-controls-only">
         <MenuVolume />
-        <div className="map-title">
-          <div className="map-title-main">Match</div>
-          <div className="map-title-sub">Same course. Settle it on the green.</div>
-        </div>
         <GolferChip />
       </div>
 

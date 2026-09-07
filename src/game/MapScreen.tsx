@@ -282,7 +282,7 @@ export function MapScreen() {
   const [kings, setKings] = useState<Record<string, NearbyLocation>>({});
   const kingsRef = useRef<Record<string, NearbyLocation>>({});
   kingsRef.current = kings;
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [netError, setNetError] = useState<string | null>(null);
   /** 'stale': showing remembered thrones while the server is unreachable; 'empty': nothing to show yet. */
   const [thronesDown, setThronesDown] = useState<'none' | 'stale' | 'empty'>('none');
@@ -369,7 +369,7 @@ export function MapScreen() {
   }, []);
 
   const [osmLoading, setOsmLoading] = useState(false);
-  const [wide, setWide] = useState(false);
+  const [, setWide] = useState(false);
 
   /** Adds places to the pin set, dropping the farthest from the search centre past the cap. */
   const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
@@ -745,30 +745,13 @@ export function MapScreen() {
   const difficultyLabel = difficulty === 'easy' ? 'Easy' : difficulty === 'hard' ? 'Hard' : 'Medium';
   const coursePar = preview && selected && preview.id === selected.id ? preview.par : (king?.par ?? null);
   const myBest = board && selected && board.id === selected.id ? (board.rows.find((r) => r.user_id === me)?.score ?? null) : null;
-  const claimedCount = Object.values(kings).filter((k) => k.king_name).length;
 
   return (
     <div className={`map-screen ${zoomClass}`}>
       <div ref={mapEl} className="map-canvas" />
 
-      <div className="map-head">
+      <div className="map-head menu-controls-only">
         <MenuVolume />
-        <div className="map-title">
-          <div className="map-title-main">Nearby thrones</div>
-          <div className="map-title-sub">
-            {!fix && !geoError
-              ? 'finding you…'
-              : geoError && !places.length
-                ? 'no location'
-                : osmLoading
-                  ? `${wide ? 'widening the search' : 'searching OpenStreetMap'}… ${places.length ? `${places.length} so far` : ''}`
-                  : loading
-                    ? `${places.length} bathrooms · loading thrones…`
-                    : places.length
-                      ? `${places.length} bathrooms · ${claimedCount} claimed`
-                      : 'no bathrooms found here'}
-          </div>
-        </div>
         <button className="name-chip menu-golfer" onClick={() => setAskName(true)} title="Your account">
           <Avatar av={getSavedAvatar()} size={22} className="chip-avatar" />
           {name ?? 'Set name'}

@@ -9,9 +9,6 @@ import { Avatar } from './Avatar';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 
-function since(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-}
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
@@ -49,12 +46,8 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
   const mine = !!id && id === me;
   return (
     <div className="leaders profile">
-      <div className="map-head">
+      <div className="map-head menu-controls-only">
         <MenuVolume />
-        <div className="map-title">
-          <div className="map-title-main">{p?.name ?? 'Player'}</div>
-          <div className="map-title-sub">{p ? `playing since ${since(p.since)}` : ''}</div>
-        </div>
         <GolferChip />
       </div>
 
