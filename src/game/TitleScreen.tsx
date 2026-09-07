@@ -13,7 +13,6 @@ import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net
 import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { TabBar } from './TabBar';
-import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
 
@@ -28,40 +27,11 @@ function untilTomorrowUtc(): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function Mascot() {
-  return <svg className="mascot" viewBox={MASCOT_VIEWBOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MASCOT_BODY }} />;
-}
-
-
-/** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
-export const ART = {
-  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
-  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/home-island-v2.webp`,
-};
-
-/** Resolves to true once the image loads, false if missing, null while unknown. */
-function useImage(src: string): boolean | null {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    let live = true;
-    const img = new Image();
-    img.onload = () => live && setOk(true);
-    img.onerror = () => live && setOk(false);
-    img.src = src;
-    return () => {
-      live = false;
-    };
-  }, [src]);
-  return ok;
-}
-
 export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
   const [avatar] = useState(getSavedAvatar());
-  const logoArt = useImage(ART.logo) === true;
-  const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
   const [custom, setCustom] = useState(false);
@@ -214,6 +184,20 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
+      <div className="course-atmosphere" aria-hidden="true">
+        <svg className="course-backdrop" viewBox="0 0 600 900" preserveAspectRatio="xMidYMid slice">
+          <g fill="#65c68e" stroke="#b8f1bd" strokeWidth="2">
+            <path d="M-50 150C20 25 190 50 180 155S80 220 115 330S-65 380-50 150Z" />
+            <path d="M415 70C535 5 665 100 580 195S505 390 405 330S525 195 415 70Z" />
+            <path d="M55 565C-10 435 190 370 225 500S115 610 215 745S-40 785 55 565Z" />
+            <path d="M480 540C620 425 705 670 555 695S545 940 385 830S395 665 480 540Z" />
+          </g>
+          <path d="M-30 450C215 295 275 115 355-30M140 960C360 710 210 525 400 435S620 450 670 340" fill="none" stroke="#fff1bc" strokeWidth="17" />
+          <path d="M-30 450C215 295 275 115 355-30M140 960C360 710 210 525 400 435S620 450 670 340" fill="none" stroke="#408e77" strokeWidth="2" strokeDasharray="8 10" />
+          <path d="M240 235C295 155 365 225 320 300S245 360 240 235Z" fill="#67daee" stroke="#c1f9ee" strokeWidth="3" />
+          <g fill="none" stroke="#fff4bd" strokeWidth="3" strokeLinecap="round"><path d="M80 145v-45l28 10-28 10M475 235v-45l28 10-28 10M125 560v-45l28 10-28 10M490 760v-45l28 10-28 10" /></g>
+        </svg>
+      </div>
       <div className="title-inner home2 compact-home open-home">
         <header className="home-top">
           <div className="home-icons">
@@ -242,30 +226,16 @@ export function TitleScreen() {
             <span className="player-thrones">👑 {thrones ?? '–'}</span>
           </button>
         </header>
-        <div className="brand hero">
-          {logoArt ? (
-            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" draggable={false} />
-          ) : (
-            <>
-              <Mascot />
-              <div className="logo big">
-                <span className="logo-top">Putt Putt</span>
-                <span className="logo-bottom">Potty</span>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="open-hero" aria-label="A putting island with one crowned toilet goal">
-          {dailyArt ? <img src={ART.daily} alt="A floating putting green with a golf ball and one crowned toilet goal" draggable={false} /> : <Mascot />}
-        </div>
-        <div className="home-intro"><h1>Your next great putt.</h1><p>Play a round. Rule a throne.</p></div>
+        <div className="club-brand"><span>PUTT PUTT <b>POTTY</b></span><GameIcon kind="crown" /></div>
+        <section className="daily-feature" aria-label="Daily challenge">
+          <div className="feature-eyebrow"><span>THE DAILY NINE</span><span>{played ? 'ROUND COMPLETE' : 'NEW EVERY DAY'}</span></div>
+          <h1>{played ? <>That's a wrap.</> : <>Small putts.<br /><em>Big throne energy.</em></>}</h1>
+          <p>{played ? 'Your round is in. See where you stand.' : 'Nine holes. One daily challenge. Make it count.'}</p>
+          <div className="feature-score"><span>{best !== null ? <><b>{best}</b> YOUR STROKES</> : <><b>09</b> HOLES</>}</span><GameIcon kind={played ? 'trophy' : 'flag'} /></div>
+          <button className="daily-play" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}><span>{played ? 'See daily results' : 'Play daily round'}</span><span aria-hidden="true">↗</span></button>
+          <small className="feature-reset">{edition} course · Next round in {untilTomorrowUtc()}</small>
+        </section>
         <section className="home-actions" aria-label="Choose how to play">
-          <button className="action-tile daily-action" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            <GameIcon kind={played ? 'trophy' : 'flag'} />
-            <strong>{played ? 'Daily results' : 'Daily round'}</strong>
-            <small>{played ? 'View leaderboard' : `The ${edition} course`}</small>
-            <span className="tile-arrow" aria-hidden="true">↗</span>
-          </button>
           <button className="action-tile map-action" onClick={() => go(() => navigate('map'), 'whoosh')}>
             <GameIcon kind="map" /><strong>Throne map</strong>
             <small>{nearby ? `${nearby.total} bathrooms nearby` : 'Find your next throne'}</small>
@@ -277,8 +247,8 @@ export function TitleScreen() {
           <span>{best !== null ? <><b>{best}</b> daily strokes</> : dailyRank ? <><b>#{dailyRank.rank}</b> daily rank</> : <>Next daily <b>{untilTomorrowUtc()}</b></>}</span>
         </div>
         <div className="home-secondary">
-          <button onClick={() => go(() => setCustom(true))}><GameIcon kind="dice" /> Custom game</button>
-          <button onClick={() => go(() => navigate('match'), 'whoosh')}><GameIcon kind="flag" /> Quick match</button>
+          <button onClick={() => go(() => setCustom(true))}><GameIcon kind="dice" /><span>Custom game<small>Your round, your length</small></span></button>
+          <button onClick={() => go(() => navigate('match'), 'whoosh')}><GameIcon kind="flag" /><span>Quick match<small>Go head to head</small></span></button>
         </div>
       </div>
       <TabBar active="play" />
