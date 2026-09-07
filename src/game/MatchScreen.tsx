@@ -258,7 +258,7 @@ export function MatchScreen({ code, matchId }: Props) {
   const share = async () => {
     if (!match?.code) return;
     const url = `${location.origin}/match?code=${match.code}`;
-    const text = `Play me at Putt Putt Potty. Same three holes, fewest strokes wins. Code ${match.code}`;
+    const text = `Play me at Putt Putt Potty. Same ${match.holes || 9} holes, fewest strokes wins. Code ${match.code}`;
     try {
       if (navigator.share) await navigator.share({ title: 'Putt Putt Potty match', text, url });
       else await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -306,7 +306,7 @@ export function MatchScreen({ code, matchId }: Props) {
         )}
         scorecardExtra={
           <div className="match-result">
-            {error && <div className="err">{error}</div>}
+            {error && <div className="err" role="alert">{error}</div>}
             {!mine && !error && <div className="sub">Submitting your round…</div>}
             {mine && match.status !== 'done' && (
               <div className="sub">
@@ -329,69 +329,58 @@ export function MatchScreen({ code, matchId }: Props) {
           ⌂
         </button>
         <div className="map-title">
-          <div className="map-title-main">Quick match</div>
-          <div className="map-title-sub">same three holes · fewest strokes · ties go to the faster round</div>
+          <div className="map-title-main">Match</div>
+          <div className="map-title-sub">Same course. Settle it on the green.</div>
         </div>
       </div>
 
       <div className="board match-board">
-        {error && <div className="err">{error}</div>}
+        {error && <div className="err" role="alert">{error}</div>}
 
         {phase === 'lobby' && (
           <>
-            <button className="play-btn thrones" disabled={busy} onClick={() => void start(() => api.findMatch())}>
-              <span className="pb-icon">🎯</span>
-              <span className="pb-text">
-                <span className="pb-title">Find an opponent</span>
-                <span className="pb-sub">Nine holes against whoever's waiting.</span>
-              </span>
-              <span className="pb-go">Go</span>
-            </button>
-            <div className="play-btn daily">
-              <span className="pb-icon">💌</span>
-              <span className="pb-text">
-                <span className="pb-title">Invite a friend</span>
-                <span className="pb-sub">Get a code or a link to send. Pick the length.</span>
-                <span className="len-chips">
-                  {INVITE_LENGTHS.map((n) => (
-                    <button key={n} className={n === inviteLen ? 'active' : ''} onClick={() => setInviteLen(n)}>
-                      {n}
-                    </button>
-                  ))}
-                  <span className="len-word">holes</span>
-                </span>
-              </span>
-              <button className="pb-go" disabled={busy} onClick={() => void start(() => api.createInvite(inviteLen))}>
-                Invite
+            <section className="match-hero">
+              <div className="match-eyebrow">BRAGGING RIGHTS AWAIT</div>
+              <div className="match-duel" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt="" /><b>VS</b><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt="" /></div>
+              <h1>PUTT UP.</h1>
+              <p>Same holes. Fewest strokes wins.<br />Tied score? The faster round takes it.</p>
+              <button className="match-find" disabled={busy} onClick={() => void start(() => api.findMatch())}>
+                {busy ? 'Connecting…' : 'Find an opponent'} <span aria-hidden="true">→</span>
               </button>
-            </div>
-            <div className="play-btn custom">
-              <span className="pb-icon">🔑</span>
-              <span className="pb-text">
-                <span className="pb-title">Enter a code</span>
-                <input className="code-input" maxLength={6} placeholder="ABCDEF" value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase())} />
-              </span>
-              <button className="pb-go" disabled={codeInput.trim().length < 6 || busy} onClick={() => void start(() => api.joinInvite(codeInput.trim()))}>
-                Join
-              </button>
-            </div>
+              <small>Nine holes · matched with another player</small>
+            </section>
+            <section className="friend-card" aria-labelledby="friend-title">
+              <div className="match-section-heading"><span className="match-section-icon" aria-hidden="true">⚑</span><div><h2 id="friend-title">Play a friend</h2><p>Pick your round, then share the invite.</p></div></div>
+              <div className="friend-controls">
+                <div className="len-chips" aria-label="Invite round length">
+                  {INVITE_LENGTHS.map(n => <button key={n} aria-pressed={n === inviteLen} disabled={busy} className={n === inviteLen ? 'active' : ''} onClick={() => setInviteLen(n)}>{n}<small>holes</small></button>)}
+                </div>
+                <button className="invite-create" disabled={busy} onClick={() => void start(() => api.createInvite(inviteLen))}>Create invite</button>
+              </div>
+            </section>
+            <form className="join-card" onSubmit={e => { e.preventDefault(); if (codeInput.trim().length === 6 && !busy) void start(() => api.joinInvite(codeInput.trim())); }}>
+              <label htmlFor="match-code">Already have an invite?</label>
+              <div><input id="match-code" className="code-input" maxLength={6} minLength={6} required autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder="6-character code" value={codeInput} onChange={e => setCodeInput(e.target.value.toUpperCase().replace(/\s/g, ''))} />
+              <button type="submit" disabled={codeInput.trim().length !== 6 || busy}>Join →</button></div>
+            </form>
           </>
         )}
 
         {phase === 'waiting' && match && (
           <div className="waiting">
-            <div className="spinner">⛳</div>
+            <div className="match-search-orbit" aria-hidden="true">⛳</div>
+            <h2>{match.code ? "Your friend’s seat is ready" : "Finding your matchup"}</h2>
             {match.code ? (
               <>
                 <div className="sub">Your invite code</div>
                 <div className="big-code">{match.code}</div>
                 <button className="primary" onClick={() => void share()}>
-                  {shared ? 'Sent!' : 'Share the link'}
+                  {shared ? 'Share again' : 'Share invite'}
                 </button>
                 <div className="sub">{match.holes} holes · waiting for your friend to join…</div>
               </>
             ) : (
-              <div className="sub">Looking for an opponent…</div>
+              <div className="sub" role="status">Waiting for another player to join.<br />Your round starts when you’re paired.</div>
             )}
             <button onClick={() => void cancel()}>Cancel</button>
           </div>
@@ -399,7 +388,9 @@ export function MatchScreen({ code, matchId }: Props) {
 
         {phase === 'loading' && (
           <div className="waiting">
-            <div className="spinner">🚽</div>
+            <div className="match-search-orbit" aria-hidden="true">⛳</div>
+            <h2>Getting the course ready</h2>
+            {building > 0 && <progress aria-label="Course loading progress" value={building} max={match?.holes || 9} />}
             <div className="sub">{building ? `Laying out hole ${building} of ${match?.holes ?? 9}…` : 'Opening the match…'}</div>
           </div>
         )}
