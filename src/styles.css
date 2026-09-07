@@ -104,6 +104,24 @@ input[type='checkbox'] {
   display: block;
   touch-action: none;
 }
+/* The floor bitmap: laid onto the tilted plane by a CSS 3D transform, under the scene canvas. */
+.play canvas.floor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  flex: none;
+  width: auto;
+  height: auto;
+  transform-origin: 0 0;
+  pointer-events: none;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.play canvas.scene {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
 .hud {
   position: absolute;
   top: 0;
