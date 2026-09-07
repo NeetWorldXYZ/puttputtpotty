@@ -3,13 +3,12 @@
  * always reads as that hazard. World units.
  */
 
-import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, Wall } from '../sim/types';
+import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, SurfaceZone, Wall } from '../sim/types';
 import { compassVector } from '../sim/geometry';
 import { drawSprite } from './sprites';
-import { detailedSurface, detailedHazard, solidDetail, goalCrown, portal, rubberHead, screw } from './gameplayDetails';
-import { finishMaterial } from './materials';
+import { finishMaterial, type Material } from './materials';
 import { OUTLINE, type Theme } from './themes';
-import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, roundRectPath, roundedPolygonPath, hashString } from './shapes';
+import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, polygonCentroid, roundRectPath, roundedPolygonPath, hashString } from './shapes';
 
 export const COLORS = {
   ball: '#ffffff',
@@ -56,7 +55,114 @@ function shapeRadius(poly: Polygon): number {
   return Math.min(0.9, Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.18);
 }
 
-export const drawSurfaceZone = detailedSurface;
+export function drawSurfaceZone(ctx: CanvasRenderingContext2D, z: SurfaceZone, seed: number): void {
+  paintSurfaceZone(ctx, z, seed);
+  const b = bbox(z.polygon);
+  ctx.save(); roundedPolygonPath(ctx, z.polygon, shapeRadius(z.polygon)); ctx.clip();
+  const material: Material = z.surfaceType === 'tile' ? 'ceramic' : z.surfaceType === 'wet' ? 'water' : z.surfaceType === 'sand' ? 'stone' : z.surfaceType === 'shag' ? 'fabric' : 'rubber';
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, material, seed);
+  ctx.restore();
+}
+
+function paintSurfaceZone(ctx: CanvasRenderingContext2D, z: SurfaceZone, seed: number): void {
+  const poly = z.polygon;
+  const rand = makeRand(seed);
+  const b = bbox(poly);
+  roundedPolygonPath(ctx, poly, shapeRadius(poly));
+  ctx.save();
+  switch (z.surfaceType) {
+    case 'tile':
+      chunky(ctx, COLORS.tile, 0.16);
+      ctx.clip();
+      ctx.strokeStyle = COLORS.tileLight;
+      ctx.lineWidth = 0.14;
+      ctx.beginPath();
+      for (let x = Math.floor(b.minX); x <= b.maxX; x += 2) {
+        ctx.moveTo(x, b.minY);
+        ctx.lineTo(x, b.maxY);
+      }
+      for (let y = Math.floor(b.minY); y <= b.maxY; y += 2) {
+        ctx.moveTo(b.minX, y);
+        ctx.lineTo(b.maxX, y);
+      }
+      ctx.stroke();
+      break;
+    case 'shag':
+      chunky(ctx, COLORS.shag, 0.16);
+      ctx.clip();
+      ctx.fillStyle = COLORS.shagDark;
+      for (let i = 0; i < ((b.maxX - b.minX) * (b.maxY - b.minY)) / 1.3; i++) {
+        circle(ctx, b.minX + rand() * (b.maxX - b.minX), b.minY + rand() * (b.maxY - b.minY), 0.14 + rand() * 0.1);
+        ctx.fill();
+      }
+      break;
+    case 'wet':
+      chunky(ctx, COLORS.wet, 0.16);
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.7;
+      for (let i = 0; i < 3; i++) ellipse(ctx, b.minX + (0.2 + 0.3 * i) * (b.maxX - b.minX), b.minY + (0.25 + 0.25 * i) * (b.maxY - b.minY), 0.9, 0.28), ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    case 'sand':
+      chunky(ctx, COLORS.sand, 0.16);
+      ctx.clip();
+      ctx.fillStyle = COLORS.sandDot;
+      for (let i = 0; i < ((b.maxX - b.minX) * (b.maxY - b.minY)) / 1.6; i++) {
+        circle(ctx, b.minX + rand() * (b.maxX - b.minX), b.minY + rand() * (b.maxY - b.minY), 0.1 + rand() * 0.12);
+        ctx.fill();
+      }
+      break;
+    case 'sticky':
+      chunky(ctx, COLORS.gum, 0.18);
+      ctx.clip();
+      ctx.fillStyle = COLORS.gumLight;
+      for (let i = 0; i < 4; i++) {
+        ellipse(ctx, b.minX + rand() * (b.maxX - b.minX), b.minY + rand() * (b.maxY - b.minY), 0.45, 0.3);
+        ctx.fill();
+      }
+      break;
+    default:
+      ctx.restore();
+      return;
+  }
+  ctx.restore();
+  // Icon: wet-floor cone / gum blob mark so the meaning reads at a glance.
+  const c = polygonCentroid(poly);
+  const s = Math.min(1.2, Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.22);
+  if (z.surfaceType === 'wet') drawConeIcon(ctx, c.x, c.y, s);
+  if (z.surfaceType === 'sticky') drawStickyIcon(ctx, c.x, c.y, s);
+}
+
+function drawConeIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.beginPath();
+  ctx.moveTo(0, -1.2);
+  ctx.lineTo(0.8, 0.8);
+  ctx.lineTo(-0.8, 0.8);
+  ctx.closePath();
+  chunky(ctx, '#ffd60a', 0.14);
+  ctx.fillStyle = OUTLINE;
+  ctx.fillRect(-0.45, -0.2, 0.9, 0.3);
+  ctx.restore();
+}
+
+function drawStickyIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.16;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-0.9, 0.6);
+  ctx.quadraticCurveTo(-0.6, -0.9, 0, 0.2);
+  ctx.quadraticCurveTo(0.6, -0.9, 0.9, 0.6);
+  ctx.stroke();
+  ctx.restore();
+}
 
 export function drawSlopeZone(ctx: CanvasRenderingContext2D, z: SlopeZone): void {
   const v = compassVector(z.direction);
@@ -69,8 +175,8 @@ export function drawSlopeZone(ctx: CanvasRenderingContext2D, z: SlopeZone): void
   ctx.fillStyle = OUTLINE;
   ctx.fill();
   ctx.globalAlpha = 1;
-  const spacing = 4.4;
-  const size = 0.65 + z.grade * 0.2;
+  const spacing = 3.2;
+  const size = 0.8 + z.grade * 0.25;
   const px = -v.y;
   const py = v.x;
   ctx.lineCap = 'round';
@@ -96,7 +202,154 @@ export function drawSlopeZone(ctx: CanvasRenderingContext2D, z: SlopeZone): void
   ctx.restore();
 }
 
-export const drawHazard = detailedHazard;
+export function drawHazard(ctx: CanvasRenderingContext2D, h: Hazard, seed: number): void {
+  paintHazard(ctx, h, seed);
+  const b = bbox(h.polygon);
+  ctx.save(); roundedPolygonPath(ctx, h.polygon, Math.min(1.4, shapeRadius(h.polygon) * 2)); ctx.clip();
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, h.type === 'water' || h.type === 'overflow' ? 'water' : h.type === 'drain' ? 'metal' : 'rubber', seed);
+  ctx.restore();
+}
+
+function paintHazard(ctx: CanvasRenderingContext2D, h: Hazard, seed: number): void {
+  const poly = h.polygon;
+  const b = bbox(poly);
+  const c = polygonCentroid(poly);
+  const rand = makeRand(seed);
+  const iconS = Math.max(0.9, Math.min(1.6, Math.min(b.maxX - b.minX, b.maxY - b.minY) * 0.22));
+  roundedPolygonPath(ctx, poly, Math.min(1.4, shapeRadius(poly) * 2));
+  ctx.save();
+  switch (h.type) {
+    case 'water':
+      chunky(ctx, COLORS.water, 0.24);
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.85;
+      ellipse(ctx, b.minX + (b.maxX - b.minX) * 0.32, b.minY + (b.maxY - b.minY) * 0.3, Math.min(1.6, (b.maxX - b.minX) * 0.2), 0.45);
+      ctx.fill();
+      ctx.globalAlpha = 0.6;
+      ellipse(ctx, b.minX + (b.maxX - b.minX) * 0.7, b.minY + (b.maxY - b.minY) * 0.68, 0.8, 0.28);
+      ctx.fill();
+      ctx.restore();
+      drawDropletIcon(ctx, c.x, c.y, iconS);
+      return;
+    case 'drain':
+      chunky(ctx, COLORS.drain, 0.24);
+      ctx.clip();
+      ctx.fillStyle = COLORS.drainDark;
+      roundedPolygonPath(ctx, poly, Math.min(1.4, shapeRadius(poly) * 2));
+      ctx.save();
+      ctx.translate(0.35, 0.35);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#152b3a';
+      for (let y = b.minY + 0.9; y < b.maxY - 0.5; y += 0.9) {
+        roundRectPath(ctx, b.minX + 0.8, y, b.maxX - b.minX - 1.6, 0.4, 0.2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = '#b9d2dc';
+      ctx.lineWidth = 0.08;
+      for (let y = b.minY + 0.9; y < b.maxY - 0.5; y += 0.9) {
+        ctx.beginPath(); ctx.moveTo(b.minX + 1, y); ctx.lineTo(b.maxX - 1, y); ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    case 'pit':
+      chunky(ctx, COLORS.pit, 0.24);
+      ctx.clip();
+      ctx.strokeStyle = COLORS.pitRim;
+      ctx.lineWidth = 0.5;
+      roundedPolygonPath(ctx, poly, Math.min(1.4, shapeRadius(poly) * 2));
+      ctx.save();
+      ctx.translate(0, 0.25);
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      drawPitIcon(ctx, c.x, c.y, iconS);
+      return;
+    case 'overflow':
+      chunky(ctx, COLORS.overflow, 0.24);
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.7;
+      for (let i = 0; i < 6; i++) {
+        circle(ctx, b.minX + rand() * (b.maxX - b.minX), b.minY + rand() * (b.maxY - b.minY), 0.22 + rand() * 0.25);
+        ctx.fill();
+      }
+      ctx.restore();
+      drawWaveIcon(ctx, c.x, c.y, iconS);
+      return;
+    case 'outOfBounds':
+      chunky(ctx, COLORS.oob, 0.24);
+      ctx.clip();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      for (let d = b.minX - (b.maxY - b.minY); d < b.maxX; d += 1.8) {
+        ctx.moveTo(d, b.minY);
+        ctx.lineTo(d + (b.maxY - b.minY), b.maxY);
+      }
+      ctx.stroke();
+      ctx.restore();
+      return;
+  }
+  ctx.restore();
+}
+
+function drawDropletIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.beginPath();
+  ctx.moveTo(0, -1.1);
+  ctx.quadraticCurveTo(0.95, 0.15, 0, 0.85);
+  ctx.quadraticCurveTo(-0.95, 0.15, 0, -1.1);
+  chunky(ctx, COLORS.waterLight, 0.16);
+  highlight(ctx, -0.25, -0.15, 0.16, 0.3);
+  ctx.restore();
+}
+
+function drawPitIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ellipse(ctx, 0, 0, 1.1, 0.7);
+  chunky(ctx, '#000000', 0.16, COLORS.pitRim);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 0.14;
+  ctx.beginPath();
+  ctx.moveTo(-0.6, -0.5);
+  ctx.lineTo(0.6, -0.5);
+  ctx.moveTo(-0.9, -0.2);
+  ctx.lineTo(0.9, -0.2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWaveIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(s, s);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.34;
+  ctx.lineCap = 'round';
+  for (let k = -1; k <= 1; k += 2) {
+    ctx.beginPath();
+    ctx.moveTo(-1.1, k * 0.35);
+    ctx.quadraticCurveTo(-0.55, k * 0.35 - 0.6, 0, k * 0.35);
+    ctx.quadraticCurveTo(0.55, k * 0.35 + 0.6, 1.1, k * 0.35);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 0.16;
+  for (let k = -1; k <= 1; k += 2) {
+    ctx.beginPath();
+    ctx.moveTo(-1.1, k * 0.35);
+    ctx.quadraticCurveTo(-0.55, k * 0.35 - 0.6, 0, k * 0.35);
+    ctx.quadraticCurveTo(0.55, k * 0.35 + 0.6, 1.1, k * 0.35);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 
 // ---------------------------------------------------------------------------
 // Obstacles
@@ -117,13 +370,22 @@ function shapeShadow(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void 
   ctx.restore();
 }
 
+/** Raised block: a darker side face below the top face. */
+function shapeSide(ctx: CanvasRenderingContext2D, s: Obstacle['shape'], color: string): void {
+  ctx.save();
+  ctx.translate(0, 0.55);
+  shapePath(ctx, s);
+  chunky(ctx, color, 0.24);
+  ctx.restore();
+}
+
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number): void {
   paintObstacle(ctx, o, seed);
   if (o.type === 'post' || o.type === 'bumper' || o.type === 'pipe') return;
   const s = o.shape;
   const b = s.kind === 'rect' ? {minX:s.x,minY:s.y,maxX:s.x+s.w,maxY:s.y+s.h} : s.kind === 'circle' ? {minX:s.x-s.r,minY:s.y-s.r,maxX:s.x+s.r,maxY:s.y+s.r} : bbox(s.points);
   ctx.save(); shapePath(ctx, s); ctx.clip();
-  solidDetail(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, o.type, seed, s.kind === 'rect');
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, o.type === 'blocker' ? 'ceramic' : 'rubber', seed);
   // Inset trim makes the full obstacle extent readable without moving its face.
   shapePath(ctx, s);ctx.strokeStyle='#ffffff50';ctx.lineWidth=0.3;ctx.stroke();
   ctx.restore();
@@ -134,6 +396,7 @@ function paintObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number)
   switch (o.type) {
     case 'blocker': {
       shapeShadow(ctx, s);
+      shapeSide(ctx, s, COLORS.blockerShade);
       shapePath(ctx, s);
       chunky(ctx, COLORS.blocker, 0.24);
       // top highlight band
@@ -150,6 +413,7 @@ function paintObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number)
     }
     case 'deadWall': {
       shapeShadow(ctx, s);
+      shapeSide(ctx, s, COLORS.deadWallDot);
       shapePath(ctx, s);
       chunky(ctx, COLORS.deadWall, 0.24);
       ctx.save();
@@ -250,7 +514,6 @@ function paintObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number)
       circle(ctx, s.x, s.y, s.r * 0.62);
       ctx.fillStyle = OUTLINE;
       ctx.fill();
-      portal(ctx,s.x,s.y,s.r);
       const ex = o.exit.x;
       const ey = o.exit.y;
       ctx.save();
@@ -268,7 +531,6 @@ function paintObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number)
       circle(ctx, ex, ey, 0.5);
       ctx.fillStyle = OUTLINE;
       ctx.fill();
-      portal(ctx,ex,ey,.95);
       const a = o.mode === 'redirect' ? (o.exitAngle ?? 0) : Math.atan2(ey - s.y, ex - s.x);
       ctx.save();
       ctx.translate(ex, ey);
@@ -318,8 +580,7 @@ export function drawTee(ctx: CanvasRenderingContext2D, x: number, y: number, bal
   ctx.fill();
   ctx.restore();
   roundRectPath(ctx, x - w / 2, y - h / 2, w, h, 0.5);
-  chunky(ctx, '#2a8463', 0.22);
-  ctx.save();ctx.clip();finishMaterial(ctx,{x:x-w/2,y:y-h/2,w,h},'turf');ctx.restore();
+  chunky(ctx, COLORS.tee, 0.22);
   ctx.save();
   ctx.setLineDash([0.35, 0.3]);
   ctx.strokeStyle = OUTLINE;
@@ -331,7 +592,6 @@ export function drawTee(ctx: CanvasRenderingContext2D, x: number, y: number, bal
 
 export function drawCup(ctx: CanvasRenderingContext2D, x: number, y: number, cupR: number, flash = 0): void {
   if (drawSprite(ctx, 'toilet', x - 2.5 * cupR, y - 3.584 * cupR, 5 * cupR, 5.6 * cupR)) {
-    goalCrown(ctx,x,y,cupR);
     // Keep the exact simulation capture circle readable, independent of painted water.
     circle(ctx, x, y, cupR);
     ctx.fillStyle = OUTLINE;
@@ -381,7 +641,17 @@ export function drawCup(ctx: CanvasRenderingContext2D, x: number, y: number, cup
   circle(ctx, x, y, cupR);
   ctx.fillStyle = OUTLINE;
   ctx.fill();
-  goalCrown(ctx,x,y,cupR);
+  // A small gold crown emblem sits on the existing tank, not over the goal.
+  ctx.save();
+  ctx.translate(x, y - ry - cupR * 0.35);
+  ctx.scale(cupR * 0.5, cupR * 0.5);
+  ctx.beginPath();
+  ctx.moveTo(-0.7, 0.25); ctx.lineTo(-0.9, -0.5);
+  ctx.lineTo(-0.3, -0.1); ctx.lineTo(0, -0.75);
+  ctx.lineTo(0.3, -0.1); ctx.lineTo(0.9, -0.5); ctx.lineTo(0.7, 0.25);
+  ctx.closePath();
+  chunky(ctx, '#ffd34c', 0.16);
+  ctx.restore();
   if (flash > 0) {
     ctx.save();
     ctx.globalAlpha = flash;
@@ -549,20 +819,18 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
       ctx.translate(s.x, s.y);
       ctx.rotate(a);
       roundRectPath(ctx, 0, -bw / 2, s.r, bw, bw * 0.4);
-      chunky(ctx, '#91b6bd', 0.12);
+      chunky(ctx, k % 2 === 0 ? '#ff6f3c' : '#ffd166', 0.22);
       ctx.save();
       roundRectPath(ctx,0,-bw/2,s.r,bw,bw*0.4);ctx.clip();
       finishMaterial(ctx,{x:0,y:-bw/2,w:s.r,h:bw},'metal');
       ctx.restore();
-      ctx.fillStyle='#28545e';ctx.fillRect(s.r*.75,-bw*.35,s.r*.2,bw*.7);
-      screw(ctx,s.r*.82,0,Math.min(.12,bw*.2));
       ctx.fillStyle = 'rgba(255,255,255,0.45)';
       roundRectPath(ctx, s.r * 0.15, -bw / 2 + 0.12, s.r * 0.7, bw * 0.3, 0.1);
       ctx.fill();
       ctx.restore();
     }
     circle(ctx, s.x, s.y, Math.max(0.5, bw * 0.9));
-    chunky(ctx, '#eef2f5', 0.12);
+    chunky(ctx, '#eef2f5', 0.22);
     circle(ctx, s.x, s.y, 0.18);
     ctx.fillStyle = OUTLINE;
     ctx.fill();
@@ -597,13 +865,13 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
     ctx.fill();
     ctx.restore();
     ctx.save();
-    ctx.translate(0, 0.18);
+    ctx.translate(0, 0.5);
     roundRectPath(ctx, x, y, s.w, s.h, 0.4);
-    chunky(ctx, o.look === 'luggage' ? '#8a2e3b' : COLORS.blockerShade, 0.12);
+    chunky(ctx, o.look === 'luggage' ? '#8a2e3b' : COLORS.blockerShade, 0.22);
     ctx.restore();
     roundRectPath(ctx, x, y, s.w, s.h, 0.4);
     if (o.look === 'luggage') {
-      chunky(ctx, '#e63946', 0.12);
+      chunky(ctx, '#e63946', 0.22);
       // handle + strap
       const hx = x + s.w / 2;
       roundRectPath(ctx, hx - Math.min(1.2, s.w * 0.2), y - 0.5, Math.min(2.4, s.w * 0.4), 0.5, 0.2);
@@ -617,7 +885,7 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
       ctx.lineTo(x + s.w * 0.7, y + s.h);
       ctx.stroke();
     } else if (o.look === 'piston') {
-      chunky(ctx, '#9fb0bd', 0.12);
+      chunky(ctx, '#9fb0bd', 0.22);
       ctx.fillStyle = '#ffd166';
       ctx.strokeStyle = OUTLINE;
       ctx.lineWidth = 0.14;
@@ -633,7 +901,7 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
         ctx.stroke();
       }
     } else {
-      chunky(ctx, COLORS.blocker, 0.12);
+      chunky(ctx, COLORS.blocker, 0.22);
       ctx.fillStyle = '#ffd166';
       ctx.strokeStyle = OUTLINE;
       ctx.lineWidth = 0.35;
@@ -646,9 +914,7 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
     }
     ctx.save();
     roundRectPath(ctx,x,y,s.w,s.h,0.4);ctx.clip();
-    finishMaterial(ctx,{x,y,w:s.w,h:s.h},o.look === 'luggage' ? 'rubber' : 'metal');
-    if(o.look==='luggage')drawSprite(ctx,'suitcase',x,y,s.w,s.h);
-    else {screw(ctx,x+Math.min(.25,s.w/3),y+Math.min(.25,s.h/3),.1);screw(ctx,x+s.w-Math.min(.25,s.w/3),y+s.h-Math.min(.25,s.h/3),.1);}
+    finishMaterial(ctx,{x,y,w:s.w,h:s.h},o.look === 'luggage' ? 'fabric' : 'metal');
     ctx.restore();
   } else {
     const s = o.shape;
@@ -671,11 +937,10 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
     ctx.strokeStyle = '#d9a066';
     ctx.lineWidth = 0.42;
     ctx.stroke();
-    // weight: shaded rubber plunger head
+    // weight: a plunger head
     dropShadow(ctx, bx, by, br, br * 0.8);
     circle(ctx, bx, by, br);
-    chunky(ctx, COLORS.plunger, 0.12);
-    rubberHead(ctx,bx,by,br);
+    chunky(ctx, COLORS.plunger, 0.22);
     highlight(ctx, bx - br * 0.35, by - br * 0.35, br * 0.28, br * 0.2);
     circle(ctx, s.x, s.y, 0.16);
     ctx.fillStyle = OUTLINE;
@@ -693,10 +958,7 @@ export interface BallStyle {
 export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null): void {
   dropShadow(ctx, x, y, r * 1.05, r * 0.75);
   circle(ctx, x, y, r);
-  chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.09, r * 0.22));
-  const shine=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.05,x+r*.1,y+r*.15,r);
-  shine.addColorStop(0,'#ffffffb0');shine.addColorStop(.5,'#ffffff00');shine.addColorStop(1,'#092b4055');
-  ctx.fillStyle=shine;ctx.fill();
+  chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.12, r * 0.36));
   ctx.save();
   circle(ctx, x, y, r * 0.88);
   ctx.clip();
