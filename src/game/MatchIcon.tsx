@@ -1,22 +1,21 @@
-/** Shared match emblem, designed to stay legible in the dock and on Home. */
+/** Two proper bell-cup plungers: long handles above wide, hollow rubber bases. */
 export function MatchIcon() {
-  return <svg className="match-emblem" viewBox="0 0 64 64" fill="none" stroke="#092b40" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <g transform="translate(32 31) rotate(40)">
-      <rect x="-3" y="-8" width="6" height="34" rx="3" fill="#e7b56b"/>
-      <path d="M-1 0v20" stroke="#fff0be" strokeWidth="1.5"/>
-      <path d="M-11-8q1-14 11-14T11-8Z" fill="#43c6d9"/>
-      <path d="M-6-12q1-6 5-6" stroke="#cff9ff" strokeWidth="2.5"/>
-      <rect x="-14" y="-9" width="28" height="7" rx="3.5" fill="#2796af"/>
+  return <svg className="match-emblem" viewBox="0 0 64 64" fill="none" stroke="#092b40" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <g transform="translate(32 29) rotate(35)">
+      <rect x="-2.8" y="-25" width="5.6" height="38" rx="2" fill="#dba46a"/>
+      <path d="M-1-21V7" stroke="#ffe6b1" strokeWidth="1.3"/>
+      <path d="M-4 9h8l2 6q1 4 7 7v4h-26v-4q6-3 7-7Z" fill="#28a7b7"/>
+      <path d="m-4 15-3 6" stroke="#a6eef0" strokeWidth="2"/>
+      <ellipse cy="25" rx="14" ry="4" fill="#176776"/>
+      <path d="M-10 25q10 3 20 0" stroke="#72d9db" strokeWidth="1.5"/>
     </g>
-    <g transform="translate(32 31) rotate(-40)">
-      <rect x="-3" y="-8" width="6" height="34" rx="3" fill="#e7b56b"/>
-      <path d="M-1 0v20" stroke="#fff0be" strokeWidth="1.5"/>
-      <path d="M-11-8q1-14 11-14T11-8Z" fill="#ff8062"/>
-      <path d="M-6-12q1-6 5-6" stroke="#ffe5b9" strokeWidth="2.5"/>
-      <rect x="-14" y="-9" width="28" height="7" rx="3.5" fill="#d9584e"/>
+    <g transform="translate(32 29) rotate(-35)">
+      <rect x="-2.8" y="-25" width="5.6" height="38" rx="2" fill="#dba46a"/>
+      <path d="M-1-21V7" stroke="#ffe6b1" strokeWidth="1.3"/>
+      <path d="M-4 9h8l2 6q1 4 7 7v4h-26v-4q6-3 7-7Z" fill="#dd5744"/>
+      <path d="m-4 15-3 6" stroke="#ffb698" strokeWidth="2"/>
+      <ellipse cy="25" rx="14" ry="4" fill="#923a36"/>
+      <path d="M-10 25q10 3 20 0" stroke="#f79072" strokeWidth="1.5"/>
     </g>
-    <circle cx="32" cy="46" r="8" fill="#fff9e8"/>
-    <g fill="#aecdd2" stroke="none"><circle cx="29" cy="43" r="1.5"/><circle cx="35" cy="44" r="1.5"/><circle cx="32" cy="49" r="1.5"/></g>
-    <path d="M32 4v4M5 23l4 2m50-2-4 2" stroke="#ffdf69" strokeWidth="3"/>
   </svg>;
 }
