@@ -36,7 +36,7 @@ function Mascot() {
 /** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
 export const ART = {
   logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
-  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
+  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/home-island-v2.webp`,
 };
 
 /** Resolves to true once the image loads, false if missing, null while unknown. */
@@ -53,56 +53,6 @@ function useImage(src: string): boolean | null {
     };
   }, [src]);
   return ok;
-}
-
-/** The daily card's picture: a floating green, a flag, a crowned throne. */
-function DailyArt({ played }: { played: boolean }) {
-  return (
-    <svg className="daily-art" viewBox="0 0 360 190" aria-hidden="true">
-      <defs>
-        <linearGradient id="da-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#233258" />
-          <stop offset="1" stopColor="#1a2440" />
-        </linearGradient>
-        <linearGradient id="da-green" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8fe36b" />
-          <stop offset="1" stopColor="#4fb84a" />
-        </linearGradient>
-        <linearGradient id="da-dirt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8a5a3c" />
-          <stop offset="1" stopColor="#5a3a26" />
-        </linearGradient>
-      </defs>
-      <rect width="360" height="190" fill="url(#da-sky)" />
-      {[
-        [30, 24, 1.6],
-        [70, 60, 1.1],
-        [120, 18, 1.3],
-        [300, 30, 1.8],
-        [335, 80, 1.1],
-        [250, 14, 1.2],
-        [20, 120, 1.0],
-        [345, 140, 1.4],
-      ].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity="0.8" />
-      ))}
-      <path d="M40 132 C60 108 300 104 320 132 C335 150 300 176 180 180 C60 176 25 150 40 132 Z" fill="url(#da-green)" stroke="#1f2a44" strokeWidth="4" />
-      <path d="M46 140 C60 160 120 178 180 180 C240 178 300 160 314 140 L300 172 C260 190 100 190 60 172 Z" fill="url(#da-dirt)" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="120" cy="148" rx="40" ry="14" fill="#3f9c3a" opacity="0.55" />
-      <circle cx="248" cy="112" r="16" fill="#2f8f3e" stroke="#1f2a44" strokeWidth="3" />
-      <circle cx="268" cy="124" r="12" fill="#3aa347" stroke="#1f2a44" strokeWidth="3" />
-      <rect x="246" y="126" width="4" height="14" fill="#5a3a26" />
-      <circle cx="128" cy="150" r="5" fill="#1f2a44" opacity="0.5" />
-      <rect x="126" y="108" width="3" height="44" fill="#f4f6f7" stroke="#1f2a44" strokeWidth="1.5" />
-      <path d="M129 108 L154 116 L129 124 Z" fill="#ff5f7e" stroke="#1f2a44" strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="150" cy="156" r="6" fill="#fff" stroke="#1f2a44" strokeWidth="2.5" />
-      <ellipse cx="205" cy="146" rx="18" ry="6" fill="rgba(0,0,0,0.25)" />
-      <rect x="192" y="96" width="26" height="22" rx="5" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <path d="M186 118 C186 114 194 112 205 112 C216 112 224 114 224 118 L221 132 C219 140 212 144 205 144 C198 144 191 140 189 132 Z" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="205" cy="118" rx="14" ry="5" fill="#4db8ff" stroke="#1f2a44" strokeWidth="2.5" />
-      <path d="M193 96 L196 84 L201 90 L205 80 L209 90 L214 84 L217 96 Z" fill={played ? '#c9d8ff' : '#ffc63a'} stroke="#1f2a44" strokeWidth="3" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 export function TitleScreen() {
@@ -264,7 +214,7 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home2 compact-home">
+      <div className="title-inner home2 compact-home open-home">
         <header className="home-top">
           <div className="home-icons">
             <button
@@ -305,51 +255,31 @@ export function TitleScreen() {
             </>
           )}
         </div>
-        <div className="tagline">Every bathroom is a course.</div>
-
-        <section className={`daily-card${played ? ' played' : ''}`}>
-          <div className="daily-heading"><span>DAILY CHALLENGE</span><span>{played ? 'ROUND COMPLETE' : '9 HOLES · ONE SHOT'}</span></div>
-          {dailyArt ? (
-            <div className="daily-art-wrap">
-              <img className="daily-img" src={ART.daily} alt="" draggable={false} />
-              {played && (
-                // The painted sign and the result share one slot: once the round is played,
-                // this board covers the painted one exactly, so only one of them ever shows.
-                <span className="result-sign" role="status">
-                  <span className="sign-top">{best !== null ? 'You shot' : 'Your round'}</span>
-                  <span className="sign-main">{best !== null ? best : 'Played'}</span>
-                  <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board'}</span>
-                </span>
-              )}
-            </div>
-          ) : (
-            <DailyArt played={played} />
-          )}
-          <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            {played ? 'View daily leaderboard' : `▶ Play the ${edition} course`}
+        <div className="open-hero" aria-label="A putting island with one crowned toilet goal">
+          {dailyArt ? <img src={ART.daily} alt="A floating putting green with a golf ball and one crowned toilet goal" draggable={false} /> : <Mascot />}
+        </div>
+        <div className="home-intro"><h1>Your next great putt.</h1><p>Play a round. Rule a throne.</p></div>
+        <section className="home-actions" aria-label="Choose how to play">
+          <button className="action-tile daily-action" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            <GameIcon kind={played ? 'trophy' : 'flag'} />
+            <strong>{played ? 'Daily results' : 'Daily round'}</strong>
+            <small>{played ? 'View leaderboard' : `The ${edition} course`}</small>
+            <span className="tile-arrow" aria-hidden="true">↗</span>
           </button>
-          <div className="daily-reset">{played ? 'Next challenge' : 'New course'} in {untilTomorrowUtc()}</div>
-        </section>
-
-        <section className="menu2">
-          <div className="mrow feature">
-            <GameIcon kind="map" />
-            <div className="mrow-text">
-              <strong>Explore throne map</strong>
-              <small>{nearby ? `${nearby.total} nearby · ${nearby.claimed} claimed` : 'Real bathrooms near you'}</small>
-            </div>
-            <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
-              Explore
-            </button>
-          </div>
-          <div className="kingdom-panel" aria-label="Your kingdom">
-            <div className="kingdom-title"><GameIcon kind="crown" /> YOUR KINGDOM</div>
-            <div className="kingdom-stats"><span><b>{thrones ?? '—'}</b>Thrones held</span><span><b>{nearby?.total ?? '—'}</b>Nearby</span><span><b>{nearby?.claimed ?? '—'}</b>Claimed nearby</span></div>
-          </div>
-          <button className="custom-launch" onClick={() => go(() => setCustom(true))}>
-            <GameIcon kind="dice" /> Custom game <span>Choose your holes ›</span>
+          <button className="action-tile map-action" onClick={() => go(() => navigate('map'), 'whoosh')}>
+            <GameIcon kind="map" /><strong>Throne map</strong>
+            <small>{nearby ? `${nearby.total} bathrooms nearby` : 'Find your next throne'}</small>
+            <span className="tile-arrow" aria-hidden="true">↗</span>
           </button>
         </section>
+        <div className="home-status" aria-label="Your progress">
+          <span><b>{thrones ?? '—'}</b> thrones held</span>
+          <span>{best !== null ? <><b>{best}</b> daily strokes</> : dailyRank ? <><b>#{dailyRank.rank}</b> daily rank</> : <>Next daily <b>{untilTomorrowUtc()}</b></>}</span>
+        </div>
+        <div className="home-secondary">
+          <button onClick={() => go(() => setCustom(true))}><GameIcon kind="dice" /> Custom game</button>
+          <button onClick={() => go(() => navigate('match'), 'whoosh')}><GameIcon kind="flag" /> Quick match</button>
+        </div>
       </div>
       <TabBar active="play" />
       {custom && (
