@@ -15,6 +15,7 @@ import { AccountSheet } from './AccountSheet';
 import { TabBar } from './TabBar';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
+import { MatchIcon } from './MatchIcon';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -234,7 +235,7 @@ export function TitleScreen() {
         </section>
         <section className="arcade-modes" aria-label="More ways to play">
           <button className="arcade-map" aria-label={nearby ? `Throne map, ${nearby.total} bathrooms nearby` : 'Throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}><GameIcon kind="map" /><span>THRONE<br />MAP</span></button>
-          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="#09233d" strokeWidth="5" strokeLinecap="round"><path d="m9 6 29 34q8 7 7-4M39 6 10 40q-8 7-7-4"/></g><path d="m9 6 13 15M39 6 26 21" stroke="#fff" strokeWidth="2"/></svg><span>QUICK<br />MATCH</span></button>
+          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><MatchIcon /><span>QUICK<br />MATCH</span></button>
         </section>
         <button className="arcade-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
