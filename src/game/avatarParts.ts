@@ -95,8 +95,8 @@ function faceSvg(face: string): string {
   if (face === 'cool') return `<path d="M52 63 h25 v9 q-12 14 -25 0 Z M83 63 h25 v9 q-12 14 -25 0 Z" fill="${INK}"/><path d="M77 66 h6" stroke="${INK}" stroke-width="4"/>${smile}`;
   if (face === 'sleepy') return `<path d="M59 70 q7 6 14 0 M87 70 q7 6 14 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="88" rx="5" ry="6" fill="${INK}"/>`;
   if (face === 'angry') return `${eyes}<path d="M59 60 l14 4 M101 60 l-14 4 M68 88 q12 -7 24 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
-  if (face === 'wink') return `<path d="M66 69 v2 M88 69 l9 3 -9 3" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>${smile}`;
-  return smile;
+  if (face === 'wink') return `<path d="M66 69 v2 M87 71 Q94 65 101 71" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>${smile}`;
+  return `${eyes}${smile}`;
 }
 
 function ballSvg(look: BallLook, cx: number, cy: number, r: number, id: string): string {
