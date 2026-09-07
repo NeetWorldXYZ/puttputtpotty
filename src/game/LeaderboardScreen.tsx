@@ -8,6 +8,7 @@ import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { ReportSheet } from './ReportSheet';
 import { Avatar } from './Avatar';
+import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 
 type Tab = 'nearby' | 'world' | 'daily';
@@ -92,8 +93,8 @@ export function LeaderboardScreen() {
         </button>
       </div>
 
-      <div className="rank-context">
-        <strong>{tab === 'daily' ? 'One course. Everyone’s best shot.' : 'More records. More thrones.'}</strong>
+      <div className="rank-context"><GameIcon kind="trophy" />
+        <strong>{tab === 'daily' ? 'TODAY’S TOP PUTTERS' : 'CHASE THE CROWN'}</strong>
         <p>{tab === 'daily' ? 'Lowest total strokes leads the daily board.' : 'Ranked by thrones held. Beat a bathroom’s course record to claim it.'}</p>
         {!fix && <button className="location-link" onClick={() => navigate('map')}>Open map to enable nearby ranks →</button>}
       </div>

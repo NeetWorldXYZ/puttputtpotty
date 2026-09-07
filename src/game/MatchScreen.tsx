@@ -340,9 +340,9 @@ export function MatchScreen({ code, matchId }: Props) {
         {phase === 'lobby' && (
           <>
             <section className="match-hero">
-              <div className="match-eyebrow">HEAD TO HEAD</div>
-              <div className="match-duel" aria-hidden="true"><span>YOU</span><b>VS</b><span>?</span></div>
-              <h1>A little friendly competition.</h1>
+              <div className="match-eyebrow">BRAGGING RIGHTS AWAIT</div>
+              <div className="match-duel" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt="" /><b>VS</b><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt="" /></div>
+              <h1>PUTT UP.</h1>
               <p>Same holes. Fewest strokes wins.<br />Tied score? The faster round takes it.</p>
               <button className="match-find" disabled={busy} onClick={() => void start(() => api.findMatch())}>
                 {busy ? 'Connecting…' : 'Find an opponent'} <span aria-hidden="true">→</span>
@@ -350,7 +350,7 @@ export function MatchScreen({ code, matchId }: Props) {
               <small>Nine holes · matched with another player</small>
             </section>
             <section className="friend-card" aria-labelledby="friend-title">
-              <div className="match-section-heading"><span className="match-section-icon" aria-hidden="true">↗</span><div><h2 id="friend-title">Play a friend</h2><p>Pick your round, then share the invite.</p></div></div>
+              <div className="match-section-heading"><span className="match-section-icon" aria-hidden="true">⚑</span><div><h2 id="friend-title">Play a friend</h2><p>Pick your round, then share the invite.</p></div></div>
               <div className="friend-controls">
                 <div className="len-chips" aria-label="Invite round length">
                   {INVITE_LENGTHS.map(n => <button key={n} aria-pressed={n === inviteLen} disabled={busy} className={n === inviteLen ? 'active' : ''} onClick={() => setInviteLen(n)}>{n}<small>holes</small></button>)}
