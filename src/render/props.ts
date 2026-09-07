@@ -1,3 +1,5 @@
+import { drawSprite } from './sprites';
+import { drawFurnishing } from './decor';
 /**
  * Decorative props (outside the playable area) and floor decals (inside,
  * subtle). All drawn in world units with the house outline. Props never
@@ -34,7 +36,7 @@ export function placeProps(hole: Hole, region: Region, theme: Theme): PropPlacem
   for (let y = b.y + 1.5; y < b.y + b.h - 1.5; y += 1) {
     for (let x = b.x + 1.5; x < b.x + b.w - 1.5; x += 1) {
       if (pointInRegion(region, x, y)) continue;
-      if (distToWalls(hole, x, y) < 1.9) continue;
+      if (distToWalls(hole, x, y) < 2.7) continue;
       cands.push({ x, y });
     }
   }
@@ -50,6 +52,7 @@ export function placeProps(hole: Hole, region: Region, theme: Theme): PropPlacem
     const c = cands[Math.floor(rand() * cands.length)];
     const jx = c.x + (rand() - 0.5) * 0.8;
     const jy = c.y + (rand() - 0.5) * 0.8;
+    if (pointInRegion(region, jx, jy) || distToWalls(hole, jx, jy) < 2.5) continue;
     if (out.some((p) => Math.hypot(p.x - jx, p.y - jy) < 5)) continue;
     if (k >= order.length) {
       order = shuffle(theme.props.slice(), rand);
@@ -192,8 +195,7 @@ export function drawPropAnimated(ctx: CanvasRenderingContext2D, p: PropPlacement
       break;
     }
     case 'sensor': {
-      roundRectPath(ctx, -0.6, -0.4, 1.2, 0.8, 0.2);
-      chunky(ctx, '#dde2e7', 0.14);
+      drawFurnishing(ctx, 'sensor');
       const on = Math.sin(t * 2.5 + ph * 6) > 0.6;
       ctx.fillStyle = on ? '#e63946' : '#7a1f1a';
       circle(ctx, 0, 0, 0.15);
@@ -338,10 +340,18 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropPlacement): void 
   const rand = makeRand(p.seed);
   ctx.save();
   ctx.translate(p.x, p.y);
+  const sprite = p.kind === 'mopBucket' ? 'janitor' : p.kind === 'palm' ? 'plant' : p.kind === 'sink' ? 'sink' : null;
+  if (sprite && drawSprite(ctx, sprite, -2.3, -2.3, 4.6, 4.6)) { ctx.restore(); return; }
+  if (drawFurnishing(ctx, p.kind)) { ctx.restore(); return; }
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   const tilt = (rand() - 0.5) * 0.5;
   switch (p.kind) {
+    case 'sink':
+      roundRectPath(ctx, -1.5, -1.5, 3, 3, 0.5); chunky(ctx, '#f4f8fa', 0.18);
+      ellipse(ctx, 0, 0.2, 1, 0.85); chunky(ctx, '#bedaea', 0.12);
+      roundRectPath(ctx, -0.2, -1.6, 0.4, 1, 0.1); chunky(ctx, '#9eb8c9', 0.1);
+      break;
     case 'stain':
       ctx.globalAlpha = 0.5;
       ctx.fillStyle = '#2b1d0a';

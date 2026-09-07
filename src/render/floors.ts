@@ -3,8 +3,21 @@
 import type { Rect } from '../sim/types';
 import type { Theme } from './themes';
 import { makeRand, roundRectPath, circle } from './shapes';
+import { finishMaterial, type Material } from './materials';
 
 export function drawFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed: number): void {
+  ctx.save();
+  paintFloor(ctx, b, t, seed);
+  const materials: Record<Theme['floor']['kind'], Material> = {
+    tile: 'ceramic', bigTile: 'ceramic', crackedTile: 'ceramic', checker: 'ceramic',
+    marble: 'stone', terrazzo: 'stone', plastic: 'rubber', cobble: 'stone',
+    metalGrid: 'metal', bamboo: 'wood', floralCarpet: 'fabric', stripes: 'turf',
+  };
+  finishMaterial(ctx, b, materials[t.floor.kind], seed);
+  ctx.restore();
+}
+
+function paintFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed: number): void {
   const f = t.floor;
   const rand = makeRand(seed ^ 0x51ed);
   ctx.fillStyle = f.a;
@@ -26,9 +39,16 @@ export function drawFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed
           ctx.fillStyle = alt ? f.a : f.b;
           roundRectPath(ctx, x + g / 2, y + g / 2, s - g, s - g, 0.35);
           ctx.fill();
-          ctx.fillStyle = 'rgba(255,255,255,0.18)';
+          ctx.fillStyle = 'rgba(255,255,255,0.13)';
           roundRectPath(ctx, x + g / 2 + 0.15, y + g / 2 + 0.15, s - g - 0.3, (s - g) * 0.28, 0.25);
           ctx.fill();
+          ctx.strokeStyle = 'rgba(18,42,65,0.18)';
+          ctx.lineWidth = 0.09;
+          ctx.beginPath();
+          ctx.moveTo(x + g + 0.15, y + s - g - 0.1);
+          ctx.lineTo(x + s - g - 0.1, y + s - g - 0.1);
+          ctx.lineTo(x + s - g - 0.1, y + g + 0.15);
+          ctx.stroke();
         }
       }
       ctx.strokeStyle = f.grout;
@@ -273,7 +293,7 @@ export function drawFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed
       }
       ctx.strokeStyle = f.grout;
       ctx.lineWidth = 0.14;
-      ctx.globalAlpha = 0.7;
+      ctx.globalAlpha = 0.14;
       ctx.beginPath();
       for (let y = y0; y <= y1; y += s) {
         ctx.moveTo(x0, y);
@@ -293,12 +313,15 @@ export function drawSurround(ctx: CanvasRenderingContext2D, b: Rect, t: Theme): 
   light.addColorStop(1, t.surroundB);
   ctx.fillStyle = light;
   ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = t.surroundB;
-  ctx.lineWidth = 0.9;
+  // The outside reads as the room's tiled apron, not diagonal placeholder stripes.
+  ctx.strokeStyle = '#0a1e3038';
+  ctx.lineWidth = 0.09;
   ctx.beginPath();
-  for (let d = b.x - b.h; d < b.x + b.w; d += 2.6) {
-    ctx.moveTo(d, b.y);
-    ctx.lineTo(d + b.h, b.y + b.h);
+  for (let x = b.x; x < b.x + b.w; x += 3) {
+    ctx.moveTo(x, b.y); ctx.lineTo(x, b.y + b.h);
+  }
+  for (let y = b.y; y < b.y + b.h; y += 3) {
+    ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y);
   }
   ctx.stroke();
   // Soft edge shading is cached with the scenery, outside the playable floor.

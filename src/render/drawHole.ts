@@ -7,6 +7,7 @@
  */
 
 import type { Hole } from '../sim/types';
+import { spriteRevision } from './sprites';
 import { isMoving } from '../sim/types';
 import type { Camera } from './camera';
 import { themeById, OUTLINE, type Theme } from './themes';
@@ -100,7 +101,7 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   const maxPpu = Math.min(MAX_SIDE / b.w, MAX_SIDE / b.h);
   if (ppu > maxPpu) ppu = maxPpu;
   ppu = Math.round(ppu * 4) / 4;
-  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}`;
+  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${spriteRevision()}`;
   const hit = layerCache.get(key);
   if (hit) return hit;
   const w = Math.max(1, Math.ceil(b.w * ppu));
