@@ -13,7 +13,6 @@ import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net
 import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { TabBar } from './TabBar';
-import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
 
@@ -28,90 +27,11 @@ function untilTomorrowUtc(): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function Mascot() {
-  return <svg className="mascot" viewBox={MASCOT_VIEWBOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MASCOT_BODY }} />;
-}
-
-
-/** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
-export const ART = {
-  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
-  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
-};
-
-/** Resolves to true once the image loads, false if missing, null while unknown. */
-function useImage(src: string): boolean | null {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    let live = true;
-    const img = new Image();
-    img.onload = () => live && setOk(true);
-    img.onerror = () => live && setOk(false);
-    img.src = src;
-    return () => {
-      live = false;
-    };
-  }, [src]);
-  return ok;
-}
-
-/** The daily card's picture: a floating green, a flag, a crowned throne. */
-function DailyArt({ played }: { played: boolean }) {
-  return (
-    <svg className="daily-art" viewBox="0 0 360 190" aria-hidden="true">
-      <defs>
-        <linearGradient id="da-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#233258" />
-          <stop offset="1" stopColor="#1a2440" />
-        </linearGradient>
-        <linearGradient id="da-green" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8fe36b" />
-          <stop offset="1" stopColor="#4fb84a" />
-        </linearGradient>
-        <linearGradient id="da-dirt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8a5a3c" />
-          <stop offset="1" stopColor="#5a3a26" />
-        </linearGradient>
-      </defs>
-      <rect width="360" height="190" fill="url(#da-sky)" />
-      {[
-        [30, 24, 1.6],
-        [70, 60, 1.1],
-        [120, 18, 1.3],
-        [300, 30, 1.8],
-        [335, 80, 1.1],
-        [250, 14, 1.2],
-        [20, 120, 1.0],
-        [345, 140, 1.4],
-      ].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity="0.8" />
-      ))}
-      <path d="M40 132 C60 108 300 104 320 132 C335 150 300 176 180 180 C60 176 25 150 40 132 Z" fill="url(#da-green)" stroke="#1f2a44" strokeWidth="4" />
-      <path d="M46 140 C60 160 120 178 180 180 C240 178 300 160 314 140 L300 172 C260 190 100 190 60 172 Z" fill="url(#da-dirt)" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="120" cy="148" rx="40" ry="14" fill="#3f9c3a" opacity="0.55" />
-      <circle cx="248" cy="112" r="16" fill="#2f8f3e" stroke="#1f2a44" strokeWidth="3" />
-      <circle cx="268" cy="124" r="12" fill="#3aa347" stroke="#1f2a44" strokeWidth="3" />
-      <rect x="246" y="126" width="4" height="14" fill="#5a3a26" />
-      <circle cx="128" cy="150" r="5" fill="#1f2a44" opacity="0.5" />
-      <rect x="126" y="108" width="3" height="44" fill="#f4f6f7" stroke="#1f2a44" strokeWidth="1.5" />
-      <path d="M129 108 L154 116 L129 124 Z" fill="#ff5f7e" stroke="#1f2a44" strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="150" cy="156" r="6" fill="#fff" stroke="#1f2a44" strokeWidth="2.5" />
-      <ellipse cx="205" cy="146" rx="18" ry="6" fill="rgba(0,0,0,0.25)" />
-      <rect x="192" y="96" width="26" height="22" rx="5" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <path d="M186 118 C186 114 194 112 205 112 C216 112 224 114 224 118 L221 132 C219 140 212 144 205 144 C198 144 191 140 189 132 Z" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="205" cy="118" rx="14" ry="5" fill="#4db8ff" stroke="#1f2a44" strokeWidth="2.5" />
-      <path d="M193 96 L196 84 L201 90 L205 80 L209 90 L214 84 L217 96 Z" fill={played ? '#c9d8ff' : '#ffc63a'} stroke="#1f2a44" strokeWidth="3" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
   const [avatar] = useState(getSavedAvatar());
-  const logoArt = useImage(ART.logo) === true;
-  const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
   const [custom, setCustom] = useState(false);
@@ -264,7 +184,8 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home2 compact-home">
+      <div className="arcade-backdrop" aria-hidden="true" />
+      <div className="title-inner home2 compact-home open-home">
         <header className="home-top">
           <div className="home-icons">
             <button
@@ -292,64 +213,30 @@ export function TitleScreen() {
             <span className="player-thrones">👑 {thrones ?? '–'}</span>
           </button>
         </header>
-        <div className="brand hero">
-          {logoArt ? (
-            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" draggable={false} />
-          ) : (
-            <>
-              <Mascot />
-              <div className="logo big">
-                <span className="logo-top">Putt Putt</span>
-                <span className="logo-bottom">Potty</span>
-              </div>
-            </>
-          )}
+        <div className="arcade-brand"><img src={`${import.meta.env.BASE_URL}art/arcade-logo.webp`} alt="Putt Putt Potty" draggable={false} /></div>
+        <div className="arcade-green" aria-hidden="true">
+          <svg viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet">
+            <path className="putt-trail" d="M72 213C230 208 291 123 291 80" fill="none" stroke="#fff9df" strokeWidth="4" strokeDasharray="10 13" strokeLinecap="round" />
+            <g stroke="#09233d" strokeWidth="4" strokeLinejoin="round">
+              <g transform="translate(256 8)"><path d="M9 19h53v44H12Z" fill="#fffdf0"/><path d="M15 27h41v27H17Z" fill="#e9ecde" strokeWidth="2"/><path d="M19 84h30l4 22H16Z" fill="#fdfaf0"/><path d="M4 65Q35 52 67 65L60 83Q34 108 11 83Z" fill="#fffdf0"/><ellipse cx="35" cy="67" rx="29" ry="11" fill="#fff"/><ellipse cx="35" cy="67" rx="18" ry="6" fill="#70b7ca"/><path d="M14 15 9-1 25 6 35-9 44 6 60-1 54 15Z" fill="#ffd044"/></g>
+              <circle cx="72" cy="213" r="22" fill="#f8fbff"/>
+            </g>
+            <g fill="#c7d9e2"><circle cx="65" cy="202" r="3"/><circle cx="76" cy="199" r="3"/><circle cx="83" cy="208" r="3"/><circle cx="69" cy="213" r="3"/><circle cx="60" cy="219" r="3"/><circle cx="78" cy="223" r="3"/></g>
+            <g stroke="#ffda4d" strokeWidth="4" strokeLinecap="round"><path d="m39 210-15-3m20 19-13 8m210-201-9-12m91 20 12-11"/></g>
+          </svg>
         </div>
-        <div className="tagline">Every bathroom is a course.</div>
-
-        <section className={`daily-card${played ? ' played' : ''}`}>
-          <div className="daily-heading"><span>DAILY CHALLENGE</span><span>{played ? 'ROUND COMPLETE' : '9 HOLES · ONE SHOT'}</span></div>
-          {dailyArt ? (
-            <div className="daily-art-wrap">
-              <img className="daily-img" src={ART.daily} alt="" draggable={false} />
-              {played && (
-                // The painted sign and the result share one slot: once the round is played,
-                // this board covers the painted one exactly, so only one of them ever shows.
-                <span className="result-sign" role="status">
-                  <span className="sign-top">{best !== null ? 'You shot' : 'Your round'}</span>
-                  <span className="sign-main">{best !== null ? best : 'Played'}</span>
-                  <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board'}</span>
-                </span>
-              )}
-            </div>
-          ) : (
-            <DailyArt played={played} />
-          )}
-          <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            {played ? 'View daily leaderboard' : `▶ Play the ${edition} course`}
-          </button>
-          <div className="daily-reset">{played ? 'Next challenge' : 'New course'} in {untilTomorrowUtc()}</div>
-        </section>
-
-        <section className="menu2">
-          <div className="mrow feature">
-            <GameIcon kind="map" />
-            <div className="mrow-text">
-              <strong>Explore throne map</strong>
-              <small>{nearby ? `${nearby.total} nearby · ${nearby.claimed} claimed` : 'Real bathrooms near you'}</small>
-            </div>
-            <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
-              Explore
-            </button>
-          </div>
-          <div className="kingdom-panel" aria-label="Your kingdom">
-            <div className="kingdom-title"><GameIcon kind="crown" /> YOUR KINGDOM</div>
-            <div className="kingdom-stats"><span><b>{thrones ?? '—'}</b>Thrones held</span><span><b>{nearby?.total ?? '—'}</b>Nearby</span><span><b>{nearby?.claimed ?? '—'}</b>Claimed nearby</span></div>
-          </div>
-          <button className="custom-launch" onClick={() => go(() => setCustom(true))}>
-            <GameIcon kind="dice" /> Custom game <span>Choose your holes ›</span>
+        <section className="arcade-daily" aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`}>
+          <div className="challenge-label">{played ? 'ROUND COMPLETE' : "TODAY’S CHALLENGE"}</div>
+          <button className="arcade-play" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            <strong>{played ? 'DAILY RESULTS' : 'PLAY DAILY'}</strong>
+            <small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See where you stand') : '9 holes. One shot at glory.'}</small>
           </button>
         </section>
+        <section className="arcade-modes" aria-label="More ways to play">
+          <button className="arcade-map" aria-label={nearby ? `Throne map, ${nearby.total} bathrooms nearby` : 'Throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}><GameIcon kind="map" /><span>THRONE<br />MAP</span></button>
+          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="#09233d" strokeWidth="5" strokeLinecap="round"><path d="m9 6 29 34q8 7 7-4M39 6 10 40q-8 7-7-4"/></g><path d="m9 6 13 15M39 6 26 21" stroke="#fff" strokeWidth="2"/></svg><span>QUICK<br />MATCH</span></button>
+        </section>
+        <button className="arcade-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
       {custom && (
