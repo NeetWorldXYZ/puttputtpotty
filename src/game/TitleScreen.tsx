@@ -217,9 +217,9 @@ export function TitleScreen() {
         <div className="arcade-green" aria-hidden="true">
           <svg viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet">
             <path className="putt-trail" d="M72 213C230 208 291 123 291 80" fill="none" stroke="#fff9df" strokeWidth="4" strokeDasharray="10 13" strokeLinecap="round" />
-            <g stroke="#09233d" strokeWidth="4" strokeLinejoin="round">
-              <g transform="translate(256 8)"><path d="M9 19h53v44H12Z" fill="#fffdf0"/><path d="M15 27h41v27H17Z" fill="#e9ecde" strokeWidth="2"/><path d="M19 84h30l4 22H16Z" fill="#fdfaf0"/><path d="M4 65Q35 52 67 65L60 83Q34 108 11 83Z" fill="#fffdf0"/><ellipse cx="35" cy="67" rx="29" ry="11" fill="#fff"/><ellipse cx="35" cy="67" rx="18" ry="6" fill="#70b7ca"/><path d="M14 15 9-1 25 6 35-9 44 6 60-1 54 15Z" fill="#ffd044"/></g>
-              <circle cx="72" cy="213" r="22" fill="#f8fbff"/>
+            <g className="home-putt-scene" stroke="#09233d" strokeWidth="4" strokeLinejoin="round">
+              <g className="home-throne" transform="translate(256 8)"><path d="M9 19h53v44H12Z" fill="#fffdf0"/><path d="M15 27h41v27H17Z" fill="#e9ecde" strokeWidth="2"/><path d="M19 84h30l4 22H16Z" fill="#fdfaf0"/><path d="M4 65Q35 52 67 65L60 83Q34 108 11 83Z" fill="#fffdf0"/><ellipse cx="35" cy="67" rx="29" ry="11" fill="#fff"/><ellipse cx="35" cy="67" rx="18" ry="6" fill="#70b7ca"/><path d="M14 15 9-1 25 6 35-9 44 6 60-1 54 15Z" fill="#ffd044"/></g>
+              <circle className="home-ball" cx="72" cy="213" r="22" fill="#f8fbff"/>
             </g>
             <g fill="#c7d9e2"><circle cx="65" cy="202" r="3"/><circle cx="76" cy="199" r="3"/><circle cx="83" cy="208" r="3"/><circle cx="69" cy="213" r="3"/><circle cx="60" cy="219" r="3"/><circle cx="78" cy="223" r="3"/></g>
             <g stroke="#ffda4d" strokeWidth="4" strokeLinecap="round"><path d="m39 210-15-3m20 19-13 8m210-201-9-12m91 20 12-11"/></g>

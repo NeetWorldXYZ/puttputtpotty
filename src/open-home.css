@@ -31,3 +31,17 @@
 @media(max-width:360px){.open-home.home2{padding-left:12px;padding-right:12px}.arcade-modes{gap:7px}.arcade-modes button{gap:5px}.arcade-modes svg{width:30px}.open-home .player-name{max-width:85px}.arcade-play small{font-size:11px}}
 @media(max-height:500px) and (min-width:600px){.open-home.home2{max-width:900px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:36px 1fr auto auto;gap:8px 18px}.home-top{grid-column:1/-1}.arcade-brand{grid-column:1;grid-row:2;height:100%;min-height:0}.open-home .arcade-green{grid-column:1;grid-row:3/5;min-height:65px}.arcade-daily{grid-column:2;grid-row:2;align-self:end}.arcade-modes{grid-column:2;grid-row:3}.arcade-custom{grid-column:2;grid-row:4;justify-self:center}}
 @media(prefers-reduced-motion:reduce){.putt-trail{animation:none}}
+
+/* Small arcade flourishes, keeping the approved Home layout and touch targets. */
+.open-home .arcade-green:before,.open-home .arcade-green:after{content:'✦';position:absolute;color:#ffe27a;font-size:22px;text-shadow:0 2px 0 #123b42;pointer-events:none;animation:home-sparkle 4s ease-in-out infinite}
+.open-home .arcade-green:before{right:19%;top:8%}.open-home .arcade-green:after{left:19%;bottom:22%;font-size:14px;animation-delay:1.7s}
+.home-throne{transform-box:fill-box;transform-origin:center;animation:home-throne-bob 5s ease-in-out infinite}
+.arcade-play{overflow:hidden;transition:transform .15s ease,filter .15s ease}
+.arcade-play:after{content:'';position:absolute;inset:-60% auto -60% -65%;width:35%;background:linear-gradient(90deg,transparent,#fff7,transparent);transform:skewX(-24deg);animation:home-button-shine 7s ease-in-out infinite;pointer-events:none}
+.arcade-modes button{transition:transform .15s ease,filter .15s ease}.arcade-modes button:active{filter:brightness(1.08)}
+.open-home .arcade-custom{background:#092c3dc9;border:2px solid #91d9a0;border-radius:22px;padding:6px 20px;box-shadow:0 3px 0 #08233c;font-size:15px}.arcade-custom:active{transform:translateY(2px)}
+@keyframes home-throne-bob{0%,100%{translate:0 0}50%{translate:0 -3px}}
+@keyframes home-sparkle{0%,65%,100%{opacity:.25;scale:.7}30%{opacity:1;scale:1.1}}
+@keyframes home-button-shine{0%,72%{left:-65%}92%,100%{left:140%}}
+@media(hover:hover){.arcade-play:hover,.arcade-modes button:hover{filter:brightness(1.06);transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.home-throne,.open-home .arcade-green:before,.open-home .arcade-green:after,.arcade-play:after{animation:none}.arcade-play:after{display:none}.arcade-play,.arcade-modes button{transition:none}}

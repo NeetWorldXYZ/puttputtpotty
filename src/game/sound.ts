@@ -7,6 +7,39 @@ import { stinger, type StingerLevel } from './music';
 
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
+let backgrounded = typeof document !== 'undefined' && document.hidden;
+let silentMedia: HTMLAudioElement | null = null;
+
+function isBackgrounded(): boolean {
+  return backgrounded || (typeof document !== 'undefined' && document.hidden);
+}
+
+function syncAudioVisibility(): void {
+  const hidden = isBackgrounded();
+  if (master) {
+    master.gain.cancelScheduledValues(ctx?.currentTime ?? 0);
+    master.gain.value = hidden || muted ? 0 : 0.8;
+  }
+  if (hidden) {
+    silentMedia?.pause();
+    try {
+      const nav = navigator as unknown as { audioSession?: { type: string } };
+      if (nav.audioSession) nav.audioSession.type = 'auto';
+    } catch { /* Optional Safari API. */ }
+  }
+  if (!(ctx instanceof AudioContext)) return;
+  const live = ctx;
+  if (hidden) void live.suspend().then(() => {
+    if (!isBackgrounded()) syncAudioVisibility();
+  }).catch(() => {});
+  else if (live.state !== 'running') void live.resume().then(() => {
+    // A pending foreground resume must not restart audio after another app switch.
+    if (isBackgrounded()) {
+      if (master) master.gain.value = 0;
+      return live.suspend();
+    }
+  }).catch(() => {});
+}
 
 /**
  * Optional recorded crowd cheers. Drop files at public/sfx/cheer-big.mp3
@@ -56,7 +89,7 @@ export function setMuted(m: boolean): void {
   } catch {
     /* ignore */
   }
-  if (master) master.gain.value = m ? 0 : 0.8;
+  if (master) master.gain.value = m || isBackgrounded() ? 0 : 0.8;
 }
 
 /**
@@ -76,10 +109,11 @@ function primeMediaSession(): void {
   if (mediaPrimed) return;
   try {
     const el = new Audio(SILENT_WAV);
+    silentMedia = el;
     el.setAttribute('playsinline', '');
     el.volume = 0.01;
     const p = el.play();
-    if (p && typeof p.then === 'function') p.then(() => (mediaPrimed = true)).catch(() => {});
+    if (p && typeof p.then === 'function') p.then(() => { mediaPrimed = true; el.pause(); }).catch(() => {});
   } catch {
     /* ignore */
   }
@@ -87,9 +121,10 @@ function primeMediaSession(): void {
 
 /** Call from a pointer/touch handler so the context is allowed to start. */
 export function unlockAudio(): void {
+  if (isBackgrounded()) return;
   primeMediaSession();
   if (ctx) {
-    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
+    syncAudioVisibility();
     return;
   }
   try {
@@ -101,7 +136,7 @@ export function unlockAudio(): void {
     master.connect(ctx.destination);
     loadCheerSamples();
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
-    if (ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
+    syncAudioVisibility();
   } catch {
     ctx = null;
   }
@@ -110,8 +145,13 @@ export function unlockAudio(): void {
 // Any first touch anywhere counts; iOS only honours resume() inside these.
 if (typeof window !== 'undefined') {
   for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
+  window.addEventListener('pagehide', () => { backgrounded = true; syncAudioVisibility(); });
+  window.addEventListener('pageshow', () => { backgrounded = document.hidden; syncAudioVisibility(); });
+  window.addEventListener('blur', () => { backgrounded = true; syncAudioVisibility(); });
+  window.addEventListener('focus', () => { backgrounded = document.hidden; syncAudioVisibility(); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && ctx instanceof AudioContext && ctx.state !== 'running') ctx.resume().catch(() => {});
+    backgrounded = document.hidden;
+    syncAudioVisibility();
   });
 }
 
