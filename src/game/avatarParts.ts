@@ -1,9 +1,4 @@
-/**
- * Player avatars: the toilet mascot with choices. Porcelain and seat colours,
- * a hat, a face and a golf ball. Rendered as SVG for chips, banners and
- * boards, and the ball look is drawn on the canvas during play. No uploads,
- * nothing to moderate. Every part is a named item so unlocks can come later.
- */
+/** Human golfer portraits. Legacy porcelain/seat keys retain saved profile compatibility. */
 
 export interface Avatar {
   porcelain: string;
@@ -14,21 +9,21 @@ export interface Avatar {
 }
 
 export const PORCELAIN: Record<string, { top: string; bottom: string; label: string }> = {
-  white: { top: '#ffffff', bottom: '#d6e2ee', label: 'Porcelain' },
-  mint: { top: '#eafff5', bottom: '#9fe3c3', label: 'Mint' },
-  pink: { top: '#ffeaf1', bottom: '#ffb3c9', label: 'Blush' },
-  sky: { top: '#eaf6ff', bottom: '#9fd0ff', label: 'Sky' },
-  lavender: { top: '#f3ecff', bottom: '#c6b0ff', label: 'Lavender' },
-  gold: { top: '#fff6cf', bottom: '#f2c94c', label: 'Gold' },
-  onyx: { top: '#6a7486', bottom: '#2b3242', label: 'Onyx' },
+  white: { top: '#fff1d2', bottom: '#edcaa0', label: 'Fair' },
+  mint: { top: '#f0cfaa', bottom: '#d9aa7d', label: 'Light' },
+  pink: { top: '#e3b38a', bottom: '#c38d64', label: 'Warm' },
+  sky: { top: '#c48c62', bottom: '#a76e4c', label: 'Tan' },
+  lavender: { top: '#a66d49', bottom: '#855135', label: 'Brown' },
+  gold: { top: '#825238', bottom: '#653c29', label: 'Deep' },
+  onyx: { top: '#5d3d30', bottom: '#422a23', label: 'Rich' },
 };
 
 export const SEATS: Record<string, { color: string; label: string }> = {
-  white: { color: '#ffffff', label: 'White' },
+  white: { color: '#63bdcb', label: 'Teal' },
   ink: { color: '#1f2a44', label: 'Black' },
   red: { color: '#ff5f7e', label: 'Red' },
   blue: { color: '#4db8ff', label: 'Blue' },
-  wood: { color: '#c8874a', label: 'Wood' },
+  wood: { color: '#c8874a', label: 'Clay' },
   gold: { color: '#ffd447', label: 'Gold' },
 };
 
@@ -95,25 +90,13 @@ function hatSvg(hat: string): string {
 }
 
 function faceSvg(face: string): string {
-  const eyes = `<circle cx="64" cy="70" r="9" fill="#fff" stroke="${INK}" stroke-width="4"/><circle cx="96" cy="70" r="9" fill="#fff" stroke="${INK}" stroke-width="4"/>
-<circle cx="66.5" cy="71.5" r="4" fill="${INK}"/><circle cx="98.5" cy="71.5" r="4" fill="${INK}"/><circle cx="68" cy="69.5" r="1.4" fill="#fff"/><circle cx="100" cy="69.5" r="1.4" fill="#fff"/>`;
-  switch (face) {
-    case 'cool':
-      return `<rect x="50" y="61" width="26" height="17" rx="7" fill="${INK}"/><rect x="84" y="61" width="26" height="17" rx="7" fill="${INK}"/><path d="M76 67 h8" stroke="${INK}" stroke-width="4"/><path d="M54 66 h8" stroke="#fff" stroke-width="2.5" opacity="0.6"/>
-<path d="M70 87 Q84 92 94 84" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
-    case 'sleepy':
-      return `<path d="M55 71 q9 7 18 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><path d="M87 71 q9 7 18 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
-<ellipse cx="80" cy="88" rx="5" ry="3.5" fill="${INK}"/><text x="112" y="58" font-family="Arial, sans-serif" font-weight="900" font-size="16" fill="${INK}">z</text>`;
-    case 'angry':
-      return `${eyes}<path d="M52 56 l22 9" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/><path d="M108 56 l-22 9" stroke="${INK}" stroke-width="4.5" stroke-linecap="round"/>
-<path d="M66 90 Q80 82 94 90" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
-    case 'wink':
-      return `<circle cx="64" cy="70" r="9" fill="#fff" stroke="${INK}" stroke-width="4"/><circle cx="66.5" cy="71.5" r="4" fill="${INK}"/><circle cx="68" cy="69.5" r="1.4" fill="#fff"/>
-<path d="M87 71 q9 6 18 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>
-<path d="M66 86 Q80 94 94 86" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><path d="M84 88 q4 8 -4 9" fill="#ff5f7e" stroke="${INK}" stroke-width="2.5"/>`;
-    default:
-      return `${eyes}<path d="M66 86 Q80 94 94 86" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
-  }
+  const eyes = `<path d="M66 69 v2 M94 69 v2" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
+  const smile = `<path d="M67 84 Q80 97 93 84" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
+  if (face === 'cool') return `<path d="M52 63 h25 v9 q-12 14 -25 0 Z M83 63 h25 v9 q-12 14 -25 0 Z" fill="${INK}"/><path d="M77 66 h6" stroke="${INK}" stroke-width="4"/>${smile}`;
+  if (face === 'sleepy') return `<path d="M59 70 q7 6 14 0 M87 70 q7 6 14 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="88" rx="5" ry="6" fill="${INK}"/>`;
+  if (face === 'angry') return `${eyes}<path d="M59 60 l14 4 M101 60 l-14 4 M68 88 q12 -7 24 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
+  if (face === 'wink') return `<path d="M66 69 v2 M88 69 l9 3 -9 3" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>${smile}`;
+  return smile;
 }
 
 function ballSvg(look: BallLook, cx: number, cy: number, r: number, id: string): string {
@@ -139,19 +122,12 @@ export const AVATAR_VIEWBOX = '0 0 160 170';
 export function avatarSvg(input: Avatar | null | undefined, id = 'av'): string {
   const av = normalizeAvatar(input);
   const p = PORCELAIN[av.porcelain];
-  const seat = SEATS[av.seat].color;
-  const look = ballLook(av);
-  return `<defs><linearGradient id="${id}-porc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.top}"/><stop offset="1" stop-color="${p.bottom}"/></linearGradient></defs>
-<ellipse cx="80" cy="160" rx="54" ry="7" fill="rgba(0,0,0,0.3)"/>
-<rect x="40" y="46" width="80" height="50" rx="10" fill="url(#${id}-porc)" stroke="${INK}" stroke-width="5"/>
-<rect x="34" y="40" width="92" height="14" rx="6" fill="${p.top}" stroke="${INK}" stroke-width="5"/>
-<rect x="112" y="60" width="16" height="7" rx="3.5" fill="#c7d1dd" stroke="${INK}" stroke-width="3.5"/>
+  const shirt = SEATS[av.seat].color;
+  return `<path d="M25 151 C25 120 47 104 80 104 C113 104 135 120 135 151 Z" fill="${shirt}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
+<path d="M30 144 H130 V149 H30 Z" fill="${INK}" opacity=".12"/>
+<circle cx="80" cy="73" r="36" fill="${p.top}" stroke="${INK}" stroke-width="7"/>
+<path d="M102 47 A36 36 0 0 1 59 103 A36 36 0 0 0 102 47" fill="${p.bottom}" opacity=".35"/>
 ${faceSvg(av.face)}
-<path d="M26 104 C26 94 44 90 80 90 C116 90 134 94 134 104 L128 128 C122 148 104 156 80 156 C56 156 38 148 32 128 Z" fill="url(#${id}-porc)" stroke="${INK}" stroke-width="5"/>
-<ellipse cx="80" cy="104" rx="46" ry="15" fill="${seat}" stroke="${INK}" stroke-width="5"/>
-<ellipse cx="80" cy="105" rx="31" ry="9" fill="#4db8ff" stroke="${INK}" stroke-width="4"/>
-<ellipse cx="70" cy="103" rx="9" ry="3" fill="#9fdcff"/>
 ${hatSvg(av.hat)}
-<path d="M8 150 h14 M4 142 h16 M10 134 h10" stroke="${INK}" stroke-width="3.5" stroke-linecap="round" opacity="0.6"/>
-${ballSvg(look, 36, 146, 13, id)}`;
+${ballSvg(ballLook(av), 132, 146, 13, id)}`;
 }

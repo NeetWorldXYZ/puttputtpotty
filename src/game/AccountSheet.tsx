@@ -9,8 +9,8 @@ import { BALLS, DEFAULT_AVATAR, FACES, HATS, PORCELAIN, SEATS, type Avatar as Av
 
 type LookOption = readonly [string, string, string | null];
 const LOOK_GROUPS: readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] = [
-  ['Porcelain', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
-  ['Seat', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
+  ['Skin', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
+  ['Shirt', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
   ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
   ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
   ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
