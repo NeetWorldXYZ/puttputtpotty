@@ -6,6 +6,11 @@ export type Material = 'ceramic' | 'rubber' | 'metal' | 'water' | 'fabric' | 'st
 
 export function finishMaterial(ctx: CanvasRenderingContext2D, b: Rect, material: Material, seed = 1): void {
   ctx.save();
+  if(material==='metal'){
+    const metal=ctx.createLinearGradient(b.x,b.y,b.x+b.w*.25,b.y+b.h);
+    for(const [p,c] of [[0,'#06172733'],[.18,'#ffffff88'],[.35,'#d0e6ee22'],[.52,'#0c26354d'],[.7,'#ffffff88'],[1,'#11293655']] as const)metal.addColorStop(p,c);
+    ctx.fillStyle=metal;ctx.fillRect(b.x,b.y,b.w,b.h);
+  }
   const light = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h);
   light.addColorStop(0, material === 'metal' ? '#ffffff65' : '#ffffff24');
   light.addColorStop(0.35, '#ffffff00');
@@ -36,6 +41,10 @@ export function finishMaterial(ctx: CanvasRenderingContext2D, b: Rect, material:
       ctx.moveTo(x, b.y); ctx.lineTo(x, b.y + b.h);
     }
     ctx.stroke();
+  }
+  if(material==='rubber'||material==='ceramic'){
+    const rand=makeRand(seed+9);ctx.fillStyle='#ffffff13';
+    for(let i=0;i<Math.min(900,b.w*b.h*5);i++){ctx.fillRect(b.x+rand()*b.w,b.y+rand()*b.h,.035,.035);}
   }
   if (material === 'water') {
     ctx.strokeStyle = '#d8faff75'; ctx.lineWidth = 0.075;

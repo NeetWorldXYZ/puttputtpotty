@@ -184,6 +184,7 @@ function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLa
     if (h.type !== 'water' && h.type !== 'overflow') continue;
     const c = polygonCentroid(h.polygon);
     ctx.save();
+    ctx.beginPath();h.polygon.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.clip();
     ctx.strokeStyle = '#ffffff';
     for (let k = 0; k < 2; k++) {
       const ph = ((t * 0.45 + k * 0.5) % 1);

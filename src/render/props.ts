@@ -42,7 +42,7 @@ export function placeProps(hole: Hole, region: Region, theme: Theme): PropPlacem
   }
   const out: PropPlacement[] = [];
   // Fewer, varied props: round-robin through the theme's list, signs at most twice.
-  const target = Math.min(14, Math.round((cands.length / 55) * theme.propDensity) + 2);
+  const target = Math.min(18, Math.round((cands.length / 44) * theme.propDensity) + 2);
   const SIGNS: PropKind[] = ['outOfOrder', 'washSign', 'gateSign', 'neonSign'];
   const counts = new Map<PropKind, number>();
   let order = shuffle(theme.props.slice(), rand);
@@ -340,6 +340,11 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropPlacement): void 
   const rand = makeRand(p.seed);
   ctx.save();
   ctx.translate(p.x, p.y);
+  if (p.kind === 'soap' || p.kind === 'brush' || p.kind === 'towel' || p.kind === 'suitcase') {
+    const h=p.kind === 'soap' ? 1.9 : p.kind === 'suitcase' ? 2.7 : 3.8;
+    if(drawSprite(ctx,p.kind,-1.8,-h/2,3.6,h)){ctx.restore();return;}
+  }
+  if(p.kind === 'paperStack' && drawSprite(ctx,'paper-roll',-1.6,-1.6,3.2,3.2)){ctx.restore();return;}
   const sprite = p.kind === 'mopBucket' ? 'janitor' : p.kind === 'palm' ? 'plant' : p.kind === 'sink' ? 'sink' : null;
   if (sprite && drawSprite(ctx, sprite, -2.3, -2.3, 4.6, 4.6)) { ctx.restore(); return; }
   if (drawFurnishing(ctx, p.kind)) { ctx.restore(); return; }
@@ -347,6 +352,13 @@ export function drawProp(ctx: CanvasRenderingContext2D, p: PropPlacement): void 
   ctx.lineCap = 'round';
   const tilt = (rand() - 0.5) * 0.5;
   switch (p.kind) {
+    case 'paperStack':
+      circle(ctx,0,0,1.2);chunky(ctx,'#fff3dc',.13);circle(ctx,0,0,.4);chunky(ctx,'#7d6849',.1);break;
+    case 'soap':
+      roundRectPath(ctx,-1.5,-.7,3,1.4,.35);chunky(ctx,'#9fcead',.12);break;
+    case 'brush':
+      ctx.strokeStyle='#3d929b';ctx.lineWidth=.3;ctx.beginPath();ctx.moveTo(-1,1);ctx.lineTo(1,-1.4);ctx.stroke();
+      ellipse(ctx,-1,1,.6,.7);chunky(ctx,'#e8e0ca',.12);break;
     case 'sink':
       roundRectPath(ctx, -1.5, -1.5, 3, 3, 0.5); chunky(ctx, '#f4f8fa', 0.18);
       ellipse(ctx, 0, 0.2, 1, 0.85); chunky(ctx, '#bedaea', 0.12);
