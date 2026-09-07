@@ -1,3 +1,4 @@
+import { MenuVolume } from './MenuControls';
 import { useEffect, useRef, useState } from 'react';
 import { COURSE } from '../holes';
 import { drawHole } from '../render/drawHole';
@@ -5,8 +6,8 @@ import { fitCamera } from '../render/camera';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import type { Hole } from '../sim/types';
 import { COURSE_LENGTHS, dailyEdition, dailySeed, getBest, getPreferredLength, goToCourse, secondsUntilNextDaily, setPreferredLength } from './courses';
-import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
-import { startTheme, stopTheme } from './music';
+import { getAudio, isMuted, sfx, unlockAudio } from './sound';
+import { startTheme } from './music';
 import { navigate } from '../router';
 import { api } from '../net/api';
 import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net/supabase';
@@ -30,7 +31,6 @@ function untilTomorrowUtc(): string {
 
 export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
   const [avatar] = useState(getSavedAvatar());
   const [askName, setAskName] = useState(false);
@@ -158,7 +158,7 @@ export function TitleScreen() {
   // Coming back from a game the context is already unlocked: music starts straight away. Leaving fades it out.
   useEffect(() => {
     theme();
-    return () => stopTheme();
+    // Music is shared across menus; App stops it when entering a course.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const go = (fn: () => void, sound: 'tap' | 'whoosh' = 'tap') => {
@@ -189,21 +189,7 @@ export function TitleScreen() {
       <div className="title-inner home2 compact-home open-home">
         <header className="home-top">
           <div className="home-icons">
-            <button
-              className="icon-btn"
-              aria-label={muted ? 'Sound off' : 'Sound on'}
-              onClick={() =>
-                go(() => {
-                  const m = !muted;
-                  setMuted(m);
-                  setMutedState(m);
-                  if (m) stopTheme();
-                  else theme();
-                })
-              }
-            >
-              {muted ? '🔇' : '🔊'}
-            </button>
+            <MenuVolume />
             <button className="icon-btn" aria-label="How to play" onClick={() => go(() => setHelp(true))}>
               ❓
             </button>

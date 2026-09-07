@@ -1,7 +1,8 @@
 import { PlayView } from './game/PlayView';
 import { GeneratedCourse } from './game/GeneratedCourse';
 import { TitleScreen } from './game/TitleScreen';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
+import { stopTheme } from './game/music';
 import { EditorView } from './editor/EditorView';
 import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
@@ -27,6 +28,8 @@ function Loading() {
 
 export function App() {
   const loc = useLocation();
+  const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
+  useEffect(() => { if (!menu) stopTheme(); }, [menu]);
   if (loc.route === 'editor') return <EditorView onExit={() => navigate('play')} />;
   if (loc.route === 'map')
     return (

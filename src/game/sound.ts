@@ -84,6 +84,7 @@ export function isMuted(): boolean {
 
 export function setMuted(m: boolean): void {
   muted = m;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
   try {
     localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   } catch {

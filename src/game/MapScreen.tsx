@@ -1,3 +1,4 @@
+import { MenuVolume } from './MenuControls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -751,7 +752,7 @@ export function MapScreen() {
       <div ref={mapEl} className="map-canvas" />
 
       <div className="map-head">
-        <div className="map-badge">📍</div>
+        <MenuVolume />
         <div className="map-title">
           <div className="map-title-main">Nearby thrones</div>
           <div className="map-title-sub">
@@ -768,7 +769,7 @@ export function MapScreen() {
                       : 'no bathrooms found here'}
           </div>
         </div>
-        <button className="name-chip" onClick={() => setAskName(true)} title="Your account">
+        <button className="name-chip menu-golfer" onClick={() => setAskName(true)} title="Your account">
           <Avatar av={getSavedAvatar()} size={22} className="chip-avatar" />
           {name ?? 'Set name'}
         </button>

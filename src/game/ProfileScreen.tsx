@@ -1,3 +1,4 @@
+import { MenuVolume, GolferChip } from './MenuControls';
 import { useEffect, useState } from 'react';
 import { api, fmtElapsed, type PlayerProfile } from '../net/api';
 import { currentUserId } from '../net/supabase';
@@ -49,16 +50,12 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
   return (
     <div className="leaders profile">
       <div className="map-head">
-        <button className="corner-btn" onClick={() => (window.history.length > 1 ? window.history.back() : navigate('play'))} title="Back">
-          ‹
-        </button>
+        <MenuVolume />
         <div className="map-title">
           <div className="map-title-main">{p?.name ?? 'Player'}</div>
           <div className="map-title-sub">{p ? `playing since ${since(p.since)}` : ''}</div>
         </div>
-        <button className="corner-btn" onClick={() => navigate('leaders')} title="Leaderboard">
-          🏆
-        </button>
+        <GolferChip />
       </div>
 
       {error && <div className="lb-note">Profile offline · {error}</div>}

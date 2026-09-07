@@ -1,6 +1,7 @@
 import { navigate } from '../router';
 import { sfx, unlockAudio } from './sound';
 import './TabBar.css';
+import { useMenuMusic } from './MenuControls';
 import { MatchIcon } from './MatchIcon';
 
 export type Tab = 'play' | 'map' | 'match' | 'leaders' | 'profile';
@@ -23,6 +24,7 @@ const TABS: { tab: Tab; label: string }[] = [
 
 /** Stable destinations on every menu screen. Gameplay retains its own controls. */
 export function TabBar({ active }: { active: Tab }) {
+  useMenuMusic();
   const go = (tab: Tab) => {
     unlockAudio();
     if (tab === active) return;

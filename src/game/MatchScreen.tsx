@@ -1,3 +1,4 @@
+import { MenuVolume, GolferChip } from './MenuControls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TabBar } from './TabBar';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -13,6 +14,7 @@ import { PlayView, type HoleDoneInfo } from './PlayView';
 import { NamePrompt } from './NamePrompt';
 import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
+import { stopTheme } from './music';
 
 interface Props {
   /** Invite code from a shared link. */
@@ -37,6 +39,7 @@ const POLL_MS = 2000;
  */
 export function MatchScreen({ code, matchId }: Props) {
   const [phase, setPhase] = useState<Phase>(matchId ? 'loading' : code ? 'loading' : 'lobby');
+  useEffect(() => { if (phase === 'playing') stopTheme(); }, [phase]);
   const [match, setMatch] = useState<MatchRow | null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [holes, setHoles] = useState<Hole[] | null>(null);
@@ -325,13 +328,12 @@ export function MatchScreen({ code, matchId }: Props) {
   return (
     <div className="leaders match-screen">
       <div className="map-head">
-        <button className="corner-btn" onClick={() => navigate('play')} title="Title screen">
-          ⌂
-        </button>
+        <MenuVolume />
         <div className="map-title">
           <div className="map-title-main">Match</div>
           <div className="map-title-sub">Same course. Settle it on the green.</div>
         </div>
+        <GolferChip />
       </div>
 
       <div className="board match-board">
