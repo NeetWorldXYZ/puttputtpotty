@@ -7,14 +7,14 @@
  */
 import type { StyleSpecification } from 'maplibre-gl';
 
-const INK = '#1f2a44';
-const FAIRWAY = '#7fcc63';
-const ROUGH = '#5fae4c';
-const GREEN = '#98dd78';
-const WATER = '#4db8ff';
+const INK = '#233e46';
+const FAIRWAY = '#85bf68';
+const ROUGH = '#569952';
+const GREEN = '#a2d47d';
+const WATER = '#54bee4';
 const SAND = '#f2dfa4';
-const PATH = '#f7f0dc';
-const BUILDING = '#eadcb8';
+const PATH = '#fff2d5';
+const BUILDING = '#dec99d';
 const FONT = ['Noto Sans Bold'];
 const FONT_REG = ['Noto Sans Regular'];
 
@@ -91,7 +91,7 @@ export const COURSE_STYLE: StyleSpecification = {
       source: 'openmaptiles',
       'source-layer': 'water_name',
       layout: { 'text-field': ['get', 'name'], 'text-font': FONT_REG, 'text-size': 12, 'symbol-placement': 'line' },
-      paint: { 'text-color': '#1c5a8a', 'text-halo-color': '#cfeaff', 'text-halo-width': 1.5 },
+      paint: { 'text-color': '#175b80', 'text-halo-color': '#cfefff', 'text-halo-width': 1.5 },
     },
     {
       id: 'road-name',
@@ -109,7 +109,7 @@ export const COURSE_STYLE: StyleSpecification = {
       'source-layer': 'place',
       filter: ['in', 'class', 'city', 'town', 'village'],
       layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': ['match', ['get', 'class'], 'city', 18, 'town', 15, 13], 'text-transform': 'uppercase', 'text-letter-spacing': 0.08 },
-      paint: { 'text-color': INK, 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+      paint: { 'text-color': INK, 'text-halo-color': '#f5ffdf', 'text-halo-width': 2 },
     },
     {
       id: 'place-hood',
@@ -119,7 +119,7 @@ export const COURSE_STYLE: StyleSpecification = {
       minzoom: 13,
       filter: ['in', 'class', 'suburb', 'neighbourhood', 'hamlet'],
       layout: { 'text-field': ['get', 'name'], 'text-font': FONT, 'text-size': 12 },
-      paint: { 'text-color': INK, 'text-halo-color': '#ffffff', 'text-halo-width': 1.5, 'text-opacity': 0.8 },
+      paint: { 'text-color': INK, 'text-halo-color': '#f5ffdf', 'text-halo-width': 1.5, 'text-opacity': 0.8 },
     },
   ],
 };
