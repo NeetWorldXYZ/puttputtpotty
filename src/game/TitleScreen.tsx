@@ -14,7 +14,6 @@ import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
-import { TabBar } from './TabBar';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -292,7 +291,7 @@ export function TitleScreen() {
       </div>
       <div className="title-inner home2">
         <header className="home-top">
-          <span className="home-icons">
+          <div className="home-icons">
             <button
               className="icon-btn"
               aria-label={muted ? 'Sound off' : 'Sound on'}
@@ -311,7 +310,7 @@ export function TitleScreen() {
             <button className="icon-btn" aria-label="How to play" onClick={() => go(() => setHelp(true))}>
               ❓
             </button>
-          </span>
+          </div>
           <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
             <Avatar av={avatar} size={26} className="chip-avatar" />
             <span className="player-name">{name ?? 'Set your name'}</span>
@@ -333,52 +332,69 @@ export function TitleScreen() {
         </div>
         <div className="tagline">Every bathroom is a course.</div>
 
-        <button className={`daily-card${played ? ' played' : ''}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+        <section className={`daily-card${played ? ' played' : ''}`}>
           {dailyArt ? <img className="daily-img" src={ART.daily} alt="" /> : <DailyArt played={played} />}
-          {dailyArt && !played ? null : (
-            <span className={`sign${dailyArt ? ' badge' : ''}`}>
-              <span className="sign-top">{played ? 'Your round' : "Today's round"}</span>
-              <span className="sign-main">{played ? (best !== null ? `You shot ${best}` : 'Played') : 'Nine holes.'}</span>
-              <span className="sign-sub">{played ? (dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.') : 'One throne.'}</span>
+          {played && (
+            <span className="sign badge">
+              <span className="sign-top">Your round</span>
+              <span className="sign-main">{best !== null ? `You shot ${best}` : 'Played'}</span>
+              <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board.'}</span>
             </span>
           )}
-          <span className="cta in-card">{played ? `🏆 Leaderboard · next in ${untilTomorrowUtc()}` : `${edition === 'morning' ? '🌅' : '🌇'}  Play the ${edition} course`}</span>
-        </button>
-        <button className="map-card" onClick={() => go(() => navigate('map'), 'whoosh')}>
-          <span className="mc-text">
-            <span className="mc-kicker">📍 Real bathrooms</span>
-            <strong>Nearby thrones</strong>
-            <small>{nearby ? `${nearby.total} bathrooms · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Three holes each. One throne to win.'}</small>
-            <span className="mc-go">Open the map ›</span>
-          </span>
-          <MapArt mine={nearby?.mine ?? 0} />
-        </button>
-
-        <div className="duo">
-          <button className="tile pink" onClick={() => go(() => navigate('match'), 'whoosh')}>
-            <span className="tile-icon">🪠</span>
-            <span className="tile-title">Quick match</span>
-            <span className="tile-sub">Same nine holes. Live.</span>
+          <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            {played ? `🏆 Daily leaderboard · next in ${untilTomorrowUtc()}` : `▶  Play the ${edition} course`}
           </button>
-          <div className="tile mint">
-            <span className="tile-icon">🎲</span>
-            <span className="tile-title">Custom game</span>
-            <span className="tile-sub">Pick your holes.</span>
-            <span className="len-chips">
-              {COURSE_LENGTHS.map((l) => (
-                <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
-                  {l.label}
-                </button>
-              ))}
-            </span>
-            <button className="tile-go" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
-              Tee off · {len} holes
+        </section>
+
+        <section className="menu2">
+          <div className="mrow feature">
+            <MapArt mine={nearby?.mine ?? 0} />
+            <div className="mrow-text">
+              <strong>Nearby thrones</strong>
+              <small>{nearby ? `${nearby.total} bathrooms · ${nearby.claimed} claimed · you hold ${nearby.mine}` : 'Real bathrooms, three holes each.'}</small>
+            </div>
+            <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
+              Open map
             </button>
           </div>
-        </div>
-
+          <div className="mrow">
+            <span className="mrow-icon">🪠</span>
+            <div className="mrow-text">
+              <strong>Quick match</strong>
+              <small>Same nine holes, live against someone.</small>
+            </div>
+            <button className="mbtn" onClick={() => go(() => navigate('match'), 'whoosh')}>
+              Play
+            </button>
+          </div>
+          <div className="mrow">
+            <span className="mrow-icon">🎲</span>
+            <div className="mrow-text">
+              <strong>Custom game</strong>
+              <span className="len-chips">
+                {COURSE_LENGTHS.map((l) => (
+                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
+                    {l.label}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <button className="mbtn" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
+              Tee off
+            </button>
+          </div>
+          <div className="mrow">
+            <span className="mrow-icon">🏆</span>
+            <div className="mrow-text">
+              <strong>Leaderboards</strong>
+              <small>Today&apos;s round, thrones and kings.</small>
+            </div>
+            <button className="mbtn" onClick={() => go(() => navigate('leaders'), 'tap')}>
+              Open
+            </button>
+          </div>
+        </section>
       </div>
-      <TabBar active="play" />
 
       {askName && (
         <AccountSheet

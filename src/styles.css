@@ -2794,16 +2794,6 @@ input[type='checkbox'] {
   align-items: center;
   justify-content: center;
 }
-.home-season {
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 800;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.12);
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
-  padding: 4px 10px;
-}
 .home2 .player-chip {
   flex-direction: row;
   align-items: center;
@@ -2969,239 +2959,9 @@ input[type='checkbox'] {
   font-weight: 800;
   box-shadow: 0 6px 0 var(--ink), 0 10px 16px rgba(0, 0, 0, 0.3);
 }
-.cta.in-card {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: auto;
-  padding: 11px 12px;
-  font-size: 18px;
-  text-align: center;
-  border-radius: 14px;
-  box-shadow: 0 4px 0 var(--ink), 0 8px 14px rgba(0, 0, 0, 0.35);
-}
-.daily-card:active .cta.in-card {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--ink);
-}
-.daily-card .daily-img {
-  padding-bottom: 46px;
-  box-sizing: border-box;
-}
-.cta:active {
+.daily-card:active .cta:active {
   transform: translateY(4px);
   box-shadow: 0 2px 0 var(--ink);
-}
-.duo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.tile {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 4px solid var(--ink);
-  color: var(--ink);
-  font-family: var(--game-font);
-  text-align: left;
-  box-shadow: 0 5px 0 var(--ink), 0 8px 14px rgba(0, 0, 0, 0.3);
-  min-height: 112px;
-}
-button.tile:active {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 var(--ink);
-}
-.tile.pink {
-  background: linear-gradient(180deg, #ffb3c1, #ff8fa3);
-}
-.tile.mint {
-  background: linear-gradient(180deg, #b8f5d8, #8ce8bd);
-}
-.tile-icon {
-  font-size: 34px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.2));
-}
-.tile-title {
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.05;
-}
-.tile-sub {
-  font-size: 12px;
-  font-weight: 700;
-  opacity: 0.85;
-}
-.tile .len-chips {
-  display: flex;
-  gap: 4px;
-  margin: 2px 0;
-}
-.tile .len-chips button {
-  min-width: 28px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: 8px;
-  border: 2px solid var(--ink);
-  background: #fff;
-  color: var(--ink);
-  font-weight: 800;
-  font-size: 13px;
-}
-.tile .len-chips button.active {
-  background: var(--ink);
-  color: #fff;
-}
-.tile-go {
-  margin-top: auto;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 10px;
-  border: 3px solid var(--ink);
-  background: #fff;
-  color: var(--ink);
-  font-weight: 800;
-  font-size: 13px;
-  font-family: var(--game-font);
-}
-.row-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 16px;
-  border: 4px solid var(--ink);
-  background: #fff;
-  color: var(--ink);
-  text-align: left;
-  font-family: var(--game-font);
-  box-shadow: 0 5px 0 var(--ink), 0 8px 14px rgba(0, 0, 0, 0.3);
-}
-.row-card:active {
-  transform: translateY(3px);
-  box-shadow: 0 2px 0 var(--ink);
-}
-.rc-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #b8f5d8, #8ce8bd);
-  border: 3px solid var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  flex: none;
-}
-.rc-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-.rc-text strong {
-  font-size: 17px;
-}
-.rc-text small {
-  font-size: 12px;
-  opacity: 0.75;
-  font-weight: 600;
-}
-.rc-chev {
-  font-size: 26px;
-  opacity: 0.5;
-}
-/* ---- Home map card ---- */
-.map-card {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 8px 8px 14px;
-  border-radius: 20px;
-  border: 4px solid var(--ink);
-  background: linear-gradient(180deg, #b8f5d8, #8ce8bd);
-  color: var(--ink);
-  text-align: left;
-  font-family: var(--game-font);
-  box-shadow: 0 6px 0 var(--ink), 0 10px 16px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-}
-.map-card:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 var(--ink);
-}
-.mc-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-  min-width: 0;
-  justify-content: center;
-}
-.mc-kicker {
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-.mc-text strong {
-  font-size: 23px;
-  line-height: 1;
-  white-space: nowrap;
-}
-.mc-text small {
-  font-size: 12px;
-  font-weight: 700;
-  opacity: 0.8;
-}
-.mc-go {
-  margin-top: 4px;
-  align-self: flex-start;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-}
-.map-art {
-  width: 100px;
-  height: 80px;
-  flex: none;
-  border-radius: 14px;
-  border: 3px solid var(--ink);
-  background: #dff8ec;
-}
-.home-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 2px;
-}
-.foot-btn {
-  background: rgba(255, 255, 255, 0.12);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  color: #fff;
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.foot-season {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  font-weight: 700;
 }
 
 /* ---- Tab bar ---- */
@@ -3250,11 +3010,11 @@ button.tile:active {
 }
 
 .title:has(.home2) .title-bg {
-  opacity: 0.28;
-  filter: saturate(0.7);
+  opacity: 0.2;
+  filter: saturate(0.6);
 }
 .title:has(.home2) .floaters {
-  opacity: 0.45;
+  opacity: 0.22;
 }
 
 /* ---- Map redesign: navy pins, filters, badge ---- */
@@ -3457,4 +3217,214 @@ button.tile:active {
 }
 .daily-card .sign.badge::after {
   display: none;
+}
+
+/* ---- Smooth home: no outlines, soft depth, buttons do the navigating ---- */
+.home2 .icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home2 .player-chip {
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  max-width: 62vw;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.home2 .player-chip:active,
+.home2 .icon-btn:active,
+.home2 .mbtn:active,
+.home2 .cta:active {
+  transform: scale(0.97);
+}
+.home2 .logo-img.hero {
+  width: min(58%, 250px);
+  height: auto;
+  max-width: none;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.4));
+}
+.home2 .tagline {
+  margin: -6px 0 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: none;
+}
+.home2 .daily-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 12px 12px;
+  border: none;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #243361, #1a2440);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  cursor: default;
+  overflow: visible;
+}
+.home2 .daily-img {
+  width: 100%;
+  padding: 0;
+  height: clamp(170px, 25vh, 230px);
+  aspect-ratio: auto;
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.35));
+}
+.home2 .daily-art {
+  width: auto;
+  height: clamp(170px, 25vh, 230px);
+  align-self: center;
+}
+.home2 .sign.badge {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  bottom: auto;
+  border: none;
+  border-radius: 14px;
+  background: rgba(20, 28, 50, 0.85);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.home2 .cta {
+  border: none;
+  border-radius: 16px;
+  padding: 14px 12px;
+  font-size: 18px;
+  background: linear-gradient(180deg, #ffe08a, #ffc93c);
+  box-shadow: 0 8px 22px rgba(255, 201, 60, 0.28);
+}
+.menu2 {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 9px 9px 12px;
+  border-radius: 18px;
+  background: rgba(38, 50, 86, 0.78);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  color: #fff;
+  font-family: var(--game-font);
+}
+.mrow.feature {
+  padding: 11px 11px 11px 12px;
+  background: linear-gradient(135deg, rgba(64, 128, 112, 0.92), rgba(38, 60, 92, 0.9));
+}
+.mrow-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex: none;
+}
+.mrow-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mrow-text strong {
+  font-size: 16px;
+  line-height: 1.1;
+}
+.mrow.feature .mrow-text strong {
+  font-size: 17px;
+  white-space: nowrap;
+}
+.mrow-text small {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mbtn {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: var(--game-font);
+  font-weight: 800;
+  font-size: 13px;
+}
+.mbtn.primary {
+  padding: 9px 12px;
+  background: linear-gradient(180deg, #ffe08a, #ffc93c);
+  color: var(--ink);
+  box-shadow: 0 6px 16px rgba(255, 201, 60, 0.25);
+}
+.mrow .map-art {
+  width: 70px;
+  height: 56px;
+  flex: none;
+  border-radius: 12px;
+}
+.mrow .len-chips {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+.mrow .len-chips button {
+  min-width: 30px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: var(--game-font);
+  font-weight: 800;
+  font-size: 12px;
+}
+.mrow .len-chips button.active {
+  background: #fff;
+  color: var(--ink);
+}
+
+/* ---- Softer chrome elsewhere: tab bar, map controls, dialogs ---- */
+.tabbar {
+  border: none;
+  background: rgba(20, 28, 50, 0.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  border-radius: 22px;
+}
+.map-filters button,
+.map-tool,
+.name-chip {
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.map-badge {
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+.overlay > .card {
+  border: none;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
