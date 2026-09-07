@@ -2308,6 +2308,20 @@ input[type='checkbox'] {
   height: 52px;
   font-size: 21px;
 }
+.cluster-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cluster .throne-glyph {
+  display: block;
+  width: 30px;
+  height: 36px;
+}
+.cluster.big .throne-glyph {
+  width: 35px;
+  height: 42px;
+}
 .cluster-count {
   position: absolute;
   top: -10px;

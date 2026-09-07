@@ -91,15 +91,16 @@ function ago(iso: string): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+const THRONE_GLYPH = `<svg class="throne-glyph" viewBox="0 0 40 48" aria-hidden="true"><path d="m8 12-3-9 9 5 6-7 6 7 9-5-3 9Z" fill="#ffdc65" stroke="#14213d" stroke-width="2"/><rect x="9" y="14" width="22" height="13" rx="3" fill="white" stroke="#14213d" stroke-width="2"/><path d="M6 27h28q0 13-11 14l3 5H14l3-5Q6 40 6 27Z" fill="white" stroke="#14213d" stroke-width="2"/><ellipse cx="20" cy="28" rx="12" ry="4" fill="#55d9f0" stroke="#14213d" stroke-width="2"/></svg>`;
+
 /**
  * A pin says one thing at a glance: empty throne (white), taken (gold with
  * the king's score), or yours (gold with a glow).
  */
 function pinHtml(_p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, mine: boolean): string {
-  const icon = `<svg class="throne-glyph" viewBox="0 0 40 48" aria-hidden="true"><path d="m8 12-3-9 9 5 6-7 6 7 9-5-3 9Z" fill="#ffdc65" stroke="#14213d" stroke-width="2"/><rect x="9" y="14" width="22" height="13" rx="3" fill="white" stroke="#14213d" stroke-width="2"/><path d="M6 27h28q0 13-11 14l3 5H14l3-5Q6 40 6 27Z" fill="white" stroke="#14213d" stroke-width="2"/><ellipse cx="20" cy="28" rx="12" ry="4" fill="#55d9f0" stroke="#14213d" stroke-width="2"/></svg>`;
   const claimed = !!king?.king_name;
   const badge = claimed && king!.king_score !== null ? `<span class="pin-score">${king!.king_score}</span>` : '';
-  return `<div class="pin${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="pin-icon">${icon}</span>${badge}</div>`;
+  return `<div class="pin${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="pin-icon">${THRONE_GLYPH}</span>${badge}</div>`;
 }
 
 /** Zoomed out past this, nearby flags fold into count bubbles that split apart as you zoom in. */
@@ -149,7 +150,7 @@ function clusterPlaces(places: OsmPlace[], zoom: number, kings: Record<string, N
 
 function clusterHtml(c: Cluster): string {
   const big = c.members.length >= 10;
-  return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${c.claimed ? '👑' : '🚽'}</span></div>`;
+  return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${THRONE_GLYPH}</span></div>`;
 }
 
 const FOUND_TYPES: [string, string][] = [
