@@ -6,7 +6,7 @@
  * before.
  */
 
-import type { Hole } from '../sim/types';
+import type { Hole, Rect } from '../sim/types';
 import { isMoving } from '../sim/types';
 import type { Camera } from './camera';
 import { themeById, OUTLINE, type Theme } from './themes';
@@ -26,7 +26,10 @@ import {
   drawTee,
   drawTrail,
   drawWalls,
+  drawWallShadows,
   drawWallGlow,
+  shapeShadow,
+  SOLID_OBSTACLES,
   hazardSeed,
   holeSeed,
 } from './objects';
@@ -65,13 +68,19 @@ export interface DrawOptions {
 // ---------------------------------------------------------------------------
 // Static layer cache
 
-interface StaticLayer {
+export interface StaticLayer {
   canvas: HTMLCanvasElement | OffscreenCanvas;
   ppu: number;
   key: string;
   animated: PropPlacement[];
   region: Region;
+  /** World rectangle the bitmap covers (the bounds, or more floor around them for the tilted view). */
+  rect: Rect;
 }
+export type FloorLayer = StaticLayer;
+
+/** 'flat' is the classic top-down picture; 'floor' leaves out everything that stands up (the scene renderer draws those). */
+type LayerMode = 'flat' | 'floor';
 
 const layerCache = new Map<string, StaticLayer>();
 const holeKeys = new WeakMap<Hole, string>();
@@ -94,22 +103,29 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
   return c;
 }
 
-function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number): StaticLayer {
+/** The flat floor bitmap the tilted renderer lays under its standing things. */
+export function getFloorLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number): FloorLayer {
+  return getStaticLayer(hole, ppuWanted, cupR, ballR, 'floor');
+}
+
+function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number, mode: LayerMode = 'flat'): StaticLayer {
   const b = hole.bounds;
+  // The tilted view sees past the bounds, so its floor bitmap carries extra surround on every side.
+  const rect: Rect = mode === 'floor' ? { x: b.x - b.w * 0.6, y: b.y - b.h * 0.35, w: b.w * 2.2, h: b.h * 1.7 } : b;
   let ppu = ppuWanted;
-  const maxPpu = Math.min(MAX_SIDE / b.w, MAX_SIDE / b.h);
+  const maxPpu = Math.min(MAX_SIDE / rect.w, MAX_SIDE / rect.h);
   if (ppu > maxPpu) ppu = maxPpu;
   ppu = Math.round(ppu * 4) / 4;
-  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}`;
+  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${mode}`;
   const hit = layerCache.get(key);
   if (hit) return hit;
-  const w = Math.max(1, Math.ceil(b.w * ppu));
-  const h = Math.max(1, Math.ceil(b.h * ppu));
+  const w = Math.max(1, Math.ceil(rect.w * ppu));
+  const h = Math.max(1, Math.ceil(rect.h * ppu));
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-  ctx.setTransform(ppu, 0, 0, ppu, -b.x * ppu, -b.y * ppu);
-  const { animated, region } = paintStatic(ctx, hole, cupR, ballR);
-  const layer: StaticLayer = { canvas, ppu, key, animated, region };
+  ctx.setTransform(ppu, 0, 0, ppu, -rect.x * ppu, -rect.y * ppu);
+  const { animated, region } = paintStatic(ctx, hole, cupR, ballR, mode, rect);
+  const layer: StaticLayer = { canvas, ppu, key, animated, region, rect };
   // Small LRU.
   if (layerCache.size > 6) {
     const first = layerCache.keys().next().value;
@@ -119,14 +135,15 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   return layer;
 }
 
-function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): { animated: PropPlacement[]; region: Region } {
+function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number, mode: LayerMode, rect: Rect): { animated: PropPlacement[]; region: Region } {
   const theme: Theme = themeById(hole.theme);
   const b = hole.bounds;
+  const area = mode === 'floor' ? rect : b;
   const seed = holeSeed(hole);
   const region = wallLoops(hole);
 
   // Out of play area + props (animated ones are drawn per frame instead).
-  drawSurround(ctx, b, theme);
+  drawSurround(ctx, area, theme);
   const props = placeProps(hole, region, theme);
   const animated: PropPlacement[] = [];
   for (const p of props) {
@@ -158,20 +175,23 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
 
   drawTee(ctx, hole.tee.x, hole.tee.y, ballR);
   hole.obstacles.forEach((o, i) => {
-    if (!isMoving(o)) drawObstacle(ctx, o, seed + 31 * i);
+    if (isMoving(o)) return;
+    if (mode === 'floor' && SOLID_OBSTACLES.includes(o.type)) shapeShadow(ctx, o.shape);
+    else drawObstacle(ctx, o, seed + 31 * i);
   });
   drawCup(ctx, hole.cup.x, hole.cup.y, cupR, 0);
-  drawWalls(ctx, hole.walls, theme);
+  if (mode === 'floor') drawWallShadows(ctx, hole.walls);
+  else drawWalls(ctx, hole.walls, theme);
 
   // Spotlight vignette over the whole bounds.
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
-  const rMax = Math.hypot(b.w, b.h) * 0.62;
+  const rMax = Math.hypot(area.w, area.h) * 0.62;
   const grad = ctx.createRadialGradient(cx, cy, rMax * 0.45, cx, cy, rMax);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(1, 'rgba(0,0,0,0.38)');
   ctx.fillStyle = grad;
-  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.fillRect(area.x, area.y, area.w, area.h);
   return { animated, region };
 }
 
