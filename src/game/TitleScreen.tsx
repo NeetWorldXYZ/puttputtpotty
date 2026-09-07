@@ -185,7 +185,7 @@ export function TitleScreen() {
         ))}
       </div>
       <div className="arcade-backdrop" aria-hidden="true" />
-      <div className="title-inner home2 compact-home open-home home-remix">
+      <div className="title-inner home2 compact-home open-home">
         <header className="home-top">
           <div className="home-icons">
             <button
@@ -214,40 +214,29 @@ export function TitleScreen() {
           </button>
         </header>
         <div className="arcade-brand"><img src={`${import.meta.env.BASE_URL}art/arcade-logo.webp`} alt="Putt Putt Potty" draggable={false} /></div>
-        <div className="arcade-green bathroom-green" aria-hidden="true">
-          <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              <pattern id="home-tiles" width="32" height="32" patternUnits="userSpaceOnUse"><rect width="32" height="32" fill="#e2ece1"/><path d="M0 32V0H32" fill="none" stroke="#a4bdb9" strokeWidth="2"/><path d="m1 1 30 30" stroke="#fff" opacity=".25"/></pattern>
-              <linearGradient id="home-turf" x2="0" y2="1"><stop stopColor="#a3dc58"/><stop offset="1" stopColor="#46aa55"/></linearGradient>
-            </defs>
-            <path d="M28 25Q28 8 46 8H354Q372 8 372 26V204Q372 225 350 225H50Q28 225 28 204Z" fill="#082c3b" transform="translate(0 8)"/>
-            <rect x="28" y="8" width="344" height="216" rx="22" fill="url(#home-tiles)" stroke="#092a3e" strokeWidth="5"/>
-            <path d="M47 43V28H354V204H47" fill="none" stroke="#648d91" strokeWidth="10" strokeLinejoin="round"/>
-            <path d="M50 36V27H354V203" fill="none" stroke="#fff8d9" strokeWidth="3"/>
-            <path d="M88 186C69 130 145 143 164 106S245 43 286 66S317 134 264 153S208 211 144 210Q98 211 88 186Z" fill="#225e49" stroke="#0e3942" strokeWidth="4"/>
-            <path d="M89 178C78 138 150 146 171 109S245 53 281 71S302 125 259 145S205 200 145 200Q103 201 89 178Z" fill="url(#home-turf)" stroke="#c7e87e" strokeWidth="3"/>
-            <path d="M119 174Q222 177 256 102" fill="none" stroke="#faffd5" strokeWidth="3" strokeDasharray="6 8" strokeLinecap="round"/>
-            <image href={`${import.meta.env.BASE_URL}art/gameplay/toilet.webp`} x="225" y="39" width="84" height="94"/>
-            <path d="m246 44-5-15 11 6 8-12 8 12 11-6-5 15Z" fill="#ffd43e" stroke="#092a3e" strokeWidth="3"/>
-            <image href={`${import.meta.env.BASE_URL}art/gameplay/paper-roll.webp`} x="41" y="37" width="57" height="57"/>
-            <image href={`${import.meta.env.BASE_URL}art/gameplay/plant.webp`} x="299" y="151" width="69" height="69"/>
-            <image href={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} x="29" y="124" width="76" height="76"/>
-            <circle cx="119" cy="174" r="12" fill="#fffdf0" stroke="#0e3444" strokeWidth="3"/><g fill="#bfd6d8"><circle cx="115" cy="170" r="2"/><circle cx="124" cy="172" r="2"/><circle cx="119" cy="180" r="2"/></g>
-            <g transform="translate(316 92) rotate(10)"><rect x="-19" y="-12" width="42" height="28" rx="5" fill="#ffcf45" stroke="#0e3444" strokeWidth="3"/><path d="M-5 5V-5H8L-5 0" fill="#f8725a" stroke="#0e3444" strokeWidth="2"/></g>
+        <div className="arcade-green" aria-hidden="true">
+          <svg viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet">
+            <path className="putt-trail" d="M72 213C230 208 291 123 291 80" fill="none" stroke="#fff9df" strokeWidth="4" strokeDasharray="10 13" strokeLinecap="round" />
+            <g stroke="#09233d" strokeWidth="4" strokeLinejoin="round">
+              <g transform="translate(256 8)"><path d="M9 19h53v44H12Z" fill="#fffdf0"/><path d="M15 27h41v27H17Z" fill="#e9ecde" strokeWidth="2"/><path d="M19 84h30l4 22H16Z" fill="#fdfaf0"/><path d="M4 65Q35 52 67 65L60 83Q34 108 11 83Z" fill="#fffdf0"/><ellipse cx="35" cy="67" rx="29" ry="11" fill="#fff"/><ellipse cx="35" cy="67" rx="18" ry="6" fill="#70b7ca"/><path d="M14 15 9-1 25 6 35-9 44 6 60-1 54 15Z" fill="#ffd044"/></g>
+              <circle cx="72" cy="213" r="22" fill="#f8fbff"/>
+            </g>
+            <g fill="#c7d9e2"><circle cx="65" cy="202" r="3"/><circle cx="76" cy="199" r="3"/><circle cx="83" cy="208" r="3"/><circle cx="69" cy="213" r="3"/><circle cx="60" cy="219" r="3"/><circle cx="78" cy="223" r="3"/></g>
+            <g stroke="#ffda4d" strokeWidth="4" strokeLinecap="round"><path d="m39 210-15-3m20 19-13 8m210-201-9-12m91 20 12-11"/></g>
           </svg>
         </div>
         <section className="arcade-daily" aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`}>
           <div className="challenge-label">{played ? 'ROUND COMPLETE' : "TODAY’S CHALLENGE"}</div>
           <button className="arcade-play" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            <span className="daily-ticket-icon" aria-hidden="true"><GameIcon kind={played ? 'trophy' : 'flag'} /></span><strong>{played ? 'DAILY RESULTS' : 'PLAY DAILY'}</strong><span className="daily-ticket-arrow" aria-hidden="true">›</span>
+            <strong>{played ? 'DAILY RESULTS' : 'PLAY DAILY'}</strong>
             <small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See where you stand') : '9 holes. One shot at glory.'}</small>
           </button>
         </section>
         <section className="arcade-modes" aria-label="More ways to play">
-          <button className="arcade-map" aria-label={nearby ? `Throne map, ${nearby.total} bathrooms nearby` : 'Throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}><span className="mode-illustration"><GameIcon kind="map" /></span><span>THRONE MAP</span><small>Find your next crown</small></button>
-          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><span className="mode-illustration duel-plungers" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt=""/><img src={`${import.meta.env.BASE_URL}art/gameplay/plunger.webp`} alt=""/></span><span>QUICK MATCH</span><small>Settle it on the green</small></button>
+          <button className="arcade-map" aria-label={nearby ? `Throne map, ${nearby.total} bathrooms nearby` : 'Throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}><GameIcon kind="map" /><span>THRONE<br />MAP</span></button>
+          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><svg viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="#09233d" strokeWidth="5" strokeLinecap="round"><path d="m9 6 29 34q8 7 7-4M39 6 10 40q-8 7-7-4"/></g><path d="m9 6 13 15M39 6 26 21" stroke="#fff" strokeWidth="2"/></svg><span>QUICK<br />MATCH</span></button>
         </section>
-        <button className="arcade-custom" onClick={() => go(() => setCustom(true))}><GameIcon kind="dice" /> Custom round <span aria-hidden="true">→</span></button>
+        <button className="arcade-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
       {custom && (
