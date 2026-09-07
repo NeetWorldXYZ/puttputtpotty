@@ -330,13 +330,13 @@ function drawWaveIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: nu
 // ---------------------------------------------------------------------------
 // Obstacles
 
-export function shapePath(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
+function shapePath(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
   if (s.kind === 'rect') roundRectPath(ctx, s.x, s.y, s.w, s.h, Math.min(0.6, s.w / 3, s.h / 3));
   else if (s.kind === 'circle') circle(ctx, s.x, s.y, s.r);
   else roundedPolygonPath(ctx, s.points, 0.5);
 }
 
-export function shapeShadow(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
+function shapeShadow(ctx: CanvasRenderingContext2D, s: Obstacle['shape']): void {
   ctx.save();
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = OUTLINE;
@@ -354,9 +354,6 @@ function shapeSide(ctx: CanvasRenderingContext2D, s: Obstacle['shape'], color: s
   chunky(ctx, color, 0.24);
   ctx.restore();
 }
-
-/** Obstacle types the tilted renderer draws with height; the flat floor layer keeps only their shadow. */
-export const SOLID_OBSTACLES: readonly string[] = ['blocker', 'deadWall', 'bumper', 'post'];
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number): void {
   const s = o.shape;
@@ -571,24 +568,6 @@ export function drawCup(ctx: CanvasRenderingContext2D, x: number, y: number, cup
     ctx.stroke();
     ctx.restore();
   }
-}
-
-/** Only the floor contact shadow of the walls; the tilted renderer draws the pipes themselves with height. */
-export function drawWallShadows(ctx: CanvasRenderingContext2D, walls: Wall[]): void {
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.translate(0.35, 1.0);
-  ctx.globalAlpha = 0.3;
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  for (const w of walls) {
-    ctx.moveTo(w.a.x, w.a.y);
-    ctx.lineTo(w.b.x, w.b.y);
-  }
-  ctx.stroke();
-  ctx.restore();
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D, walls: Wall[], theme: Theme): void {
@@ -863,8 +842,8 @@ export interface BallStyle {
   accent: string;
 }
 
-export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null, shadow = true): void {
-  if (shadow) dropShadow(ctx, x, y, r * 1.05, r * 0.75);
+export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null): void {
+  dropShadow(ctx, x, y, r * 1.05, r * 0.75);
   circle(ctx, x, y, r);
   chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.12, r * 0.36));
   if (style && style.pattern !== 'plain') {
