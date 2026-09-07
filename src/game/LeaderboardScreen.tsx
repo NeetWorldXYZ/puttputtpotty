@@ -25,6 +25,7 @@ export function LeaderboardScreen() {
   const [tab, setTab] = useState<Tab>(() => (recallFix() ? 'nearby' : 'world'));
   const [kings, setKings] = useState<KingRow[] | null>(null);
   const [daily, setDaily] = useState<DailyRow[] | null>(null);
+  const [retry, setRetry] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [name, setName] = useState(getSavedName());
@@ -59,7 +60,7 @@ export function LeaderboardScreen() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, retry]);
 
   const rows = tab === 'daily' ? daily : kings;
   const myRank = rows ? rows.findIndex((r) => r.user_id === me) : -1;
@@ -71,7 +72,7 @@ export function LeaderboardScreen() {
           ⌂
         </button>
         <div className="map-title">
-          <div className="map-title-main">Leaderboard</div>
+          <div className="map-title-main">Ranks</div>
           <div className="map-title-sub">{tab === 'daily' ? `${dailyEdition()} course · ${dailySeed().slice(0, 10)}` : tab === 'nearby' ? 'thrones within 25 km of you' : 'thrones across the whole world'}</div>
         </div>
         <button className="name-chip" onClick={() => setAskName(true)} title="Change name">
@@ -79,21 +80,30 @@ export function LeaderboardScreen() {
         </button>
       </div>
 
-      <div className="tabs">
-        <button className={tab === 'nearby' ? 'active' : ''} onClick={() => setTab('nearby')} disabled={!fix} title={fix ? '' : 'Open the map once so we know where you are'}>
-          Kings near you
+      <div className="tabs" aria-label="Rankings category">
+        <button aria-pressed={tab === 'nearby'} className={tab === 'nearby' ? 'active' : ''} onClick={() => setTab('nearby')} disabled={!fix} title={fix ? '' : 'Open the map once so we know where you are'}>
+          Nearby
         </button>
-        <button className={tab === 'world' ? 'active' : ''} onClick={() => setTab('world')}>
-          Kings everywhere
+        <button aria-pressed={tab === 'world'} className={tab === 'world' ? 'active' : ''} onClick={() => setTab('world')}>
+          Worldwide
         </button>
-        <button className={tab === 'daily' ? 'active' : ''} onClick={() => setTab('daily')}>
-          {dailyEdition() === 'morning' ? 'Morning' : 'Evening'} course
+        <button aria-pressed={tab === 'daily'} className={tab === 'daily' ? 'active' : ''} onClick={() => setTab('daily')}>
+          Daily course
         </button>
       </div>
 
-      <div className="board">
-        {error && <div className="lb-note">Leaderboard offline · {error}</div>}
-        {!error && !rows && <div className="lb-note">Loading…</div>}
+      <div className="rank-context">
+        <strong>{tab === 'daily' ? 'One course. Everyone’s best shot.' : 'More records. More thrones.'}</strong>
+        <p>{tab === 'daily' ? 'Lowest total strokes leads the daily board.' : 'Ranked by thrones held. Beat a bathroom’s course record to claim it.'}</p>
+        {!fix && <button className="location-link" onClick={() => navigate('map')}>Open map to enable nearby ranks →</button>}
+      </div>
+      {!error && rows && rows.length > 0 && <div className="your-standing">
+        <span><small>YOUR POSITION</small><strong>{myRank >= 0 ? `#${myRank + 1}` : 'Not on this board yet'}</strong></span>
+        {myRank >= 0 ? <button onClick={() => document.getElementById('my-rank-row')?.scrollIntoView({block:'center'})}>Find me ↓</button> : <button onClick={() => navigate(tab === 'daily' ? 'play' : 'map')}>{tab === 'daily' ? 'Play daily' : 'Find a throne'} →</button>}
+      </div>}
+      <div className="board" aria-label="Ranked players" aria-busy={!rows && !error}>
+        {error && <div className="lb-note" role="alert">Couldn’t load this board.<button onClick={() => setRetry(n => n + 1)}>Try again</button></div>}
+        {!error && !rows && <div className="lb-note" role="status">Getting the latest scores…</div>}
         {!error && rows && rows.length === 0 && (
           <div className="empty">
             <div className="empty-crown">{tab === 'daily' ? '⛳' : '👑'}</div>
@@ -103,10 +113,10 @@ export function LeaderboardScreen() {
             </button>
           </div>
         )}
-        {rows && rows.length > 0 && (
+        {!error && rows && rows.length > 0 && (
           <ol className="rows">
             {rows.map((r, i) => (
-              <li key={r.user_id} className={`row${r.user_id === me ? ' me' : ''}${i < 3 ? ` top${i + 1}` : ''}`}>
+              <li id={r.user_id === me ? 'my-rank-row' : undefined} key={r.user_id} className={`row${r.user_id === me ? ' me' : ''}${i < 3 ? ` top${i + 1}` : ''}`}>
                 <span className="rank">{i === 0 ? '👑' : i + 1}</span>
                 <Avatar av={r.avatar} size={30} className="row-avatar" />
                 <button className="who link" onClick={() => navigate('profile', null, null, { user: r.user_id })}>
@@ -127,7 +137,7 @@ export function LeaderboardScreen() {
                     </small>
                   </span>
                 )}
-                <span className="when">{ago(tab === 'daily' ? (r as DailyRow).finished_at : (r as KingRow).last_win)}</span>
+                <span className="when" title="Last recorded round">{ago(tab === 'daily' ? (r as DailyRow).finished_at : (r as KingRow).last_win)}</span>
                 {r.user_id !== me && (
                   <button className="flag-btn" title="Report this player" onClick={() => setReport({ id: r.user_id, name: r.display_name })}>
                     ⚑
@@ -137,7 +147,7 @@ export function LeaderboardScreen() {
             ))}
           </ol>
         )}
-        {rows && rows.length > 0 && myRank < 0 && <div className="lb-note">You&apos;re not on this board yet.{tab !== 'daily' && ' Claim a throne to appear.'}</div>}
+        {!error && rows && rows.length > 0 && myRank < 0 && <div className="lb-note">You&apos;re not on this board yet.{tab !== 'daily' && ' Claim a throne to appear.'}</div>}
       </div>
 
       {askName && (
