@@ -1,5 +1,6 @@
 import { navigate } from '../router';
 import { sfx, unlockAudio } from './sound';
+import { GameIcon } from './GameIcon';
 
 export type Tab = 'play' | 'map' | 'leaders';
 
@@ -14,15 +15,15 @@ export function TabBar({ active }: { active: Tab }) {
   return (
     <nav className="tabbar" aria-label="Main">
       <button className={active === 'play' ? 'on' : ''} onClick={() => go('play')}>
-        <span className="tb-icon">▶</span>
-        <span>Play</span>
+        <span className="tb-icon"><GameIcon kind="home" /></span>
+        <span>Home</span>
       </button>
       <button className={active === 'map' ? 'on' : ''} onClick={() => go('map')}>
-        <span className="tb-icon">📍</span>
+        <span className="tb-icon"><GameIcon kind="map" /></span>
         <span>Map</span>
       </button>
       <button className={active === 'leaders' ? 'on' : ''} onClick={() => go('leaders')}>
-        <span className="tb-icon">🏆</span>
+        <span className="tb-icon"><GameIcon kind="trophy" /></span>
         <span>Ranks</span>
       </button>
     </nav>
