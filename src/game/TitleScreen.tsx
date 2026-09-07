@@ -319,7 +319,7 @@ export function TitleScreen() {
         </header>
         <div className="brand hero">
           {logoArt ? (
-            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" />
+            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" draggable={false} />
           ) : (
             <>
               <Mascot />
@@ -333,7 +333,7 @@ export function TitleScreen() {
         <div className="tagline">Every bathroom is a course.</div>
 
         <section className={`daily-card${played ? ' played' : ''}`}>
-          {dailyArt ? <img className="daily-img" src={ART.daily} alt="" /> : <DailyArt played={played} />}
+          {dailyArt ? <img className="daily-img" src={ART.daily} alt="" draggable={false} /> : <DailyArt played={played} />}
           {played && (
             <span className="sign badge">
               <span className="sign-top">Your round</span>

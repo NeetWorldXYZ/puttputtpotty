@@ -3428,3 +3428,19 @@ input[type='checkbox'] {
   border: none;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
+
+/* ---- Artwork is decoration: no long-press menu, no drag, no selection, no taps ---- */
+img,
+svg {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.logo-img,
+.daily-img,
+.daily-art,
+.map-art,
+.mascot {
+  pointer-events: none;
+}
