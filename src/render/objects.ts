@@ -6,6 +6,7 @@
 import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, SurfaceZone, Wall } from '../sim/types';
 import { compassVector } from '../sim/geometry';
 import { drawSprite } from './sprites';
+import { finishMaterial, type Material } from './materials';
 import { OUTLINE, type Theme } from './themes';
 import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, polygonCentroid, roundRectPath, roundedPolygonPath, hashString } from './shapes';
 
@@ -55,6 +56,15 @@ function shapeRadius(poly: Polygon): number {
 }
 
 export function drawSurfaceZone(ctx: CanvasRenderingContext2D, z: SurfaceZone, seed: number): void {
+  paintSurfaceZone(ctx, z, seed);
+  const b = bbox(z.polygon);
+  ctx.save(); roundedPolygonPath(ctx, z.polygon, shapeRadius(z.polygon)); ctx.clip();
+  const material: Material = z.surfaceType === 'tile' ? 'ceramic' : z.surfaceType === 'wet' ? 'water' : z.surfaceType === 'sand' ? 'stone' : z.surfaceType === 'shag' ? 'fabric' : 'rubber';
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, material, seed);
+  ctx.restore();
+}
+
+function paintSurfaceZone(ctx: CanvasRenderingContext2D, z: SurfaceZone, seed: number): void {
   const poly = z.polygon;
   const rand = makeRand(seed);
   const b = bbox(poly);
@@ -193,6 +203,14 @@ export function drawSlopeZone(ctx: CanvasRenderingContext2D, z: SlopeZone): void
 }
 
 export function drawHazard(ctx: CanvasRenderingContext2D, h: Hazard, seed: number): void {
+  paintHazard(ctx, h, seed);
+  const b = bbox(h.polygon);
+  ctx.save(); roundedPolygonPath(ctx, h.polygon, Math.min(1.4, shapeRadius(h.polygon) * 2)); ctx.clip();
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, h.type === 'water' || h.type === 'overflow' ? 'water' : h.type === 'drain' ? 'metal' : 'rubber', seed);
+  ctx.restore();
+}
+
+function paintHazard(ctx: CanvasRenderingContext2D, h: Hazard, seed: number): void {
   const poly = h.polygon;
   const b = bbox(poly);
   const c = polygonCentroid(poly);
@@ -223,10 +241,15 @@ export function drawHazard(ctx: CanvasRenderingContext2D, h: Hazard, seed: numbe
       ctx.translate(0.35, 0.35);
       ctx.fill();
       ctx.restore();
-      ctx.fillStyle = COLORS.drainSlot;
+      ctx.fillStyle = '#152b3a';
       for (let y = b.minY + 0.9; y < b.maxY - 0.5; y += 0.9) {
         roundRectPath(ctx, b.minX + 0.8, y, b.maxX - b.minX - 1.6, 0.4, 0.2);
         ctx.fill();
+      }
+      ctx.strokeStyle = '#b9d2dc';
+      ctx.lineWidth = 0.08;
+      for (let y = b.minY + 0.9; y < b.maxY - 0.5; y += 0.9) {
+        ctx.beginPath(); ctx.moveTo(b.minX + 1, y); ctx.lineTo(b.maxX - 1, y); ctx.stroke();
       }
       ctx.restore();
       return;
@@ -357,6 +380,18 @@ function shapeSide(ctx: CanvasRenderingContext2D, s: Obstacle['shape'], color: s
 }
 
 export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number): void {
+  paintObstacle(ctx, o, seed);
+  if (o.type === 'post' || o.type === 'bumper' || o.type === 'pipe') return;
+  const s = o.shape;
+  const b = s.kind === 'rect' ? {minX:s.x,minY:s.y,maxX:s.x+s.w,maxY:s.y+s.h} : s.kind === 'circle' ? {minX:s.x-s.r,minY:s.y-s.r,maxX:s.x+s.r,maxY:s.y+s.r} : bbox(s.points);
+  ctx.save(); shapePath(ctx, s); ctx.clip();
+  finishMaterial(ctx, {x:b.minX,y:b.minY,w:b.maxX-b.minX,h:b.maxY-b.minY}, o.type === 'blocker' ? 'ceramic' : 'rubber', seed);
+  // Inset trim makes the full obstacle extent readable without moving its face.
+  shapePath(ctx, s);ctx.strokeStyle='#ffffff50';ctx.lineWidth=0.3;ctx.stroke();
+  ctx.restore();
+}
+
+function paintObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: number): void {
   const s = o.shape;
   switch (o.type) {
     case 'blocker': {
@@ -386,8 +421,12 @@ export function drawObstacle(ctx: CanvasRenderingContext2D, o: Obstacle, seed: n
       ctx.clip();
       const rand = makeRand(seed);
       const b = s.kind === 'rect' ? { minX: s.x, minY: s.y, maxX: s.x + s.w, maxY: s.y + s.h } : s.kind === 'circle' ? { minX: s.x - s.r, minY: s.y - s.r, maxX: s.x + s.r, maxY: s.y + s.r } : bbox(s.points);
+      ctx.strokeStyle = 'rgba(8,20,34,0.4)'; ctx.lineWidth = 0.14;
+      for (let x = b.minX + 0.4; x < b.maxX; x += 0.55) {
+        ctx.beginPath(); ctx.moveTo(x, b.minY); ctx.lineTo(x, b.maxY); ctx.stroke();
+      }
       ctx.fillStyle = COLORS.deadWallDot;
-      for (let i = 0; i < ((b.maxX - b.minX) * (b.maxY - b.minY)) / 0.8; i++) {
+      for (let i = 0; i < ((b.maxX - b.minX) * (b.maxY - b.minY)) / 3; i++) {
         circle(ctx, b.minX + rand() * (b.maxX - b.minX), b.minY + rand() * (b.maxY - b.minY), 0.12 + rand() * 0.14);
         ctx.fill();
       }
@@ -731,6 +770,18 @@ export function drawWalls(ctx: CanvasRenderingContext2D, walls: Wall[], theme: T
     ctx.stroke();
     ctx.restore();
   }
+  // Flush joint hardware stays inside the existing rail thickness.
+  ctx.save();
+  const joints = new Set<string>();
+  for (const wall of walls) for (const v of [wall.a, wall.b]) {
+    const key = `${v.x},${v.y}`;
+    if (joints.has(key)) continue;
+    joints.add(key);
+    circle(ctx,v.x,v.y,0.34); chunky(ctx,p.shade,0.09);
+    circle(ctx,v.x-0.05,v.y-0.05,0.17);ctx.fillStyle=p.highlight;ctx.fill();
+    ctx.beginPath();ctx.moveTo(v.x-0.08,v.y);ctx.lineTo(v.x+0.08,v.y);ctx.strokeStyle=OUTLINE;ctx.lineWidth=0.05;ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** Per-frame glow pass for neon pipes (flicker). */
@@ -769,6 +820,10 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
       ctx.rotate(a);
       roundRectPath(ctx, 0, -bw / 2, s.r, bw, bw * 0.4);
       chunky(ctx, k % 2 === 0 ? '#ff6f3c' : '#ffd166', 0.22);
+      ctx.save();
+      roundRectPath(ctx,0,-bw/2,s.r,bw,bw*0.4);ctx.clip();
+      finishMaterial(ctx,{x:0,y:-bw/2,w:s.r,h:bw},'metal');
+      ctx.restore();
       ctx.fillStyle = 'rgba(255,255,255,0.45)';
       roundRectPath(ctx, s.r * 0.15, -bw / 2 + 0.12, s.r * 0.7, bw * 0.3, 0.1);
       ctx.fill();
@@ -857,6 +912,10 @@ export function drawMover(ctx: CanvasRenderingContext2D, o: MovingObstacle, cloc
       }
       ctx.stroke();
     }
+    ctx.save();
+    roundRectPath(ctx,x,y,s.w,s.h,0.4);ctx.clip();
+    finishMaterial(ctx,{x,y,w:s.w,h:s.h},o.look === 'luggage' ? 'fabric' : 'metal');
+    ctx.restore();
   } else {
     const s = o.shape;
     const th = (TWO_PI * clock) / o.period + o.phase;
