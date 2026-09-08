@@ -15,7 +15,6 @@ import { AccountSheet } from './AccountSheet';
 import { TabBar } from './TabBar';
 import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
-import { GameIcon } from './GameIcon';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -39,7 +38,35 @@ export const ART = {
   daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
 };
 
-/** Resolves to true once the image loads, false if missing, null while unknown. */
+/** Little map illustration for the home card: roads, pins, and a crowned pin when you hold a throne. */
+function MapArt({ mine }: { mine: number }) {
+  return (
+    <svg className="map-art" viewBox="0 0 150 120" aria-hidden="true">
+      <rect x="0" y="0" width="150" height="120" rx="16" fill="#dff8ec" />
+      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#fff" strokeWidth="9" fill="none" />
+      <path d="M20 130 C 30 80, 80 110, 95 70 S 130 50, 155 75" stroke="#fff" strokeWidth="9" fill="none" />
+      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#a9e6c8" strokeWidth="2" strokeDasharray="6 5" fill="none" />
+      <circle cx="95" cy="92" r="10" fill="#9ad1ff" opacity="0.6" />
+      <circle cx="95" cy="92" r="4" fill="#3a8dff" stroke="#fff" strokeWidth="2" />
+      <g transform="translate(38 44)">
+        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
+        <circle cx="0" cy="-12" r="5" fill="#fff" />
+      </g>
+      <g transform="translate(118 62)">
+        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
+        <circle cx="0" cy="-12" r="5" fill="#fff" />
+      </g>
+      <g transform="translate(72 30)">
+        <path d="M0 -22 a15 15 0 1 1 0.01 0 L0 6 Z" fill={mine > 0 ? '#ffd447' : '#1f2a44'} stroke="#1f2a44" strokeWidth="2" />
+        <text x="0" y="-9" textAnchor="middle" fontSize="15">
+          👑
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/** Resolves to true once the image loads, false if it 404s, null while unknown. */
 function useImage(src: string): boolean | null {
   const [ok, setOk] = useState<boolean | null>(null);
   useEffect(() => {
@@ -114,7 +141,6 @@ export function TitleScreen() {
   const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
-  const [custom, setCustom] = useState(false);
   const [len, setLen] = useState(getPreferredLength());
   const [tick, setTick] = useState(0);
   const [thrones, setThrones] = useState<number | null>(null);
@@ -264,7 +290,7 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home2 compact-home">
+      <div className="title-inner home2">
         <header className="home-top">
           <div className="home-icons">
             <button
@@ -308,7 +334,6 @@ export function TitleScreen() {
         <div className="tagline">Every bathroom is a course.</div>
 
         <section className={`daily-card${played ? ' played' : ''}`}>
-          <div className="daily-heading"><span>DAILY CHALLENGE</span><span>{played ? 'ROUND COMPLETE' : '9 HOLES · ONE SHOT'}</span></div>
           {dailyArt ? (
             <div className="daily-art-wrap">
               <img className="daily-img" src={ART.daily} alt="" draggable={false} />
@@ -326,45 +351,60 @@ export function TitleScreen() {
             <DailyArt played={played} />
           )}
           <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            {played ? 'View daily leaderboard' : `▶ Play the ${edition} course`}
+            {played ? `🏆 Daily leaderboard · next in ${untilTomorrowUtc()}` : `▶  Play the ${edition} course`}
           </button>
-          <div className="daily-reset">{played ? 'Next challenge' : 'New course'} in {untilTomorrowUtc()}</div>
         </section>
 
         <section className="menu2">
           <div className="mrow feature">
-            <GameIcon kind="map" />
+            <MapArt mine={nearby?.mine ?? 0} />
             <div className="mrow-text">
-              <strong>Explore throne map</strong>
+              <strong>Nearby thrones</strong>
               <small>{nearby ? `${nearby.total} nearby · ${nearby.claimed} claimed` : 'Real bathrooms near you'}</small>
             </div>
             <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
-              Explore
+              Open map
             </button>
           </div>
-          <div className="kingdom-panel" aria-label="Your kingdom">
-            <div className="kingdom-title"><GameIcon kind="crown" /> YOUR KINGDOM</div>
-            <div className="kingdom-stats"><span><b>{thrones ?? '—'}</b>Thrones held</span><span><b>{nearby?.total ?? '—'}</b>Nearby</span><span><b>{nearby?.claimed ?? '—'}</b>Claimed nearby</span></div>
+          <div className="mrow">
+            <span className="mrow-icon">🪠</span>
+            <div className="mrow-text">
+              <strong>Quick match</strong>
+              <small>Same nine holes, live.</small>
+            </div>
+            <button className="mbtn" onClick={() => go(() => navigate('match'), 'whoosh')}>
+              Play
+            </button>
           </div>
-          <button className="custom-launch" onClick={() => go(() => setCustom(true))}>
-            <GameIcon kind="dice" /> Custom game <span>Choose your holes ›</span>
-          </button>
+          <div className="mrow">
+            <span className="mrow-icon">🎲</span>
+            <div className="mrow-text">
+              <strong>Custom game</strong>
+              <span className="len-chips">
+                {COURSE_LENGTHS.map((l) => (
+                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
+                    {l.label}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <button className="mbtn" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
+              Tee off
+            </button>
+          </div>
+          <div className="mrow">
+            <span className="mrow-icon">🏆</span>
+            <div className="mrow-text">
+              <strong>Leaderboards</strong>
+              <small>Daily, thrones and kings.</small>
+            </div>
+            <button className="mbtn" onClick={() => go(() => navigate('leaders'), 'tap')}>
+              Open
+            </button>
+          </div>
         </section>
       </div>
       <TabBar active="play" />
-      {custom && (
-        <div className="overlay" onClick={() => setCustom(false)}>
-          <div className="card pop custom-sheet" role="dialog" aria-modal="true" aria-label="Custom game" onClick={(e) => e.stopPropagation()}>
-            <h2>Make it your round</h2>
-            <p>How many holes?</p>
-            <div className="custom-lengths">
-              {COURSE_LENGTHS.map((l) => <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-pressed={l.n === len}>{l.label}</button>)}
-            </div>
-            <button className="primary" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>Tee off · {len} holes</button>
-            <button onClick={() => setCustom(false)}>Back to home</button>
-          </div>
-        </div>
-      )}
 
       {askName && (
         <AccountSheet
