@@ -95,16 +95,18 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
           {p.throne_list.length === 0 ? (
             <div className="lb-note">{mine ? 'No thrones yet. Open the map and go take one.' : 'No thrones yet.'}</div>
           ) : (
-            <ol className="rows">
+            <ol className="rows profile-thrones">
               {p.throne_list.map((t) => (
-                <li key={t.location_id} className="row">
-                  <span className="rank">{POI_ICON[t.poi_type] ?? '🚽'}</span>
-                  <span className="who">{t.name}</span>
-                  <span className="stat">
+                <li key={t.location_id} className="row profile-throne">
+                  <span className="rank throne-place-icon">{POI_ICON[t.poi_type] ?? '🚽'}</span>
+                  <span className="throne-place">
+                    <strong>{t.name}</strong>
+                    <small>Held {ago(t.since)}</small>
+                  </span>
+                  <span className="stat throne-record">
                     <strong>{t.score}</strong>
                     <small>par {t.par}{t.elapsed_ms ? ` · ${fmtElapsed(t.elapsed_ms)}` : ''}</small>
                   </span>
-                  <span className="when">{ago(t.since)}</span>
                 </li>
               ))}
             </ol>

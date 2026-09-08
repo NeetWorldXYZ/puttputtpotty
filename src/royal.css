@@ -86,3 +86,115 @@ button.primary,button.active { color:#14213d; background:linear-gradient(#ffe995
 .hud .env { color:#ffe295;letter-spacing:.1em; }
 @media(max-width:360px) { .title-inner.home2 { padding-left:10px;padding-right:10px; }.mrow.feature .mrow-text strong {font-size:17px}.home2 .cta {font-size:17px}.mrow {gap:8px}.mrow-icon {width:34px}.mrow .len-chips button {width:27px}.player-name {max-width:92px} }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important;scroll-behavior:auto!important; } }
+
+/* Throne ownership should feel like an achievement, not just another pin. */
+.pin.mine {
+  background:linear-gradient(145deg,#fff5ae 0%,#ffd34c 48%,#f6a900 100%)!important;
+  border-color:#fff8d5!important;
+  box-shadow:0 0 0 4px #fbc02d80,0 0 24px 10px #ffd34ca8,0 5px 10px #06182d80!important;
+  z-index:2;
+}
+.pin.mine::before {
+  content:"";
+  position:absolute;
+  inset:-10px;
+  border:3px solid #ffe26d;
+  border-radius:50% 50% 50% 0;
+  opacity:.75;
+  animation:throne-halo 1.8s ease-out infinite;
+  pointer-events:none;
+}
+.pin.mine .throne-glyph { width:34px;height:39px;filter:drop-shadow(0 2px 2px #93610070); }
+.pin.mine.selected {
+  outline:3px solid #fff7c7;
+  box-shadow:0 0 0 6px #fbc02d99,0 0 34px 15px #ffd34cc4,0 5px 12px #06182d80!important;
+}
+.pin.mine .pin-score { border-color:#ffe886;box-shadow:0 0 0 2px #14213d,0 0 12px #ffd34c; }
+@keyframes throne-halo {
+  0% { transform:scale(.78);opacity:.85; }
+  75%,100% { transform:scale(1.28);opacity:0; }
+}
+
+/* Clearer, more compact location card. */
+.map-sheet {
+  bottom:calc(env(safe-area-inset-bottom,0px) + 94px);
+  max-height:calc(100dvh - env(safe-area-inset-top,0px) - 122px);
+  padding:16px;
+  overflow-x:hidden;
+}
+.map-sheet .sheet-head { min-height:52px;padding-right:42px; }
+.map-sheet .sheet-icon {
+  width:50px;height:50px;border:1px solid #82a1c4;
+  background:linear-gradient(145deg,#f7fbff,#dcecff);
+  box-shadow:0 3px 0 #07182c55;
+}
+.map-sheet .sheet-name { font-family:var(--game-font);font-size:21px;color:#fff; }
+.map-sheet .sheet-sub { margin-top:3px;line-height:1.35; }
+.map-sheet .sheet-close { width:38px;height:38px;border-color:#8da9c8;box-shadow:0 3px 0 #07182c88; }
+.map-sheet .sheet-dist {
+  margin:12px 0 8px;padding:9px 12px;
+  border:1px solid #577aa2;background:#172f4e;color:#fff;
+}
+.map-sheet .sheet-dist .dist-num { color:#ffe17d;font-family:var(--game-font); }
+.map-sheet .sheet-dist .dist-sub { color:#c0d5eb; }
+.map-sheet .sheet-dist.here { background:#163f3a;border-color:#4fd6a1; }
+
+.map-sheet .king-banner { margin:10px 0;padding:14px;border:1px solid #ffe799;overflow:hidden; }
+.map-sheet .king-banner.mine {
+  background:radial-gradient(circle at 18% 10%,#fff8d3 0,#ffe985 38%,#ffc83f 100%);
+  border:2px solid #fff0a9;
+  box-shadow:0 0 0 4px #ffd34c38,0 0 26px #ffd34c70,0 5px 0 #9b681b;
+}
+.map-sheet .king-banner.mine::before {
+  content:"";position:absolute;inset:-70% -25%;
+  background:linear-gradient(105deg,transparent 38%,#fff9 49%,transparent 60%);
+  transform:translateX(-55%);animation:king-banner-shine 3.6s ease-in-out infinite;
+  pointer-events:none;
+}
+.map-sheet .king-banner.mine > * { position:relative;z-index:1; }
+.mine-shine { position:absolute!important;right:13px;top:7px;font-size:22px;color:#fff8cb;text-shadow:0 0 10px #fff; }
+.map-sheet .kb-label { font-size:10px; }
+.map-sheet .kb-name { font-size:23px; }
+.map-sheet .kb-score strong { font-size:26px;color:#14213d; }
+.map-sheet .kb-since { margin-top:2px;color:#655525; }
+@keyframes king-banner-shine { 0%,55% { transform:translateX(-60%); } 85%,100% { transform:translateX(60%); } }
+
+.map-sheet .facts {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:7px;margin:14px 0;
+}
+.map-sheet .fact {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:54px;padding:7px 8px;border:1px solid #53769e;border-radius:13px;
+  background:#193554;color:#fff;box-sizing:border-box;
+}
+.map-sheet .fact.you { background:#16445a;border-color:#42cae2; }
+.map-sheet .fact small { color:#adc6df;font-size:9px;text-transform:uppercase;letter-spacing:.08em; }
+.map-sheet .fact strong { color:#ffe17d;font-family:var(--game-font);font-size:20px;line-height:1.1; }
+.map-sheet .fact.you strong { color:#70e9f5; }
+.sheet-section-title { margin:2px 0 7px;color:#ffe17d;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase; }
+.map-sheet .sheet-board { margin-bottom:12px;gap:5px; }
+.map-sheet .sheet-board li { min-height:38px;padding:5px 9px;border:1px solid #42658b; }
+.map-sheet .sheet-board .stat { color:#ffe17d;font-size:17px; }
+.map-sheet .sheet-actions { margin-top:4px; }
+.map-sheet .sheet-actions button { min-height:48px;border-width:1px;box-shadow:0 4px 0 #07182c99; }
+.map-sheet .sheet-actions button.primary { color:#14213d;background:linear-gradient(#ffe98d,#ffc83d);border-color:#fff0ad; }
+
+/* Profile throne cards reserve the width for the place name and allow wrapping. */
+.profile-thrones .profile-throne {
+  grid-template-columns:42px minmax(0,1fr) auto;
+  gap:11px;padding:13px 14px;align-items:center;
+  background:linear-gradient(135deg,#fff6d9,#ffe5a0);
+  color:#14213d;border:1px solid #fff2bc;
+}
+.profile-thrones .throne-place-icon {
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:12px;background:#fff;border:1px solid #d7bd79;font-size:22px;
+}
+.profile-thrones .throne-place { min-width:0;display:flex;flex-direction:column;gap:3px; }
+.profile-thrones .throne-place strong {
+  white-space:normal;overflow-wrap:anywhere;font-family:var(--game-font);
+  font-size:16px;line-height:1.15;color:#14213d;
+}
+.profile-thrones .throne-place small { color:#705f3b;font-size:10px;text-transform:uppercase;letter-spacing:.06em; }
+.profile-thrones .throne-record strong { color:#14213d;font-size:24px; }
+.profile-thrones .throne-record small { color:#705f3b;text-transform:none;letter-spacing:0;white-space:nowrap; }

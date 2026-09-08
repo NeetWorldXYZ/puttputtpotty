@@ -3,11 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { COURSE_STYLE, circlePolygon } from './mapStyle';
-import type { Hole } from '../sim/types';
-import { drawHole } from '../render/drawHole';
-import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
-import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation } from '../net/api';
 import { currentUserId, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
@@ -207,33 +203,6 @@ function FoundSheet({ fix, onClose, onFound }: { fix: { lat: number; lng: number
   );
 }
 
-/** Hole preview drawn once per hole into a small canvas. */
-function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = canvas.clientWidth || 320;
-    const h = canvas.clientHeight || 150;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = themeById(hole.theme).page;
-    ctx.fillRect(0, 0, w, h);
-    const cam = fitCamera(hole.bounds, w, h, 6);
-    drawHole(ctx, hole, cam, { ballRadius: DEFAULT_PARAMS.ballRadius, cupRadius: cupRadius(DEFAULT_PARAMS), ball: { x: hole.tee.x, y: hole.tee.y }, dpr, time: 0 });
-  }, [hole]);
-  return (
-    <div className="sheet-hole">
-      <canvas ref={ref} className="sheet-preview" />
-      {label && <span className="sheet-hole-label">{label}</span>}
-    </div>
-  );
-}
-
 /** You are here: a golf cart. Mirrored to face the way you last moved. */
 const CART_SVG = `<svg viewBox="0 0 64 48" aria-hidden="true">
 <ellipse cx="32" cy="44" rx="24" ry="3.5" fill="rgba(0,0,0,0.3)"/>
@@ -290,9 +259,8 @@ export function MapScreen() {
   const retryRef = useRef(0);
   useEffect(() => () => window.clearTimeout(retryRef.current), []);
   const [selected, setSelected] = useState<OsmPlace | null>(null);
-  const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [building, setBuilding] = useState<{ id: string; n: number } | null>(null);
   const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
@@ -591,12 +559,10 @@ export function MapScreen() {
     if (preview?.id === selected.id) return;
     let cancelled = false;
     const signal = { cancelled: false };
-    setBuilding(null);
-    loadCourse(selected, { signal, onProgress: (n) => !cancelled && setBuilding({ id: selected.id, n }) })
+    loadCourse(selected, { signal })
       .then((r) => {
         if (cancelled) return;
-        setBuilding(null);
-        setPreview({ id: selected.id, holes: r.holes, par: r.par, king: r.king });
+        setPreview({ id: selected.id, par: r.par, king: r.king });
         const kg = r.king;
         if (kg) {
           setKings((k) => ({
@@ -741,10 +707,6 @@ export function MapScreen() {
   const king = selected ? kings[selected.id] : undefined;
   const band = selected ? bandFor(selected.poiType, selected.id) : null;
   const themeName = selected ? themeById(king?.theme ?? band!.theme).name : '';
-  const difficulty = (king?.difficulty ?? band?.difficulty ?? 'medium') as 'easy' | 'medium' | 'hard';
-  const difficultyRolls = difficulty === 'easy' ? 1 : difficulty === 'hard' ? 3 : 2;
-  const difficultyLabel = difficulty === 'easy' ? 'Easy' : difficulty === 'hard' ? 'Hard' : 'Medium';
-  const coursePar = preview && selected && preview.id === selected.id ? preview.par : (king?.par ?? null);
   const myBest = board && selected && board.id === selected.id ? (board.rows.find((r) => r.user_id === me)?.score ?? null) : null;
 
   return (
@@ -871,6 +833,7 @@ export function MapScreen() {
           <div className={`king-banner${king?.king_name ? (king.king_user === me ? ' mine' : ' held') : ' empty'}`}>
             {king?.king_name ? (
               <>
+                {king.king_user === me && <span className="mine-shine" aria-hidden="true">✦</span>}
                 <Avatar av={king.king_avatar} size={76} className="kb-avatar" />
                 <div className="kb-text">
                   <div className="kb-label">👑 {king.king_user === me ? 'You are King of the Throne' : 'King of the Throne'}</div>
@@ -880,7 +843,6 @@ export function MapScreen() {
                   <div className="kb-score">
                     <strong>{king.king_score}</strong>
                     {king.par ? <span> on par {king.par}</span> : null}
-                    {king.king_holes && <span className="dim"> · {king.king_holes.join('-')}</span>}
                     {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> · ⏱ {fmtElapsed(king.king_elapsed_ms)}</span>}
                   </div>
                   {king.king_since && <div className="kb-since">holding it {ago(king.king_since)}</div>}
@@ -904,45 +866,31 @@ export function MapScreen() {
           </div>
 
           <div className="facts">
-            <span className="fact" title="Difficulty">
-              {'🧻'.repeat(difficultyRolls)} {difficultyLabel}
-            </span>
-            {coursePar !== null && <span className="fact">Par {coursePar}</span>}
-            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact">Record {king.king_score}</span>}
-            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact">{king.run_count} {king.run_count === 1 ? 'run' : 'runs'}</span>}
-            {myBest !== null && <span className="fact you">You {myBest}</span>}
+            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact"><small>Course record</small><strong>{king.king_score}</strong></span>}
+            {myBest !== null && <span className="fact you"><small>Your best</small><strong>{myBest}</strong></span>}
+            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact"><small>Rounds played</small><strong>{king.run_count}</strong></span>}
           </div>
 
           {board?.id === selected.id && board.rows.length > 0 && (
-            <ol className="sheet-board">
-              {board.rows.map((r) => (
-                <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
-                  <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
-                  <span className="who">
-                    <Avatar av={r.avatar} size={22} className="row-avatar" />
-                    {r.display_name}
-                  </span>
-                  <span className="stat">
-                    {r.score}
-                    {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}
-                  </span>
-                  <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
-                </li>
-              ))}
-            </ol>
+            <div className="sheet-leaders">
+              <div className="sheet-section-title">Top scores</div>
+              <ol className="sheet-board">
+                {board.rows.map((r) => (
+                  <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
+                    <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+                    <span className="who">
+                      <Avatar av={r.avatar} size={22} className="row-avatar" />
+                      {r.display_name}
+                    </span>
+                    <strong className="stat">{r.score}</strong>
+                    <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
 
-          {preview?.id === selected.id ? (
-            <div className="sheet-holes">
-              {preview.holes.map((h, i) => (
-                <HolePreview key={h.id} hole={h} label={`${i + 1} · par ${h.par}`} />
-              ))}
-            </div>
-          ) : previewError ? (
-            <div className="sheet-err">{previewError}</div>
-          ) : (
-            <div className="sheet-preview loading">{building?.id === selected.id ? `building hole ${building.n} of ${HOLES_PER_COURSE}…` : 'loading course…'}</div>
-          )}
+          {previewError && <div className="sheet-err">Course details will load when you play.</div>}
 
           <div className="sheet-actions">
             {!fix ? (
