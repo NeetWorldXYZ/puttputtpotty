@@ -18,7 +18,7 @@ function NavIcon({ tab }: { tab: Tab }) {
   return <svg viewBox="0 0 48 48" fill="none" stroke="#092b40" strokeWidth="2.7" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">{art[tab]}</svg>;
 }
 const TABS: { tab: Tab; label: string }[] = [
-  {tab:'play',label:'Home'}, {tab:'map',label:'Map'}, {tab:'match',label:'Match'},
+  {tab:'play',label:'Home'}, {tab:'match',label:'Match'}, {tab:'map',label:'Map'},
   {tab:'leaders',label:'Ranks'}, {tab:'profile',label:'Profile'},
 ];
 
@@ -32,7 +32,7 @@ export function TabBar({ active }: { active: Tab }) {
     navigate(tab);
   };
   return <nav className="tabbar arcade-dock" aria-label="Main">
-    {TABS.map(({tab,label}) => <button key={tab} className={active === tab ? 'on' : ''} aria-current={active === tab ? 'page' : undefined} onClick={() => go(tab)}>
+    {TABS.map(({tab,label}) => <button key={tab} className={`${active === tab ? 'on' : ''} ${tab === 'map' ? 'dock-spotlight' : ''}`.trim()} aria-current={active === tab ? 'page' : undefined} onClick={() => go(tab)}>
       <span className={`dock-icon dock-${tab}`}><NavIcon tab={tab}/></span>
       <span className="dock-label">{label}</span>
     </button>)}
