@@ -411,7 +411,7 @@ export function startTheme(ctx: AudioContext, master: AudioNode, volume = 0.5): 
   nextTime = -1; // unset: (re)synced to the clock when the context is running
   const tick = () => {
     if (!playing) return;
-    if (ctx.state !== 'running') {
+    if (ctx.state !== 'running' || document.hidden) {
       nextTime = -1;
       timer = window.setTimeout(tick, 100);
       return;

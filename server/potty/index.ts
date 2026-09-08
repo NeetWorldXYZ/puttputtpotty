@@ -10,9 +10,8 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-const CLAIM_RADIUS_M = 50;
+const CLAIM_RADIUS_M = 25;
 const MAX_ACCURACY_M = 150;
-const DWELL_SECONDS = 20;
 const CHECKIN_MAX_AGE_S = 45 * 60;
 const COOLDOWN_HOURS = 1;
 const MAX_SPEED_MPS = 70;
@@ -20,6 +19,12 @@ const STROKE_CAP = 8;
 const FOUND_PER_DAY = 5;
 const REPORTS_PER_DAY = 10;
 const REPORTS_TO_RESET = 3;
+/** Distinct players agreeing on a report (closed, renamed, wrong) before it is applied; an admin does it alone. */
+const PLACE_REPORTS_TO_APPLY = 3;
+/** How far from their own position a player may drop a new place's pin. Admins have no limit. */
+const PIN_DRIFT_M = 200;
+/** Two places this close with the same name are one place. */
+const SAME_PLACE_M = 25;
 const LINK_CODE_TTL_MIN = 10;
 const EPOCH = Date.UTC(2026, 8, 1); // 2026-09-01
 
@@ -101,6 +106,8 @@ type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: n
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
 
 function classify(tags: Record<string, string>): { poiType: string; label: string } | null {
+  // Mappers retag closed businesses (disused:amenity=*) or flag them; neither is a place to play.
+  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags['disused:amenity'] || tags['abandoned:amenity'] || tags.end_date) return null;
   const a = tags.amenity;
   if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
   if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };
@@ -382,10 +389,27 @@ type LocationRow = {
   gen_holes: number;
   gen_tries: number;
   founded_by: string | null;
+  status: 'live' | 'pending' | 'hidden';
 };
 
 /** Founds the row if needed (no holes yet). */
-async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string): Promise<LocationRow> {
+async function isAdmin(userId: string): Promise<boolean> {
+  const { data } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle();
+  return data?.role === 'admin';
+}
+
+/** Lowercased letters and digits only, so "Sully's Tavern" and "Sullys tavern" compare equal. */
+function nameKey(s: string): string {
+  return s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
+}
+function sameName(a: string, b: string): boolean {
+  const x = nameKey(a);
+  const y = nameKey(b);
+  if (!x || !y) return false;
+  return x === y || (Math.min(x.length, y.length) >= 4 && (x.includes(y) || y.includes(x)));
+}
+
+async function ensureLocation(loc: { id: string; name: string; poiType: string; lat: number; lng: number }, userId: string, status: 'live' | 'pending' = 'live'): Promise<LocationRow> {
   const { data: existing } = await admin.from('locations').select('*').eq('id', loc.id).maybeSingle();
   if (existing) return existing as LocationRow;
   const band = bandFor(loc.poiType, loc.id);
@@ -404,6 +428,7 @@ async function ensureLocation(loc: { id: string; name: string; poiType: string; 
     gen_holes: 0,
     gen_tries: 0,
     founded_by: userId,
+    status,
   };
   const { data, error } = await admin.from('locations').upsert(row, { onConflict: 'id', ignoreDuplicates: true }).select('*').maybeSingle();
   if (error) throw new Error(error.message);
@@ -514,8 +539,8 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'me') {
       await ensureProfile(user.id);
-      const { data: prof } = await admin.from('profiles').select('display_name, slogan, avatar').eq('id', user.id).maybeSingle();
-      return json({ id: user.id, displayName: prof?.display_name ?? null, slogan: prof?.slogan ?? null, avatar: prof?.avatar ?? null });
+      const { data: prof } = await admin.from('profiles').select('display_name, slogan, avatar, role').eq('id', user.id).maybeSingle();
+      return json({ id: user.id, displayName: prof?.display_name ?? null, slogan: prof?.slogan ?? null, avatar: prof?.avatar ?? null, role: prof?.role ?? 'player' });
     }
 
     if (action === 'report') {
@@ -560,6 +585,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'bad location' }, 400);
       await ensureProfile(user.id);
       let row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
+      if (row.status === 'hidden') return json({ error: 'this place is off the map' }, 410);
       const have = Array.isArray(row.holes) ? row.holes.length : 0;
       if (have < HOLES_PER_COURSE) row = await buildNextHole(row);
       const holes = Array.isArray(row.holes) ? row.holes : [];
@@ -662,11 +688,10 @@ Deno.serve(async (req: Request) => {
         if (acc > MAX_ACCURACY_M) return json({ error: 'GPS accuracy too low' }, 400);
         const dist = haversine(lat, lng, loc.lat, loc.lng);
         if (dist > CLAIM_RADIUS_M + Math.min(acc, CLAIM_RADIUS_M)) return json({ error: `too far away (${Math.round(dist)} m)` }, 400);
-        // Dwell: a check-in at this location at least DWELL_SECONDS ago and not stale.
+        // Require a valid, unexpired check-in; no minimum wait before playing.
         const { data: ci } = await admin.from('checkins').select('at, started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
         if (!ci) return json({ error: 'check in first' }, 400);
         const age = (Date.now() - new Date(ci.at).getTime()) / 1000;
-        if (age < DWELL_SECONDS) return json({ error: `stay a little longer (${Math.ceil(DWELL_SECONDS - age)} s)` }, 400);
         if (age > CHECKIN_MAX_AGE_S) return json({ error: 'check-in expired, check in again' }, 400);
         // Round time, measured here: from the start action to this submission.
         if (!ci.started_at) return json({ error: 'round was not started' }, 400);
@@ -736,27 +761,140 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'found') {
-      // A bathroom the map doesn't know about, at the player's feet.
-      const { name, poiType, lat, lng, accuracy } = body;
+      // A bathroom the map doesn't know about. Usually at the player's feet; the pin can be
+      // dropped a little way off (across the street, inside the mall) but not across town.
+      const { name, poiType, lat, lng, accuracy, pin } = body;
       if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'no position' }, 400);
       const acc = typeof accuracy === 'number' ? accuracy : 999;
-      if (acc > 100) return json({ error: `GPS accuracy too low (${Math.round(acc)} m); step outside or wait a moment` }, 400);
+      const adminUser = await isAdmin(user.id);
+      if (acc > 100 && !adminUser) return json({ error: `GPS accuracy too low (${Math.round(acc)} m); step outside or wait a moment` }, 400);
+      let placeLat = lat;
+      let placeLng = lng;
+      if (pin && typeof pin.lat === 'number' && typeof pin.lng === 'number' && Number.isFinite(pin.lat) && Number.isFinite(pin.lng)) {
+        const drift = haversine(lat, lng, pin.lat, pin.lng);
+        if (drift > PIN_DRIFT_M && !adminUser) return json({ error: `that pin is ${Math.round(drift)} m from you; get closer or drop it nearer` }, 400);
+        placeLat = pin.lat;
+        placeLng = pin.lng;
+      }
       const cleanName = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
       if (cleanName.length < 2) return json({ error: 'give it a name' }, 400);
+      if (nameProblem(cleanName)) return json({ error: "that name won't fly here" }, 400);
       const type = typeof poiType === 'string' && ['toilets', 'fuel', 'fast_food', 'bar', 'restaurant', 'hotel', 'retail', 'park', 'stadium', 'airport'].includes(poiType) ? poiType : 'toilets';
       await ensureProfile(user.id);
-      const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-      const { count } = await admin.from('locations').select('id', { count: 'exact', head: true }).eq('founded_by', user.id).like('id', 'ppp:%').gte('created_at', since);
-      if ((count ?? 0) >= FOUND_PER_DAY) return json({ error: `that's ${FOUND_PER_DAY} new bathrooms today; more tomorrow` }, 429);
-      // Not on top of one we already have.
-      const { data: near } = await admin.rpc('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: 40 });
-      if (Array.isArray(near) && near.length) return json({ error: `${near[0].name} is already here`, existing: near[0] }, 409);
-      const { data: imported } = await admin.rpc('bathrooms_near', { in_lat: lat, in_lng: lng, radius_m: 40, lim: 1 });
-      const importedPlaces = (imported as { places?: OsmPlace[] } | null)?.places ?? [];
-      if (importedPlaces.length) return json({ error: `${importedPlaces[0].name} is already here`, existing: importedPlaces[0] }, 409);
+      if (!adminUser) {
+        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+        const { count } = await admin.from('locations').select('id', { count: 'exact', head: true }).eq('founded_by', user.id).like('id', 'ppp:%').gte('created_at', since);
+        if ((count ?? 0) >= FOUND_PER_DAY) return json({ error: `that's ${FOUND_PER_DAY} new bathrooms today; more tomorrow` }, 429);
+      }
+      // The same place under the same name is a duplicate; a different business next door is not.
+      const d = 0.001;
+      const { data: near } = await admin.from('locations').select('id, name, poi_type, lat, lng, status').neq('status', 'hidden').gte('lat', placeLat - d).lte('lat', placeLat + d).gte('lng', placeLng - d * 2).lte('lng', placeLng + d * 2);
+      for (const n of near ?? []) {
+        if (haversine(placeLat, placeLng, n.lat, n.lng) <= SAME_PLACE_M && sameName(n.name, cleanName)) return json({ error: `${n.name} is already here`, existing: { id: n.id, name: n.name, poiType: n.poi_type, lat: n.lat, lng: n.lng } }, 409);
+      }
+      const { data: imported } = await admin.rpc('bathrooms_near', { in_lat: placeLat, in_lng: placeLng, radius_m: SAME_PLACE_M, lim: 10 });
+      for (const ip of ((imported as { places?: OsmPlace[] } | null)?.places ?? [])) {
+        if (sameName(ip.name, cleanName)) return json({ error: `${ip.name} is already here`, existing: ip }, 409);
+      }
       const id = `ppp:${Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
-      const row = await ensureLocation({ id, name: cleanName, poiType: type, lat, lng }, user.id);
-      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng } });
+      const status = adminUser ? 'live' : 'pending';
+      const row = await ensureLocation({ id, name: cleanName, poiType: type, lat: placeLat, lng: placeLng }, user.id, status);
+      return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng }, status });
+    }
+
+    if (action === 'report-place') {
+      // Something is wrong with a place: it closed, it has a new name, or it is not a
+      // bathroom / in the wrong spot. Three different players make it so; an admin does it alone.
+      const place = body.place;
+      const reason = body.reason === 'wrong' ? 'wrong' : body.reason === 'renamed' ? 'renamed' : 'closed';
+      const details = reason === 'renamed' ? String(body.details ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+      if (!place || typeof place.id !== 'string' || !/^(osm:(node|way|relation):\d+|ppp:[a-f0-9]{12})$/.test(place.id) || typeof place.lat !== 'number' || typeof place.lng !== 'number')
+        return json({ error: 'bad place' }, 400);
+      if (reason === 'renamed' && (details.length < 2 || nameProblem(details))) return json({ error: 'what is it called now?' }, 400);
+      await ensureProfile(user.id);
+      const adminUser = await isAdmin(user.id);
+      const day = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const { count: mine } = await admin.from('place_reports').select('id', { count: 'exact', head: true }).eq('reporter', user.id).gte('created_at', day);
+      if ((mine ?? 0) >= REPORTS_PER_DAY && !adminUser) return json({ error: 'enough reports for today' }, 429);
+      const row = await ensureLocation({ id: place.id, name: String(place.name ?? 'Bathroom'), poiType: String(place.poiType ?? 'toilets'), lat: place.lat, lng: place.lng }, user.id);
+      if (row.status === 'hidden') return json({ ok: true, applied: true, hidden: true });
+      if (reason === 'renamed' && sameName(row.name, details)) return json({ ok: true, applied: true, name: row.name });
+      const window = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+      // One open report per player per place; a new one replaces it.
+      await admin.from('place_reports').delete().eq('reporter', user.id).eq('location_id', row.id);
+      await admin.from('place_reports').insert({ reporter: user.id, location_id: row.id, reason, details: details || null });
+      const { data: rows } = await admin.from('place_reports').select('reporter, reason, details').eq('location_id', row.id).gte('created_at', window);
+      const agree = (rows ?? []).filter((r) => r.reason === reason && (reason !== 'renamed' || sameName(String(r.details ?? ''), details)));
+      const distinct = new Set(agree.map((r) => r.reporter)).size;
+      const apply = adminUser || distinct >= PLACE_REPORTS_TO_APPLY;
+      if (apply) {
+        const patch = reason === 'renamed' ? { name: details } : { status: 'hidden' };
+        const { error } = await admin.from('locations').update(patch).eq('id', row.id);
+        if (error) return json({ error: error.message }, 500);
+        await admin.from('place_reports').delete().eq('location_id', row.id);
+      }
+      return json({ ok: true, applied: apply, hidden: apply && reason !== 'renamed', name: apply && reason === 'renamed' ? details : row.name, reports: distinct, needed: PLACE_REPORTS_TO_APPLY });
+    }
+
+    if (action === 'place-queue') {
+      // Admin only: players' finds waiting for approval and open reports, nearest first.
+      if (!(await isAdmin(user.id))) return json({ error: 'admins only' }, 403);
+      const { lat, lng } = body;
+      const here = typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+      const dist = (r: { lat: number; lng: number }) => (here ? haversine(here.lat, here.lng, r.lat, r.lng) : 0);
+      const { data: pending } = await admin.from('locations').select('id, name, poi_type, lat, lng, created_at, founded_by').eq('status', 'pending').order('created_at', { ascending: false }).limit(200);
+      const { data: reports } = await admin.from('place_reports').select('location_id, reason, details, reporter, created_at').order('created_at', { ascending: false }).limit(500);
+      const byPlace = new Map<string, { reason: string; details: string | null; reporters: Set<string>; latest: string }[]>();
+      for (const r of reports ?? []) {
+        const list = byPlace.get(r.location_id) ?? [];
+        let g = list.find((x) => x.reason === r.reason && (r.reason !== 'renamed' || sameName(String(x.details ?? ''), String(r.details ?? ''))));
+        if (!g) {
+          g = { reason: r.reason, details: r.details, reporters: new Set(), latest: r.created_at };
+          list.push(g);
+        }
+        g.reporters.add(r.reporter);
+        byPlace.set(r.location_id, list);
+      }
+      const ids = [...byPlace.keys()];
+      const { data: locs } = ids.length ? await admin.from('locations').select('id, name, poi_type, lat, lng, status').in('id', ids) : { data: [] };
+      const reported = (locs ?? [])
+        .filter((l) => l.status !== 'hidden')
+        .map((l) => ({
+          id: l.id,
+          name: l.name,
+          poiType: l.poi_type,
+          lat: l.lat,
+          lng: l.lng,
+          distance_m: dist(l),
+          reports: (byPlace.get(l.id) ?? []).map((g) => ({ reason: g.reason, details: g.details, count: g.reporters.size, latest: g.latest })),
+        }))
+        .sort((a, b) => a.distance_m - b.distance_m);
+      const finds = (pending ?? []).map((l) => ({ id: l.id, name: l.name, poiType: l.poi_type, lat: l.lat, lng: l.lng, distance_m: dist(l), created_at: l.created_at })).sort((a, b) => a.distance_m - b.distance_m);
+      return json({ finds, reported });
+    }
+
+    if (action === 'curate') {
+      // Admin only: approve a player's find, take a place off the map, put it back, rename it, or clear its reports.
+      if (!(await isAdmin(user.id))) return json({ error: 'admins only' }, 403);
+      const locationId = String(body.locationId ?? '');
+      const decision = String(body.decision ?? '');
+      if (!/^(osm:(node|way|relation):\d+|ppp:[a-f0-9]{12})$/.test(locationId)) return json({ error: 'bad request' }, 400);
+      let patch: Record<string, unknown> | null = null;
+      if (decision === 'approve' || decision === 'restore') patch = { status: 'live' };
+      else if (decision === 'hide') patch = { status: 'hidden' };
+      else if (decision === 'rename') {
+        const name = String(body.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+        if (name.length < 2 || nameProblem(name)) return json({ error: 'give it a name' }, 400);
+        patch = { name };
+      } else if (decision !== 'dismiss') return json({ error: 'bad request' }, 400);
+      if (patch) {
+        const { error } = await admin.from('locations').update(patch).eq('id', locationId);
+        if (error) return json({ error: error.message }, 500);
+      }
+      // Any decision settles the open reports on this place.
+      await admin.from('place_reports').delete().eq('location_id', locationId);
+      const { data: row } = await admin.from('locations').select('name, status').eq('id', locationId).maybeSingle();
+      return json({ ok: true, status: row?.status ?? null, name: row?.name ?? null });
     }
 
     if (action === 'link-code') {

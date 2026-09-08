@@ -1,3 +1,4 @@
+import { MenuVolume } from './MenuControls';
 import { useEffect, useRef, useState } from 'react';
 import { COURSE } from '../holes';
 import { drawHole } from '../render/drawHole';
@@ -5,16 +6,19 @@ import { fitCamera } from '../render/camera';
 import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
 import type { Hole } from '../sim/types';
 import { COURSE_LENGTHS, dailyEdition, dailySeed, getBest, getPreferredLength, goToCourse, secondsUntilNextDaily, setPreferredLength } from './courses';
-import { getAudio, isMuted, setMuted, sfx, unlockAudio } from './sound';
-import { startTheme, stopTheme } from './music';
+import { getAudio, isMuted, sfx, unlockAudio } from './sound';
+import { startTheme } from './music';
 import { navigate } from '../router';
 import { api } from '../net/api';
 import { ensureSession, getSavedName, loadProfile, getSavedAvatar } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { AccountSheet } from './AccountSheet';
 import { TabBar } from './TabBar';
-import { MASCOT_BODY, MASCOT_VIEWBOX } from './mascot';
 import { Avatar } from './Avatar';
+import { GameIcon } from './GameIcon';
+import { MatchIcon } from './MatchIcon';
+import { ClubhouseMap } from './ClubhouseMap';
+import './Clubhouse.css';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -27,120 +31,13 @@ function untilTomorrowUtc(): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function Mascot() {
-  return <svg className="mascot" viewBox={MASCOT_VIEWBOX} aria-hidden="true" dangerouslySetInnerHTML={{ __html: MASCOT_BODY }} />;
-}
-
-
-/** Art files shipped in public/art; the SVG versions stay as the fallback while a file is missing. */
-export const ART = {
-  logo: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/logo.webp`,
-  daily: `${import.meta.env.BASE_URL.replace(/\/+$/, '')}/art/daily-card.webp`,
-};
-
-/** Little map illustration for the home card: roads, pins, and a crowned pin when you hold a throne. */
-function MapArt({ mine }: { mine: number }) {
-  return (
-    <svg className="map-art" viewBox="0 0 150 120" aria-hidden="true">
-      <rect x="0" y="0" width="150" height="120" rx="16" fill="#dff8ec" />
-      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#fff" strokeWidth="9" fill="none" />
-      <path d="M20 130 C 30 80, 80 110, 95 70 S 130 50, 155 75" stroke="#fff" strokeWidth="9" fill="none" />
-      <path d="M-5 30 C 40 20, 60 60, 110 45 S 150 20, 160 35" stroke="#a9e6c8" strokeWidth="2" strokeDasharray="6 5" fill="none" />
-      <circle cx="95" cy="92" r="10" fill="#9ad1ff" opacity="0.6" />
-      <circle cx="95" cy="92" r="4" fill="#3a8dff" stroke="#fff" strokeWidth="2" />
-      <g transform="translate(38 44)">
-        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
-        <circle cx="0" cy="-12" r="5" fill="#fff" />
-      </g>
-      <g transform="translate(118 62)">
-        <path d="M0 -18 a12 12 0 1 1 0.01 0 L0 4 Z" fill="#1f2a44" />
-        <circle cx="0" cy="-12" r="5" fill="#fff" />
-      </g>
-      <g transform="translate(72 30)">
-        <path d="M0 -22 a15 15 0 1 1 0.01 0 L0 6 Z" fill={mine > 0 ? '#ffd447' : '#1f2a44'} stroke="#1f2a44" strokeWidth="2" />
-        <text x="0" y="-9" textAnchor="middle" fontSize="15">
-          👑
-        </text>
-      </g>
-    </svg>
-  );
-}
-
-/** Resolves to true once the image loads, false if it 404s, null while unknown. */
-function useImage(src: string): boolean | null {
-  const [ok, setOk] = useState<boolean | null>(null);
-  useEffect(() => {
-    let live = true;
-    const img = new Image();
-    img.onload = () => live && setOk(true);
-    img.onerror = () => live && setOk(false);
-    img.src = src;
-    return () => {
-      live = false;
-    };
-  }, [src]);
-  return ok;
-}
-
-/** The daily card's picture: a floating green, a flag, a crowned throne. */
-function DailyArt({ played }: { played: boolean }) {
-  return (
-    <svg className="daily-art" viewBox="0 0 360 190" aria-hidden="true">
-      <defs>
-        <linearGradient id="da-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#233258" />
-          <stop offset="1" stopColor="#1a2440" />
-        </linearGradient>
-        <linearGradient id="da-green" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8fe36b" />
-          <stop offset="1" stopColor="#4fb84a" />
-        </linearGradient>
-        <linearGradient id="da-dirt" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#8a5a3c" />
-          <stop offset="1" stopColor="#5a3a26" />
-        </linearGradient>
-      </defs>
-      <rect width="360" height="190" fill="url(#da-sky)" />
-      {[
-        [30, 24, 1.6],
-        [70, 60, 1.1],
-        [120, 18, 1.3],
-        [300, 30, 1.8],
-        [335, 80, 1.1],
-        [250, 14, 1.2],
-        [20, 120, 1.0],
-        [345, 140, 1.4],
-      ].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="#fff" opacity="0.8" />
-      ))}
-      <path d="M40 132 C60 108 300 104 320 132 C335 150 300 176 180 180 C60 176 25 150 40 132 Z" fill="url(#da-green)" stroke="#1f2a44" strokeWidth="4" />
-      <path d="M46 140 C60 160 120 178 180 180 C240 178 300 160 314 140 L300 172 C260 190 100 190 60 172 Z" fill="url(#da-dirt)" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="120" cy="148" rx="40" ry="14" fill="#3f9c3a" opacity="0.55" />
-      <circle cx="248" cy="112" r="16" fill="#2f8f3e" stroke="#1f2a44" strokeWidth="3" />
-      <circle cx="268" cy="124" r="12" fill="#3aa347" stroke="#1f2a44" strokeWidth="3" />
-      <rect x="246" y="126" width="4" height="14" fill="#5a3a26" />
-      <circle cx="128" cy="150" r="5" fill="#1f2a44" opacity="0.5" />
-      <rect x="126" y="108" width="3" height="44" fill="#f4f6f7" stroke="#1f2a44" strokeWidth="1.5" />
-      <path d="M129 108 L154 116 L129 124 Z" fill="#ff5f7e" stroke="#1f2a44" strokeWidth="2.5" strokeLinejoin="round" />
-      <circle cx="150" cy="156" r="6" fill="#fff" stroke="#1f2a44" strokeWidth="2.5" />
-      <ellipse cx="205" cy="146" rx="18" ry="6" fill="rgba(0,0,0,0.25)" />
-      <rect x="192" y="96" width="26" height="22" rx="5" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <path d="M186 118 C186 114 194 112 205 112 C216 112 224 114 224 118 L221 132 C219 140 212 144 205 144 C198 144 191 140 189 132 Z" fill="#ffffff" stroke="#1f2a44" strokeWidth="3" />
-      <ellipse cx="205" cy="118" rx="14" ry="5" fill="#4db8ff" stroke="#1f2a44" strokeWidth="2.5" />
-      <path d="M193 96 L196 84 L201 90 L205 80 L209 90 L214 84 L217 96 Z" fill={played ? '#c9d8ff' : '#ffc63a'} stroke="#1f2a44" strokeWidth="3" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [muted, setMutedState] = useState(isMuted());
   const [name, setName] = useState(getSavedName());
   const [avatar] = useState(getSavedAvatar());
-  const logoArt = useImage(ART.logo) === true;
-  const dailyArt = useImage(ART.daily) === true;
   const [askName, setAskName] = useState(false);
   const [help, setHelp] = useState(false);
+  const [custom, setCustom] = useState(false);
   const [len, setLen] = useState(getPreferredLength());
   const [tick, setTick] = useState(0);
   const [thrones, setThrones] = useState<number | null>(null);
@@ -172,12 +69,12 @@ export function TitleScreen() {
       if (prof?.name && !cancelled) setName(prof.name);
       const fix = recallFix();
       const [kings, near, board] = await Promise.allSettled([
-        api.kings({ limit: 200 }),
+        api.profile(me),
         fix ? api.nearby(fix.lat, fix.lng, 25000) : Promise.resolve([]),
         played ? api.leaderboard(daily) : Promise.resolve([]),
       ]);
       if (cancelled) return;
-      if (kings.status === 'fulfilled') setThrones(kings.value.find((k) => k.user_id === me)?.thrones ?? 0);
+      if (kings.status === 'fulfilled' && kings.value) setThrones(kings.value.thrones);
       if (near.status === 'fulfilled' && fix)
         setNearby({
           total: near.value.length,
@@ -263,7 +160,7 @@ export function TitleScreen() {
   // Coming back from a game the context is already unlocked: music starts straight away. Leaving fades it out.
   useEffect(() => {
     theme();
-    return () => stopTheme();
+    // Music is shared across menus; App stops it when entering a course.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const go = (fn: () => void, sound: 'tap' | 'whoosh' = 'tap') => {
@@ -290,24 +187,11 @@ export function TitleScreen() {
           </span>
         ))}
       </div>
-      <div className="title-inner home2">
+      <div className="arcade-backdrop" aria-hidden="true" />
+      <div className="title-inner home2 compact-home open-home clubhouse-home">
         <header className="home-top">
           <div className="home-icons">
-            <button
-              className="icon-btn"
-              aria-label={muted ? 'Sound off' : 'Sound on'}
-              onClick={() =>
-                go(() => {
-                  const m = !muted;
-                  setMuted(m);
-                  setMutedState(m);
-                  if (m) stopTheme();
-                  else theme();
-                })
-              }
-            >
-              {muted ? '🔇' : '🔊'}
-            </button>
+            <MenuVolume />
             <button className="icon-btn" aria-label="How to play" onClick={() => go(() => setHelp(true))}>
               ❓
             </button>
@@ -318,93 +202,42 @@ export function TitleScreen() {
             <span className="player-thrones">👑 {thrones ?? '–'}</span>
           </button>
         </header>
-        <div className="brand hero">
-          {logoArt ? (
-            <img className="logo-img hero" src={ART.logo} alt="Putt Putt Potty" draggable={false} />
-          ) : (
-            <>
-              <Mascot />
-              <div className="logo big">
-                <span className="logo-top">Putt Putt</span>
-                <span className="logo-bottom">Potty</span>
-              </div>
-            </>
-          )}
+        <div className="arcade-brand"><img src={`${import.meta.env.BASE_URL}art/arcade-logo.webp`} alt="Putt Putt Potty" draggable={false} /></div>
+        <div className="clubhouse-heading">
+          <h1>GO CLAIM YOUR CROWN</h1>
+          <p>Every bathroom is a course.</p>
         </div>
-        <div className="tagline">Every bathroom is a course.</div>
-
-        <section className={`daily-card${played ? ' played' : ''}`}>
-          {dailyArt ? (
-            <div className="daily-art-wrap">
-              <img className="daily-img" src={ART.daily} alt="" draggable={false} />
-              {played && (
-                // The painted sign and the result share one slot: once the round is played,
-                // this board covers the painted one exactly, so only one of them ever shows.
-                <span className="result-sign" role="status">
-                  <span className="sign-top">{best !== null ? 'You shot' : 'Your round'}</span>
-                  <span className="sign-main">{best !== null ? best : 'Played'}</span>
-                  <span className="sign-sub">{dailyRank ? `#${dailyRank.rank} of ${dailyRank.of}` : 'On the board'}</span>
-                </span>
-              )}
-            </div>
-          ) : (
-            <DailyArt played={played} />
-          )}
-          <button className="cta" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            {played ? `🏆 Daily leaderboard · next in ${untilTomorrowUtc()}` : `▶  Play the ${edition} course`}
+        <button className="clubhouse-invitation" aria-label={nearby ? `Open throne map, ${nearby.total} bathrooms nearby` : 'Open throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}>
+          <ClubhouseMap />
+          <span className="clubhouse-map-cta">OPEN THRONE MAP <span aria-hidden="true">→</span></span>
+        </button>
+        <p className="clubhouse-rule">Visit. Beat the record. Become king.</p>
+        <button className="clubhouse-kingdom" onClick={() => go(() => navigate('profile'))}>
+          <GameIcon kind="crown" /><strong>YOUR KINGDOM</strong>
+          <span>{thrones === null ? 'Loading…' : `${thrones} ${thrones === 1 ? 'throne' : 'thrones'} held`}</span>
+        </button>
+        <section className="clubhouse-secondary" aria-label="More ways to play">
+          <button aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            <GameIcon kind="flag" /><span><strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong><small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See your results') : 'A new course every day'}</small></span><b aria-hidden="true">›</b>
           </button>
+          <button onClick={() => go(() => navigate('match'), 'whoosh')}><MatchIcon /><span><strong>QUICK MATCH</strong><small>Find a challenger</small></span><b aria-hidden="true">›</b></button>
         </section>
-
-        <section className="menu2">
-          <div className="mrow feature">
-            <MapArt mine={nearby?.mine ?? 0} />
-            <div className="mrow-text">
-              <strong>Nearby thrones</strong>
-              <small>{nearby ? `${nearby.total} nearby · ${nearby.claimed} claimed` : 'Real bathrooms near you'}</small>
-            </div>
-            <button className="mbtn primary" onClick={() => go(() => navigate('map'), 'whoosh')}>
-              Open map
-            </button>
-          </div>
-          <div className="mrow">
-            <span className="mrow-icon">🪠</span>
-            <div className="mrow-text">
-              <strong>Quick match</strong>
-              <small>Same nine holes, live.</small>
-            </div>
-            <button className="mbtn" onClick={() => go(() => navigate('match'), 'whoosh')}>
-              Play
-            </button>
-          </div>
-          <div className="mrow">
-            <span className="mrow-icon">🎲</span>
-            <div className="mrow-text">
-              <strong>Custom game</strong>
-              <span className="len-chips">
-                {COURSE_LENGTHS.map((l) => (
-                  <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-label={`${l.n} holes`}>
-                    {l.label}
-                  </button>
-                ))}
-              </span>
-            </div>
-            <button className="mbtn" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>
-              Tee off
-            </button>
-          </div>
-          <div className="mrow">
-            <span className="mrow-icon">🏆</span>
-            <div className="mrow-text">
-              <strong>Leaderboards</strong>
-              <small>Daily, thrones and kings.</small>
-            </div>
-            <button className="mbtn" onClick={() => go(() => navigate('leaders'), 'tap')}>
-              Open
-            </button>
-          </div>
-        </section>
+        <button className="clubhouse-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
+      {custom && (
+        <div className="overlay" onClick={() => setCustom(false)}>
+          <div className="card pop custom-sheet" role="dialog" aria-modal="true" aria-label="Custom game" onClick={(e) => e.stopPropagation()}>
+            <h2>Make it your round</h2>
+            <p>How many holes?</p>
+            <div className="custom-lengths">
+              {COURSE_LENGTHS.map((l) => <button key={l.n} className={l.n === len ? 'active' : ''} onClick={() => pickLen(l.n)} aria-pressed={l.n === len}>{l.label}</button>)}
+            </div>
+            <button className="primary" onClick={() => go(() => goToCourse('random', len), 'whoosh')}>Tee off · {len} holes</button>
+            <button onClick={() => setCustom(false)}>Back to home</button>
+          </div>
+        </div>
+      )}
 
       {askName && (
         <AccountSheet

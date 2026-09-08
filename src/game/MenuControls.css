@@ -1,0 +1,5 @@
+.menu-volume{display:grid;place-items:center;flex-shrink:0;width:40px;height:40px;padding:7px;border-radius:50%;border:2px solid #83b7a7;background:#092b40;box-shadow:0 3px 0 #061c30;color:#fff3cc}.menu-volume svg{width:24px;height:24px}.menu-volume:focus-visible{outline:3px solid #ffdf72;outline-offset:3px}
+.map-head .menu-golfer{max-width:145px;min-height:40px;gap:6px}.menu-golfer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:380px){.map-head{gap:7px}.map-head .menu-golfer{max-width:112px;font-size:11px;padding:5px 7px}}
+
+.leaders .map-head.menu-controls-only,.map-screen .map-head.menu-controls-only{justify-content:space-between;background:transparent;box-shadow:none;border:none}

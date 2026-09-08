@@ -3,6 +3,8 @@
 
 /** Tag set -> our place type and a default label, or null when the object is not a bathroom venue. */
 export function classify(tags) {
+  // Mappers retag closed businesses (disused:amenity=*) or flag them; neither is a place to play.
+  if (tags.disused === 'yes' || tags.abandoned === 'yes' || tags['disused:amenity'] || tags['abandoned:amenity'] || tags.end_date) return null;
   const a = tags.amenity;
   if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
   if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };

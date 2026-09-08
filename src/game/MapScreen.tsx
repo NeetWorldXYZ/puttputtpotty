@@ -1,18 +1,15 @@
+import { MenuVolume } from './MenuControls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { COURSE_STYLE, circlePolygon } from './mapStyle';
-import type { Hole } from '../sim/types';
-import { drawHole } from '../render/drawHole';
-import { fitCamera } from '../render/camera';
 import { themeById } from '../render/themes';
-import { DEFAULT_PARAMS, cupRadius } from '../sim/params';
-import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation } from '../net/api';
+import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation, type PlaceQueue, type PlaceReason } from '../net/api';
 import { currentUserId, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
-import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
+import { CLAIM_RADIUS_M } from '../net/config';
 import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
 import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
@@ -30,6 +27,9 @@ const MIN_RESULTS_BEFORE_WIDENING = 4;
 const RESEARCH_DISTANCE_M = 1800;
 const MIN_AUTO_ZOOM = 10;
 const MAX_PINS = 400;
+/** Bathrooms this close get their course built in the background, a few at a time. */
+const WARM_RADIUS_M = 800;
+const WARM_MAX = 4;
 const THRONES_RETRY_MS = 8000;
 const THRONES_CACHE_KEY = 'ppp.thrones.v1';
 const THRONES_CACHE_MAX = 600;
@@ -90,15 +90,23 @@ function ago(iso: string): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+const THRONE_GLYPH = `<svg class="throne-glyph" viewBox="0 0 40 48" aria-hidden="true"><path d="m8 12-3-9 9 5 6-7 6 7 9-5-3 9Z" fill="#ffdc65" stroke="#14213d" stroke-width="2"/><rect x="9" y="14" width="22" height="13" rx="3" fill="white" stroke="#14213d" stroke-width="2"/><path d="M6 27h28q0 13-11 14l3 5H14l3-5Q6 40 6 27Z" fill="white" stroke="#14213d" stroke-width="2"/><ellipse cx="20" cy="28" rx="12" ry="4" fill="#55d9f0" stroke="#14213d" stroke-width="2"/></svg>`;
+
 /**
  * A pin says one thing at a glance: empty throne (white), taken (gold with
  * the king's score), or yours (gold with a glow).
  */
-function pinHtml(p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, mine: boolean): string {
-  const icon = POI_ICON[p.poiType] ?? '🚽';
+function pinHtml(_p: OsmPlace, king: NearbyLocation | undefined, selected: boolean, mine: boolean): string {
   const claimed = !!king?.king_name;
+  const pending = king?.status === 'pending';
   const badge = claimed && king!.king_score !== null ? `<span class="pin-score">${king!.king_score}</span>` : '';
-  return `<div class="pin${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}"><span class="pin-icon">${claimed ? '👑' : icon}</span>${badge}</div>`;
+  return `<div class="pin${selected ? ' selected' : ''}${claimed ? ' claimed' : ''}${mine ? ' mine' : ''}${pending ? ' pending' : ''}"><span class="pin-icon">${THRONE_GLYPH}</span>${badge}</div>`;
+}
+
+/** A throne row for a place the server has not scored yet. */
+function emptyKing(p: OsmPlace): NearbyLocation {
+  const band = bandFor(p.poiType, p.id);
+  return { id: p.id, name: p.name, poi_type: p.poiType, lat: p.lat, lng: p.lng, theme: band.theme, difficulty: band.difficulty, hole_par: null, par: null, distance_m: 0, king_name: null, king_score: null, king_user: null, king_since: null, king_holes: null, king_elapsed_ms: null, king_avatar: null, run_count: 0, status: 'live' };
 }
 
 /** Zoomed out past this, nearby flags fold into count bubbles that split apart as you zoom in. */
@@ -148,7 +156,7 @@ function clusterPlaces(places: OsmPlace[], zoom: number, kings: Record<string, N
 
 function clusterHtml(c: Cluster): string {
   const big = c.members.length >= 10;
-  return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${c.claimed ? '👑' : '🚽'}</span></div>`;
+  return `<div class="cluster${c.claimed ? ' claimed' : ''}${big ? ' big' : ''}"><span class="cluster-count">${c.members.length}</span><span class="cluster-icon">${THRONE_GLYPH}</span></div>`;
 }
 
 const FOUND_TYPES: [string, string][] = [
@@ -162,20 +170,40 @@ const FOUND_TYPES: [string, string][] = [
   ['park', 'Rest stop'],
 ];
 
-/** "Found a bathroom here": name it, say what it is, and it goes on the map at your feet. */
-function FoundSheet({ fix, onClose, onFound }: { fix: { lat: number; lng: number; accuracy: number }; onClose: () => void; onFound: (p: OsmPlace) => void }) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState('toilets');
+/** "Found a bathroom here": name it, say what it is, and it goes on the map at your feet (or where you drop the pin). */
+type FoundDraft = { name: string; type: string };
+
+function FoundSheet({
+  fix,
+  pin,
+  draft,
+  setDraft,
+  isAdmin,
+  onDropPin,
+  onClose,
+  onFound,
+}: {
+  fix: { lat: number; lng: number; accuracy: number };
+  pin: { lat: number; lng: number } | null;
+  draft: FoundDraft;
+  setDraft: (d: FoundDraft) => void;
+  isAdmin: boolean;
+  onDropPin: () => void;
+  onClose: () => void;
+  onFound: (p: OsmPlace, status: 'live' | 'pending') => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trimmed = name.trim();
+  const trimmed = draft.name.trim();
+  const gpsBad = fix.accuracy > 100 && !isAdmin;
+  const pinDist = pin ? haversine(fix.lat, fix.lng, pin.lat, pin.lng) : 0;
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const { location } = await api.found(trimmed, type, fix.lat, fix.lng, fix.accuracy);
+      const { location, status } = await api.found(trimmed, draft.type, fix.lat, fix.lng, fix.accuracy, pin);
       sfx.jingle();
-      onFound(location);
+      onFound(location, status);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -186,48 +214,183 @@ function FoundSheet({ fix, onClose, onFound }: { fix: { lat: number; lng: number
     <div className="overlay" onClick={onClose}>
       <div className="card pop found" onClick={(e) => e.stopPropagation()}>
         <h2>Found a bathroom?</h2>
-        <div className="sub">It goes on the map right where you're standing{fix.accuracy > 100 ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}.</div>
-        <input className="name-input" maxLength={40} placeholder="What's it called?" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <div className="sub">
+          {pin ? `The pin is set, ${fmtDistance(pinDist)} from you.` : `It goes on the map right where you're standing${gpsBad ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}.`}
+          {!isAdmin && ' New places show up for everyone once they are approved.'}
+        </div>
+        <input className="name-input" maxLength={40} placeholder="What's it called?" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
         <div className="found-types">
           {FOUND_TYPES.map(([id, label]) => (
-            <button key={id} className={`chip${type === id ? ' active' : ''}`} onClick={() => setType(id)}>
+            <button key={id} className={`chip${draft.type === id ? ' active' : ''}`} onClick={() => setDraft({ ...draft, type: id })}>
               {POI_ICON[id] ?? '🚽'} {label}
             </button>
           ))}
         </div>
         {error && <div className="err">{error}</div>}
-        <button className="primary" disabled={trimmed.length < 2 || busy || fix.accuracy > 100} onClick={() => void submit()}>
+        <button className="primary" disabled={trimmed.length < 2 || busy || gpsBad} onClick={() => void submit()}>
           {busy ? 'Adding…' : 'Put it on the map'}
         </button>
+        <button onClick={onDropPin}>{pin ? 'Move the pin' : "It's not where I'm standing"}</button>
         <button onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
 }
 
-/** Hole preview drawn once per hole into a small canvas. */
-function HolePreview({ hole, label }: { hole: Hole; label?: string }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = canvas.clientWidth || 320;
-    const h = canvas.clientHeight || 150;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = themeById(hole.theme).page;
-    ctx.fillRect(0, 0, w, h);
-    const cam = fitCamera(hole.bounds, w, h, 6);
-    drawHole(ctx, hole, cam, { ballRadius: DEFAULT_PARAMS.ballRadius, cupRadius: cupRadius(DEFAULT_PARAMS), ball: { x: hole.tee.x, y: hole.tee.y }, dpr, time: 0 });
-  }, [hole]);
+/** Something is wrong with a place: closed, a new name, or not a bathroom at all. */
+function PlaceReportSheet({ place, isAdmin, onClose }: { place: OsmPlace; isAdmin: boolean; onClose: (r: { hidden?: boolean; name?: string; msg: string } | null) => void }) {
+  const [reason, setReason] = useState<PlaceReason>('closed');
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const trimmed = newName.trim();
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.reportPlace({ id: place.id, name: place.name, poiType: place.poiType, lat: place.lat, lng: place.lng }, reason, reason === 'renamed' ? trimmed : undefined);
+      if (r.applied && reason === 'renamed') onClose({ name: r.name, msg: `${place.name} is now ${r.name}.` });
+      else if (r.applied) onClose({ hidden: true, msg: `Thanks. ${place.name} is off the map.` });
+      else {
+        const left = Math.max(1, (r.needed ?? 3) - (r.reports ?? 1));
+        onClose({ msg: `Thanks. ${left} more ${left === 1 ? 'player' : 'players'} saying so and it changes for everyone.` });
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  };
+  const options: [PlaceReason, string][] = [
+    ['closed', "It's closed"],
+    ['renamed', 'New name'],
+    ['wrong', 'Not a bathroom'],
+  ];
   return (
-    <div className="sheet-hole">
-      <canvas ref={ref} className="sheet-preview" />
-      {label && <span className="sheet-hole-label">{label}</span>}
+    <div className="overlay" onClick={() => onClose(null)}>
+      <div className="card pop found" onClick={(e) => e.stopPropagation()}>
+        <h2>What's wrong with {place.name}?</h2>
+        <div className="sub">{isAdmin ? 'You are an admin: this applies right away.' : 'When a few players agree, the map changes for everyone.'}</div>
+        <div className="found-types">
+          {options.map(([id, label]) => (
+            <button key={id} className={`chip${reason === id ? ' active' : ''}`} onClick={() => setReason(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {reason === 'renamed' && <input className="name-input" maxLength={40} placeholder="What's it called now?" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />}
+        {error && <div className="err">{error}</div>}
+        <button className="primary" disabled={busy || (reason === 'renamed' && trimmed.length < 2)} onClick={() => void submit()}>
+          {busy ? 'Sending…' : 'Send'}
+        </button>
+        <button onClick={() => onClose(null)}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+/** Admin: players' finds waiting for approval and places with open reports. */
+function ReviewSheet({ fix, onClose, onChanged }: { fix: Fix | null; onClose: () => void; onChanged: (id: string, r: { status: string | null; name: string | null }) => void }) {
+  const [queue, setQueue] = useState<PlaceQueue | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const load = useCallback(() => {
+    api
+      .placeQueue(fix?.lat, fix?.lng)
+      .then(setQueue)
+      .catch((e: Error) => setError(e.message));
+  }, [fix?.lat, fix?.lng]);
+  useEffect(load, [load]);
+  const decide = async (id: string, decision: 'approve' | 'hide' | 'restore' | 'rename' | 'dismiss', name?: string) => {
+    setBusy(id);
+    try {
+      const r = await api.curate(id, decision, name);
+      onChanged(id, r);
+      setRenaming(null);
+      setQueue((q) =>
+        q
+          ? {
+              finds: q.finds.filter((f) => f.id !== id),
+              reported: q.reported.filter((f) => f.id !== id),
+            }
+          : q,
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const reasonText = (r: { reason: PlaceReason; details: string | null; count: number }) =>
+    `${r.count} ${r.count === 1 ? 'says' : 'say'} ${r.reason === 'closed' ? 'closed' : r.reason === 'wrong' ? 'not a bathroom' : `renamed to "${r.details ?? ''}"`}`;
+  const empty = queue && !queue.finds.length && !queue.reported.length;
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="card pop found review" onClick={(e) => e.stopPropagation()}>
+        <h2>Review places</h2>
+        {error && <div className="err">{error}</div>}
+        {!queue && !error && <div className="sub">Loading…</div>}
+        {empty && <div className="sub">Nothing waiting. Nice.</div>}
+        {queue && queue.finds.length > 0 && (
+          <>
+            <div className="sheet-section-title">New finds</div>
+            {queue.finds.map((f) => (
+              <div key={f.id} className="review-row">
+                <div className="review-text">
+                  <strong>{f.name}</strong>
+                  <span>
+                    {POI_LABEL[f.poiType] ?? 'Bathroom'}
+                    {fix ? ` · ${fmtDistance(f.distance_m)} away` : ''}
+                  </span>
+                </div>
+                <div className="review-actions">
+                  <button className="primary" disabled={busy === f.id} onClick={() => void decide(f.id, 'approve')}>
+                    Approve
+                  </button>
+                  <button disabled={busy === f.id} onClick={() => void decide(f.id, 'hide')}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+        {queue && queue.reported.length > 0 && (
+          <>
+            <div className="sheet-section-title">Reported</div>
+            {queue.reported.map((f) => (
+              <div key={f.id} className="review-row">
+                <div className="review-text">
+                  <strong>{f.name}</strong>
+                  <span>{f.reports.map(reasonText).join(' · ')}</span>
+                </div>
+                {renaming?.id === f.id ? (
+                  <div className="review-actions">
+                    <input className="name-input" maxLength={40} value={renaming.name} onChange={(e) => setRenaming({ id: f.id, name: e.target.value })} autoFocus />
+                    <button className="primary" disabled={busy === f.id || renaming.name.trim().length < 2} onClick={() => void decide(f.id, 'rename', renaming.name.trim())}>
+                      Save
+                    </button>
+                    <button onClick={() => setRenaming(null)}>Back</button>
+                  </div>
+                ) : (
+                  <div className="review-actions">
+                    <button disabled={busy === f.id} onClick={() => void decide(f.id, 'hide')}>
+                      Remove
+                    </button>
+                    <button disabled={busy === f.id} onClick={() => setRenaming({ id: f.id, name: f.reports.find((r) => r.reason === 'renamed')?.details ?? f.name })}>
+                      Rename
+                    </button>
+                    <button disabled={busy === f.id} onClick={() => void decide(f.id, 'dismiss')}>
+                      Keep
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+        <button onClick={onClose}>Close</button>
+      </div>
     </div>
   );
 }
@@ -281,16 +444,17 @@ export function MapScreen() {
   const [kings, setKings] = useState<Record<string, NearbyLocation>>({});
   const kingsRef = useRef<Record<string, NearbyLocation>>({});
   kingsRef.current = kings;
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [netError, setNetError] = useState<string | null>(null);
   /** 'stale': showing remembered thrones while the server is unreachable; 'empty': nothing to show yet. */
   const [thronesDown, setThronesDown] = useState<'none' | 'stale' | 'empty'>('none');
+  /** The first throne answer (or failure) is in: warm-up may judge which pins still lack a course. */
+  const [thronesSettled, setThronesSettled] = useState(false);
   const retryRef = useRef(0);
   useEffect(() => () => window.clearTimeout(retryRef.current), []);
   const [selected, setSelected] = useState<OsmPlace | null>(null);
-  const [preview, setPreview] = useState<{ id: string; holes: Hole[]; par: number; king: King | null } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [building, setBuilding] = useState<{ id: string; n: number } | null>(null);
   const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
@@ -303,6 +467,18 @@ export function MapScreen() {
   const [checkinTick, setCheckinTick] = useState(0);
   const [askName, setAskName] = useState(false);
   const [founding, setFounding] = useState(false);
+  const [foundDraft, setFoundDraft] = useState<FoundDraft>({ name: '', type: 'toilets' });
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [placing, setPlacing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [reporting, setReporting] = useState<OsmPlace | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  useEffect(() => {
+    api
+      .me()
+      .then((m) => setIsAdmin(m.role === 'admin'))
+      .catch(() => {});
+  }, []);
   const [filter, setFilter] = useState<'all' | 'unclaimed' | 'mine'>('all');
   const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
@@ -368,14 +544,53 @@ export function MapScreen() {
   }, []);
 
   const [osmLoading, setOsmLoading] = useState(false);
-  const [wide, setWide] = useState(false);
+  const [, setWide] = useState(false);
+
+  /** Drops a place from the map and the throne list after it was hidden. */
+  const forgetPlace = useCallback((id: string) => {
+    placesRef.current.delete(id);
+    setPlaces([...placesRef.current.values()]);
+    setKings((k) => {
+      const m = { ...k };
+      delete m[id];
+      return m;
+    });
+    setSelected((cur) => (cur?.id === id ? null : cur));
+  }, []);
+
+  /** A place changed name: the pin, the throne row and the open sheet follow. */
+  const renamePlace = useCallback((id: string, name: string) => {
+    const p = placesRef.current.get(id);
+    if (p) {
+      placesRef.current.set(id, { ...p, name });
+      setPlaces([...placesRef.current.values()]);
+    }
+    setKings((k) => (k[id] ? { ...k, [id]: { ...k[id], name } } : k));
+    setSelected((cur) => (cur?.id === id ? { ...cur, name } : cur));
+  }, []);
+
+  const curate = async (p: OsmPlace, decision: 'approve' | 'hide') => {
+    try {
+      await api.curate(p.id, decision);
+      if (decision === 'hide') {
+        forgetPlace(p.id);
+        setNotice(`${p.name} is off the map.`);
+      } else {
+        setKings((k) => ({ ...k, [p.id]: { ...(k[p.id] ?? emptyKing(p)), status: 'live' } }));
+        setNotice(`${p.name} is live for everyone.`);
+      }
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
+  };
 
   /** Adds places to the pin set, dropping the farthest from the search centre past the cap. */
   const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
     const m = placesRef.current;
     for (const p of incoming) m.set(p.id, p);
-    // Claimed bathrooms must never be absorbed: keep them ahead of anything else.
+    // Claimed bathrooms and places players founded by hand must never be absorbed: keep them ahead of anything else.
     const claimedIds = new Set(Object.values(kingsRef.current).filter((k) => k.king_name).map((k) => k.id));
+    for (const id of m.keys()) if (id.startsWith('ppp:')) claimedIds.add(id);
     const all = [...m.values()];
     const claimed = all.filter((p) => claimedIds.has(p.id));
     const deduped = dedupePlaces(all.filter((p) => !claimedIds.has(p.id)));
@@ -428,6 +643,7 @@ export function MapScreen() {
         }, THRONES_RETRY_MS);
       }
       setLoading(false);
+      setThronesSettled(true);
     },
     [applyThrones],
   );
@@ -574,6 +790,41 @@ export function MapScreen() {
     }
   }, [places, kings, selected, fix, zoomStep, me, filter]);
 
+  // Warm-up: the nearest bathrooms without a course yet get built in the background,
+  // so by the time you walk in there is nothing to wait for.
+  const warmedRef = useRef<Set<string>>(new Set());
+  const warmingRef = useRef(false);
+  useEffect(() => {
+    if (!fix || !thronesSettled || warmingRef.current) return;
+    const todo = places
+      .filter((p) => !warmedRef.current.has(p.id) && (kings[p.id]?.par ?? null) === null && kings[p.id]?.status !== 'pending')
+      .map((p) => ({ p, d: haversine(fix.lat, fix.lng, p.lat, p.lng) }))
+      .filter((x) => x.d <= WARM_RADIUS_M)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, WARM_MAX);
+    if (!todo.length) return;
+    warmingRef.current = true;
+    const signal = { cancelled: false };
+    (async () => {
+      for (const { p } of todo) {
+        if (signal.cancelled) break;
+        warmedRef.current.add(p.id);
+        try {
+          const r = await loadCourse(p, { signal });
+          setKings((k) => ({ ...k, [p.id]: { ...(k[p.id] ?? emptyKing(p)), theme: r.location.theme, difficulty: r.location.difficulty, par: r.par } }));
+        } catch {
+          // Not now; the sheet builds it on demand anyway.
+        }
+      }
+    })().finally(() => {
+      warmingRef.current = false;
+    });
+    return () => {
+      signal.cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fix?.lat, fix?.lng, places, thronesSettled]);
+
   // Preview + founding on select.
   useEffect(() => {
     if (!selected) return;
@@ -589,12 +840,10 @@ export function MapScreen() {
     if (preview?.id === selected.id) return;
     let cancelled = false;
     const signal = { cancelled: false };
-    setBuilding(null);
-    loadCourse(selected, { signal, onProgress: (n) => !cancelled && setBuilding({ id: selected.id, n }) })
+    loadCourse(selected, { signal })
       .then((r) => {
         if (cancelled) return;
-        setBuilding(null);
-        setPreview({ id: selected.id, holes: r.holes, par: r.par, king: r.king });
+        setPreview({ id: selected.id, par: r.par, king: r.king });
         const kg = r.king;
         if (kg) {
           setKings((k) => ({
@@ -650,7 +899,7 @@ export function MapScreen() {
     });
   }, [fix, selected, mapLoaded]);
 
-  // Dwell countdown ticks once a second while a sheet is open.
+  // Keep check-in expiry current while a sheet is open.
   useEffect(() => {
     if (!selected) return;
     const id = setInterval(() => setCheckinTick((t) => t + 1), 1000);
@@ -667,9 +916,7 @@ export function MapScreen() {
   const inRange = distance !== null && fix !== null && distance <= CLAIM_RADIUS_M + Math.min(fix.accuracy, CLAIM_RADIUS_M);
   const ci = selected ? checkinAt(selected.id) : null;
   void checkinTick;
-  const dwellLeft = ci ? Math.max(0, DWELL_SECONDS - (Date.now() - ci) / 1000) : null;
   const checkinFresh = ci !== null && Date.now() - ci < 45 * 60 * 1000;
-  const ready = inRange && checkinFresh && dwellLeft === 0;
 
   const doCheckin = async () => {
     if (!selected || !fix) return;
@@ -739,41 +986,21 @@ export function MapScreen() {
   const king = selected ? kings[selected.id] : undefined;
   const band = selected ? bandFor(selected.poiType, selected.id) : null;
   const themeName = selected ? themeById(king?.theme ?? band!.theme).name : '';
-  const difficulty = (king?.difficulty ?? band?.difficulty ?? 'medium') as 'easy' | 'medium' | 'hard';
-  const difficultyRolls = difficulty === 'easy' ? 1 : difficulty === 'hard' ? 3 : 2;
-  const difficultyLabel = difficulty === 'easy' ? 'Easy' : difficulty === 'hard' ? 'Hard' : 'Medium';
-  const coursePar = preview && selected && preview.id === selected.id ? preview.par : (king?.par ?? null);
   const myBest = board && selected && board.id === selected.id ? (board.rows.find((r) => r.user_id === me)?.score ?? null) : null;
-  const claimedCount = Object.values(kings).filter((k) => k.king_name).length;
 
   return (
     <div className={`map-screen ${zoomClass}`}>
       <div ref={mapEl} className="map-canvas" />
 
-      <div className="map-head">
-        <div className="map-badge">📍</div>
-        <div className="map-title">
-          <div className="map-title-main">Nearby thrones</div>
-          <div className="map-title-sub">
-            {!fix && !geoError
-              ? 'finding you…'
-              : geoError && !places.length
-                ? 'no location'
-                : osmLoading
-                  ? `${wide ? 'widening the search' : 'searching OpenStreetMap'}… ${places.length ? `${places.length} so far` : ''}`
-                  : loading
-                    ? `${places.length} bathrooms · loading thrones…`
-                    : places.length
-                      ? `${places.length} bathrooms · ${claimedCount} claimed`
-                      : 'no bathrooms found here'}
-          </div>
-        </div>
-        <button className="name-chip" onClick={() => setAskName(true)} title="Your account">
+      <div className="map-head menu-controls-only">
+        <MenuVolume />
+        <button className="name-chip menu-golfer" onClick={() => setAskName(true)} title="Your account">
           <Avatar av={getSavedAvatar()} size={22} className="chip-avatar" />
           {name ?? 'Set name'}
         </button>
       </div>
 
+      {!placing && (
       <div className="map-filters">
         {(
           [
@@ -787,7 +1014,9 @@ export function MapScreen() {
           </button>
         ))}
       </div>
+      )}
 
+      {!placing && (
       <div className="map-tools">
         {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
         {thronesDown === 'stale' && <div className="map-tool quiet">reconnecting…</div>}
@@ -795,14 +1024,28 @@ export function MapScreen() {
           🚽 Closest
         </button>
         {fix && !selected && (
-          <button className="map-tool" onClick={() => setFounding(true)} title="Add a bathroom at your location">
+          <button
+            className="map-tool"
+            onClick={() => {
+              setFoundDraft({ name: '', type: 'toilets' });
+              setPin(null);
+              setFounding(true);
+            }}
+            title="Add a bathroom at your location"
+          >
             ➕ Found one
+          </button>
+        )}
+        {isAdmin && !selected && (
+          <button className="map-tool" onClick={() => setReviewing(true)} title="Finds and reports waiting for you">
+            🛠 Review
           </button>
         )}
         <button className="map-tool round" onClick={recentre} title="Recentre">
           ◎
         </button>
       </div>
+      )}
 
       {notice && <div className="map-toast">{notice}</div>}
 
@@ -817,15 +1060,86 @@ export function MapScreen() {
         />
       )}
 
-      {founding && fix && (
+      {founding && fix && !placing && (
         <FoundSheet
           fix={fix}
-          onClose={() => setFounding(false)}
-          onFound={(p) => {
+          pin={pin}
+          draft={foundDraft}
+          setDraft={setFoundDraft}
+          isAdmin={isAdmin}
+          onDropPin={() => {
             setFounding(false);
+            setPlacing(true);
+            const at = pin ?? fix;
+            mapRef.current?.flyTo({ center: [at.lng, at.lat], zoom: Math.max(mapRef.current.getZoom(), 17), duration: 400 });
+          }}
+          onClose={() => setFounding(false)}
+          onFound={(p, status) => {
+            setFounding(false);
+            setPin(null);
             addPlaces(p.lat, p.lng, [p]);
+            if (status === 'pending') setKings((k) => ({ ...k, [p.id]: { ...(k[p.id] ?? emptyKing(p)), status: 'pending' } }));
             setSelected(p);
-            setNotice(`${p.name} is on the map. First to sink it takes the throne.`);
+            setNotice(status === 'pending' ? `${p.name} is on your map. It shows for everyone once it's approved.` : `${p.name} is on the map. First to sink it takes the throne.`);
+          }}
+        />
+      )}
+
+      {placing && (
+        <>
+          <div className="pin-drop" aria-hidden="true">
+            <div className="pin-drop-cross">📍</div>
+          </div>
+          <div className="pin-drop-bar">
+            <div className="pd-hint">Drag the map until the pin sits on the bathroom.</div>
+            <button
+              className="primary"
+              onClick={() => {
+                const c = mapRef.current?.getCenter();
+                if (c) setPin({ lat: c.lat, lng: c.lng });
+                setPlacing(false);
+                setFounding(true);
+              }}
+            >
+              Put it here
+            </button>
+            <button
+              onClick={() => {
+                setPlacing(false);
+                setFounding(true);
+              }}
+            >
+              Back
+            </button>
+          </div>
+        </>
+      )}
+
+      {reporting && (
+        <PlaceReportSheet
+          place={reporting}
+          isAdmin={isAdmin}
+          onClose={(r) => {
+            const p = reporting;
+            setReporting(null);
+            if (!r) return;
+            if (r.hidden) forgetPlace(p.id);
+            else if (r.name) renamePlace(p.id, r.name);
+            setNotice(r.msg);
+          }}
+        />
+      )}
+
+      {reviewing && (
+        <ReviewSheet
+          fix={fix}
+          onClose={() => setReviewing(false)}
+          onChanged={(id, r) => {
+            if (r.status === 'hidden') forgetPlace(id);
+            else {
+              if (r.name) renamePlace(id, r.name);
+              if (r.status === 'live') setKings((k) => (k[id] ? { ...k, [id]: { ...k[id], status: 'live' } } : k));
+            }
           }}
         />
       )}
@@ -872,6 +1186,7 @@ export function MapScreen() {
                 {POI_LABEL[selected.poiType] ?? 'Bathroom'} · {themeName}
                 {` · ${HOLES_PER_COURSE} holes`}
                 {preview?.id === selected.id ? ` · par ${preview.par}` : king?.par ? ` · par ${king.par}` : ''}
+                {king?.status === 'pending' ? ' · awaiting approval' : ''}
               </div>
             </div>
           </div>
@@ -886,6 +1201,7 @@ export function MapScreen() {
           <div className={`king-banner${king?.king_name ? (king.king_user === me ? ' mine' : ' held') : ' empty'}`}>
             {king?.king_name ? (
               <>
+                {king.king_user === me && <span className="mine-shine" aria-hidden="true">✦</span>}
                 <Avatar av={king.king_avatar} size={76} className="kb-avatar" />
                 <div className="kb-text">
                   <div className="kb-label">👑 {king.king_user === me ? 'You are King of the Throne' : 'King of the Throne'}</div>
@@ -895,7 +1211,6 @@ export function MapScreen() {
                   <div className="kb-score">
                     <strong>{king.king_score}</strong>
                     {king.par ? <span> on par {king.par}</span> : null}
-                    {king.king_holes && <span className="dim"> · {king.king_holes.join('-')}</span>}
                     {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> · ⏱ {fmtElapsed(king.king_elapsed_ms)}</span>}
                   </div>
                   {king.king_since && <div className="kb-since">holding it {ago(king.king_since)}</div>}
@@ -919,45 +1234,31 @@ export function MapScreen() {
           </div>
 
           <div className="facts">
-            <span className="fact" title="Difficulty">
-              {'🧻'.repeat(difficultyRolls)} {difficultyLabel}
-            </span>
-            {coursePar !== null && <span className="fact">Par {coursePar}</span>}
-            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact">Record {king.king_score}</span>}
-            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact">{king.run_count} {king.run_count === 1 ? 'run' : 'runs'}</span>}
-            {myBest !== null && <span className="fact you">You {myBest}</span>}
+            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact"><small>Course record</small><strong>{king.king_score}</strong></span>}
+            {myBest !== null && <span className="fact you"><small>Your best</small><strong>{myBest}</strong></span>}
+            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact"><small>Rounds played</small><strong>{king.run_count}</strong></span>}
           </div>
 
           {board?.id === selected.id && board.rows.length > 0 && (
-            <ol className="sheet-board">
-              {board.rows.map((r) => (
-                <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
-                  <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
-                  <span className="who">
-                    <Avatar av={r.avatar} size={22} className="row-avatar" />
-                    {r.display_name}
-                  </span>
-                  <span className="stat">
-                    {r.score}
-                    {r.hole_scores && <small> {r.hole_scores.join('-')}</small>}
-                  </span>
-                  <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
-                </li>
-              ))}
-            </ol>
+            <div className="sheet-leaders">
+              <div className="sheet-section-title">Top scores</div>
+              <ol className="sheet-board">
+                {board.rows.map((r) => (
+                  <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
+                    <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
+                    <span className="who">
+                      <Avatar av={r.avatar} size={22} className="row-avatar" />
+                      {r.display_name}
+                    </span>
+                    <strong className="stat">{r.score}</strong>
+                    <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           )}
 
-          {preview?.id === selected.id ? (
-            <div className="sheet-holes">
-              {preview.holes.map((h, i) => (
-                <HolePreview key={h.id} hole={h} label={`${i + 1} · par ${h.par}`} />
-              ))}
-            </div>
-          ) : previewError ? (
-            <div className="sheet-err">{previewError}</div>
-          ) : (
-            <div className="sheet-preview loading">{building?.id === selected.id ? `building hole ${building.n} of ${HOLES_PER_COURSE}…` : 'loading course…'}</div>
-          )}
+          {previewError && <div className="sheet-err">Course details will load when you play.</div>}
 
           <div className="sheet-actions">
             {!fix ? (
@@ -972,10 +1273,6 @@ export function MapScreen() {
               <button className="primary" disabled={checkinBusy} onClick={() => void doCheckin()}>
                 {checkinBusy ? 'Checking in…' : "Check in · I'm here"}
               </button>
-            ) : !ready ? (
-              <button className="primary" disabled>
-                Warming the seat… {Math.ceil(dwellLeft ?? 0)} s
-              </button>
             ) : (
               <button className="primary throne" onClick={playThrone}>
                 {king?.king_name ? (king.king_user === me ? '👑 Defend your throne' : `⚔️ Challenge ${king.king_name}`) : '👑 Claim the empty throne'}
@@ -983,11 +1280,22 @@ export function MapScreen() {
             )}
             {checkinError && <div className="sheet-err">{checkinError}</div>}
             <button onClick={playPractice}>Practice this course</button>
+            {isAdmin && king?.status === 'pending' && (
+              <div className="admin-row">
+                <button className="primary" onClick={() => void curate(selected, 'approve')}>
+                  Approve
+                </button>
+                <button onClick={() => void curate(selected, 'hide')}>Remove</button>
+              </div>
+            )}
+            <button className="quiet" onClick={() => setReporting(selected)}>
+              Closed, renamed or wrong? Tell us
+            </button>
           </div>
         </div>
       )}
 
-      {!selected && !askName && <TabBar active="map" />}
+      {!placing && <TabBar active="map" />}
 
       {askName && (
         <AccountSheet

@@ -1,3 +1,4 @@
+import { MenuVolume, GolferChip } from './MenuControls';
 import { useEffect, useState } from 'react';
 import { api, fmtElapsed, type PlayerProfile } from '../net/api';
 import { currentUserId } from '../net/supabase';
@@ -8,9 +9,6 @@ import { Avatar } from './Avatar';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 
-function since(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
-}
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
@@ -48,17 +46,9 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
   const mine = !!id && id === me;
   return (
     <div className="leaders profile">
-      <div className="map-head">
-        <button className="corner-btn" onClick={() => (window.history.length > 1 ? window.history.back() : navigate('play'))} title="Back">
-          ‹
-        </button>
-        <div className="map-title">
-          <div className="map-title-main">{p?.name ?? 'Player'}</div>
-          <div className="map-title-sub">{p ? `playing since ${since(p.since)}` : ''}</div>
-        </div>
-        <button className="corner-btn" onClick={() => navigate('leaders')} title="Leaderboard">
-          🏆
-        </button>
+      <div className="map-head menu-controls-only">
+        <MenuVolume />
+        <GolferChip />
       </div>
 
       {error && <div className="lb-note">Profile offline · {error}</div>}
@@ -105,16 +95,17 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
           {p.throne_list.length === 0 ? (
             <div className="lb-note">{mine ? 'No thrones yet. Open the map and go take one.' : 'No thrones yet.'}</div>
           ) : (
-            <ol className="rows">
+            <ol className="rows profile-thrones">
               {p.throne_list.map((t) => (
-                <li key={t.location_id} className="row">
-                  <span className="rank">{POI_ICON[t.poi_type] ?? '🚽'}</span>
-                  <span className="who">{t.name}</span>
-                  <span className="stat">
-                    <strong>{t.score}</strong>
-                    <small>par {t.par}{t.elapsed_ms ? ` · ${fmtElapsed(t.elapsed_ms)}` : ''}</small>
-                  </span>
-                  <span className="when">{ago(t.since)}</span>
+                <li key={t.location_id} className="throne-trophy-card">
+                  <div className="throne-trophy-label">♛ KING OF THE THRONE</div>
+                  <h3>{t.name}</h3>
+                  <div className="throne-trophy-meta"><span aria-hidden="true">{POI_ICON[t.poi_type] ?? '🚽'}</span> Held {ago(t.since)}</div>
+                  <div className="throne-trophy-stats">
+                    <div><small>Record</small><strong>{t.score}<span> strokes</span></strong></div>
+                    <div><small>Course par</small><strong>{t.par}</strong></div>
+                    {t.elapsed_ms !== null && <div><small>Round time</small><strong>{fmtElapsed(t.elapsed_ms)}</strong></div>}
+                  </div>
                 </li>
               ))}
             </ol>
@@ -149,7 +140,7 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
         />
       )}
       {toast && <div className="map-toast">{toast}</div>}
-      <TabBar active="leaders" />
+      <TabBar active="profile" />
     </div>
   );
 }

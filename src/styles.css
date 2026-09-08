@@ -2308,6 +2308,20 @@ input[type='checkbox'] {
   height: 52px;
   font-size: 21px;
 }
+.cluster-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cluster .throne-glyph {
+  display: block;
+  width: 30px;
+  height: 36px;
+}
+.cluster.big .throne-glyph {
+  width: 35px;
+  height: 42px;
+}
 .cluster-count {
   position: absolute;
   top: -10px;
@@ -3493,4 +3507,139 @@ svg {
 .map-art,
 .mascot {
   pointer-events: none;
+}
+
+/* ---- Place curation: pending finds, dropping a pin, reports, admin review ---- */
+.pin.pending {
+  opacity: 0.72;
+}
+.pin.pending .pin-icon {
+  filter: grayscale(0.5);
+}
+.pin-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 550;
+  pointer-events: none;
+}
+.pin-drop-cross {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -100%);
+  font-size: 40px;
+  line-height: 44px;
+  text-align: center;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+}
+.pin-drop-cross::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(31, 42, 68, 0.8);
+  transform: translateX(-50%);
+}
+.pin-drop-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(20, 28, 50, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-family: var(--game-font);
+}
+.pin-drop-bar .pd-hint {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.85;
+}
+.pin-drop-bar button {
+  min-height: 44px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--game-font);
+  font-weight: 800;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.pin-drop-bar button.primary {
+  background: linear-gradient(180deg, #ffe08a, #ffc93c);
+  color: var(--ink);
+}
+.sheet-actions button.quiet {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 13px;
+  padding: 8px;
+  min-height: 44px;
+}
+/* Choice chips sit on the dark card: they need their own ink. */
+.found-types .chip {
+  color: var(--ink);
+}
+.sheet-actions .admin-row {
+  display: flex;
+  gap: 8px;
+}
+.sheet-actions .admin-row button {
+  flex: 1;
+}
+.card.review {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.card.review .sheet-section-title {
+  margin-top: 6px;
+}
+.review-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(31, 42, 68, 0.1);
+}
+.review-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.review-text strong {
+  font-size: 15px;
+  color: #fff;
+}
+.review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-actions button {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+.review-actions .name-input {
+  flex-basis: 100%;
+  margin: 0;
 }

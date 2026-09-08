@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './AccountSheet.css';
 import { api } from '../net/api';
 import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOut } from '../net/supabase';
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
@@ -8,8 +9,8 @@ import { BALLS, DEFAULT_AVATAR, FACES, HATS, PORCELAIN, SEATS, type Avatar as Av
 
 type LookOption = readonly [string, string, string | null];
 const LOOK_GROUPS: readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] = [
-  ['Porcelain', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
-  ['Seat', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
+  ['Skin', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
+  ['Shirt', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
   ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
   ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
   ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
@@ -19,7 +20,7 @@ interface Props {
   onClose: (name: string | null) => void;
 }
 
-type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim' | 'look';
+type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim' | 'look' | 'account';
 
 /**
  * Your account: change your name (unique, checked by the server), save the
@@ -28,6 +29,7 @@ type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim' | 'look';
  */
 export function AccountSheet({ onClose }: Props) {
   const [mode, setMode] = useState<Mode>('name');
+  const [category, setCategory] = useState<keyof AvatarSpec>('porcelain');
   const [name, setName] = useState(getSavedName() ?? '');
   const [email, setEmail] = useState('');
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
@@ -120,32 +122,41 @@ export function AccountSheet({ onClose }: Props) {
     });
 
   return (
-    <div className="overlay" onClick={() => onClose(current?.name ?? getSavedName())}>
-      <div className="card pop account" onClick={(e) => e.stopPropagation()}>
-        <h2>{mode === 'name' ? 'Your account' : mode === 'save' ? 'Save your account' : mode === 'code' ? 'Move to another phone' : mode === 'claim' ? 'Bring my account here' : mode === 'look' ? 'Your look' : 'Sign in'}</h2>
+    <div className="overlay locker-overlay" onClick={() => onClose(current?.name ?? getSavedName())}>
+      <div className="card pop account locker" role="dialog" aria-modal="true" aria-label="Edit your golfer" onClick={(e) => e.stopPropagation()}>
+        <div className="locker-heading">
+          <span className="locker-badge">PLAYER LOCKER</span>
+          <button className="locker-close" aria-label="Close editor" onClick={() => onClose(current?.name ?? getSavedName())}>×</button>
+        </div>
+        {(['name', 'look', 'account'] as Mode[]).includes(mode) ? (
+          <nav className="locker-tabs" aria-label="Editor sections">
+            {([['name', 'Identity'], ['look', 'Style'], ['account', 'Account']] as const).map(([id, label]) => (
+              <button key={id} aria-pressed={mode === id} onClick={() => { setMode(id); setError(null); setNote(null); }}>{label}</button>
+            ))}
+          </nav>
+        ) : <h2>{mode === 'save' ? 'Save your account' : mode === 'code' ? 'Move phones' : mode === 'claim' ? 'Enter a code' : 'Sign in'}</h2>}
 
         {mode === 'name' && (
           <>
-            <div className="sub">
-              {current?.email ? `Saved to ${current.email}` : current?.anonymous === false ? 'Signed in' : 'Guest on this phone only'}
-            </div>
-            <button className="look-row" onClick={() => setMode('look')}>
-              <Avatar av={avatar} size={56} />
-              <span>
-                <strong>Customize your toilet</strong>
-                <small>porcelain, seat, hat, face, ball</small>
-              </span>
-              <span className="chev">›</span>
+            <button className="locker-hero" onClick={() => setMode('look')} aria-label="Customize your golfer">
+              <Avatar av={avatar} size={96} />
+              <span><small>YOUR GOLFER</small><strong>{name || 'Make your mark'}</strong><em>Change your style ›</em></span>
             </button>
-            <label className="field-label">Name on the throne</label>
-            <input className="name-input" maxLength={24} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
-            <label className="field-label">Slogan (shows under your name)</label>
-            <input className="name-input slogan-input" maxLength={SLOGAN_MAX} placeholder="Sink it or swim in it" value={slogan} onChange={(e) => setSlogan(e.target.value)} />
+            <label htmlFor="locker-name" className="field-label">Name on the throne</label>
+            <input id="locker-name" className="name-input" maxLength={24} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} />
+            <label htmlFor="locker-slogan" className="field-label">Signature line <small>optional</small></label>
+            <input id="locker-slogan" className="name-input slogan-input" maxLength={SLOGAN_MAX} placeholder="Sink it or swim in it" value={slogan} onChange={(e) => setSlogan(e.target.value)} />
             {error && <div className="err">{error}</div>}
             {note && <div className="ok-note">{note}</div>}
             <button className="primary" disabled={!trimmed || busy || !dirty} onClick={() => void saveTheName()}>
               {busy ? 'Saving…' : 'Save'}
             </button>
+            <button onClick={() => onClose(current?.name ?? getSavedName())}>Done</button>
+          </>
+        )}
+
+        {mode === 'account' && <>
+          <div className="locker-account-status"><strong>{current?.email ? 'You’re connected' : 'Keep your crown'}</strong><p>{current?.email ?? 'Save your golfer and thrones so they follow you to your next phone.'}</p></div>
             <div className="field-label">Account</div>
             <div className="acct-links">
               {!current?.email && <button onClick={() => setMode('save')}>💾 Save by email</button>}
@@ -172,21 +183,23 @@ export function AccountSheet({ onClose }: Props) {
                 </button>
               )}
             </div>
-            <button onClick={() => onClose(current?.name ?? getSavedName())}>Done</button>
-          </>
-        )}
+        </>}
 
         {mode === 'look' && (
           <>
             <div className="look-preview">
               <Avatar av={avatar} size={120} />
             </div>
-            {LOOK_GROUPS.map(([title, key, options]) => (
+            <div className="locker-categories" aria-label="Appearance categories">
+              {LOOK_GROUPS.map(([title, key]) => <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>{title}</button>)}
+            </div>
+            {LOOK_GROUPS.filter(([, key]) => key === category).map(([title, key, options]) => (
               <div key={key} className="look-group">
                 <div className="field-label">{title}</div>
                 <div className="look-chips">
                   {options.map(([id, label, swatch]) => (
-                    <button key={id} className={`chip${avatar[key] === id ? ' active' : ''}`} onClick={() => setAvatar({ ...avatar, [key]: id })}>
+                    <button key={id} className={`chip${avatar[key] === id ? ' active' : ''}`} aria-pressed={avatar[key] === id} onClick={() => setAvatar({ ...avatar, [key]: id })}>
+                      <Avatar av={{ ...avatar, [key]: id }} size={48} />
                       {swatch && <span className="swatch" style={{ background: swatch }} />}
                       {label}
                     </button>
@@ -204,10 +217,10 @@ export function AccountSheet({ onClose }: Props) {
 
         {mode === 'code' && (
           <>
-            <div className="sub">On your other phone, open Putt Putt Potty, tap your name, choose &ldquo;I have a code&rdquo; and type this in. Good for ten minutes.</div>
+            <div className="sub">On your other phone, open Putt Putt Potty, tap your name, choose &ldquo;Account&rdquo;, then &ldquo;Enter a code&rdquo; and type this in. Good for ten minutes.</div>
             {code ? <div className="link-code">{code.slice(0, 3)} {code.slice(3)}</div> : <div className="lb-note">{error ?? 'Getting a code…'}</div>}
             <div className="sub small">That phone becomes this account; this one goes back to being a guest.</div>
-            <button onClick={() => setMode('name')}>Back</button>
+            <button onClick={() => setMode('account')}>Back</button>
           </>
         )}
 
@@ -219,7 +232,7 @@ export function AccountSheet({ onClose }: Props) {
             <button className="primary" disabled={claim.length !== 6 || busy} onClick={() => void doClaim()}>
               {busy ? 'Moving…' : 'Move my account here'}
             </button>
-            <button onClick={() => setMode('name')}>Back</button>
+            <button onClick={() => setMode('account')}>Back</button>
           </>
         )}
 
@@ -236,7 +249,7 @@ export function AccountSheet({ onClose }: Props) {
             <button className="primary" disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) || busy} onClick={() => void (mode === 'save' ? doLink() : doSignIn())}>
               {busy ? 'Sending…' : 'Email me the link'}
             </button>
-            <button onClick={() => setMode('name')}>Back</button>
+            <button onClick={() => setMode('account')}>Back</button>
           </>
         )}
       </div>

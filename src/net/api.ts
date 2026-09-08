@@ -23,6 +23,14 @@ export interface NearbyLocation {
   king_elapsed_ms: number | null;
   king_avatar: Avatar | null;
   run_count: number;
+  /** 'pending' finds show only to their finder and admins until approved. */
+  status?: 'live' | 'pending' | 'hidden';
+}
+
+export type PlaceReason = 'closed' | 'renamed' | 'wrong';
+export interface PlaceQueue {
+  finds: { id: string; name: string; poiType: string; lat: number; lng: number; distance_m: number; created_at: string }[];
+  reported: { id: string; name: string; poiType: string; lat: number; lng: number; distance_m: number; reports: { reason: PlaceReason; details: string | null; count: number; latest: string }[] }[];
 }
 
 export interface King {
@@ -250,9 +258,19 @@ export const api = {
     if (error) throw new Error(error.message);
     return (data ?? []) as LocationRow[];
   },
-  /** A bathroom the map doesn't know about, at your feet. */
-  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number) =>
-    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number } }>({ action: 'found', name, poiType, lat, lng, accuracy }),
+  /** A bathroom the map doesn't know about: at your feet, or where you drop the pin. Players' finds wait for approval. */
+  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number, pin?: { lat: number; lng: number } | null) =>
+    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number }; status: 'live' | 'pending' }>({ action: 'found', name, poiType, lat, lng, accuracy, pin: pin ?? undefined }),
+  /** Closed, renamed (details = the new name) or wrong. Three players agreeing make it so; an admin does it alone. */
+  reportPlace: (place: { id: string; name: string; poiType: string; lat: number; lng: number }, reason: PlaceReason, details?: string) =>
+    call<{ ok: true; applied: boolean; hidden?: boolean; name?: string; reports?: number; needed?: number }>({ action: 'report-place', place, reason, details }),
+  /** Admin: approve or restore a place, hide it, rename it, or dismiss its reports. */
+  curate: (locationId: string, decision: 'approve' | 'hide' | 'restore' | 'rename' | 'dismiss', name?: string) =>
+    call<{ ok: true; status: string | null; name: string | null }>({ action: 'curate', locationId, decision, name }),
+  /** Admin: finds awaiting approval and places with open reports, nearest first. */
+  placeQueue: (lat?: number, lng?: number) => call<PlaceQueue>({ action: 'place-queue', lat, lng }),
+  /** Who am I, according to the server (includes the admin flag). */
+  me: () => call<{ id: string; displayName: string | null; slogan: string | null; avatar: Avatar | null; role: 'player' | 'admin' }>({ action: 'me' }),
   /** Six digits another phone can enter to take over this account. */
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),

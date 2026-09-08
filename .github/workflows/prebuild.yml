@@ -1,31 +1,40 @@
 name: Pre-build courses
 
 # Generates the three holes of every imported bathroom in a region that has
-# no course yet, busiest neighbourhoods first, across parallel shards.
+# no course yet, busiest neighbourhoods first, across parallel shards. Rows
+# that already exist are never touched, so re-running is always safe.
+# Sundays it tops up Michigan after Monday's import brings in new places;
+# run it by hand with more regions to grow coverage (about 3 KB per course).
 on:
   workflow_dispatch:
     inputs:
-      region:
-        description: 'Region to build (as imported, e.g. michigan)'
+      regions:
+        description: 'Regions to build (as imported), comma separated: michigan,ohio'
         default: 'michigan'
         required: true
       shards:
-        description: 'Parallel jobs'
+        description: 'Parallel jobs per region'
         default: '8'
         required: true
       minutes:
         description: 'Time budget per job'
         default: '330'
         required: true
+  schedule:
+    - cron: '0 9 * * 0' # Sundays 09:00 UTC
 
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      shards: ${{ steps.plan.outputs.shards }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - id: plan
-        run: echo "shards=$(seq 0 $(( ${{ github.event.inputs.shards }} - 1 )) | jq -sc .)" >> "$GITHUB_OUTPUT"
+        run: |
+          IN="$(echo "${{ github.event.inputs.regions || 'michigan' }}" | tr 'A-Z' 'a-z' | tr ' _' '--' | sed 's/,-*/,/g; s/^-*//; s/-*$//')"
+          N="${{ github.event.inputs.shards || '4' }}"
+          M="$(for r in $(echo "$IN" | tr ',' ' '); do for s in $(seq 0 $(( N - 1 ))); do echo "{\"region\":\"$r\",\"shard\":$s}"; done; done | jq -sc .)"
+          echo "matrix={\"include\":$M}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: plan
@@ -33,8 +42,8 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      matrix:
-        shard: ${{ fromJson(needs.plan.outputs.shards) }}
+      max-parallel: 8
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,4 +55,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/prebuild.mjs --region "${{ github.event.inputs.region }}" --shard ${{ matrix.shard }} --shards ${{ github.event.inputs.shards }} --minutes ${{ github.event.inputs.minutes }}
+        run: node scripts/prebuild.mjs --region "${{ matrix.region }}" --shard ${{ matrix.shard }} --shards ${{ github.event.inputs.shards || '4' }} --minutes ${{ github.event.inputs.minutes || '330' }}

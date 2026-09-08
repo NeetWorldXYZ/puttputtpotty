@@ -10,10 +10,10 @@ describe('avatars', () => {
 
   it('renders the chosen parts', () => {
     const svg = avatarSvg({ porcelain: 'gold', seat: 'red', hat: 'tophat', face: 'cool', ball: 'dots' }, 'x');
-    expect(svg).toContain('#f2c94c'); // gold porcelain
-    expect(svg).toContain('fill="#ff5f7e"'); // red seat
+    expect(svg).toContain('#825238'); // saved gold key now maps to deep skin
+    expect(svg).toContain('fill="#ff5f7e"'); // red shirt
     expect(svg).toContain('x="56" y="2"'); // top hat
-    expect(svg).toContain('rect x="50" y="61"'); // sunglasses
+    expect(svg).toContain('M52 63 h25'); // sunglasses
     expect(svg).toContain('clip-path="url(#x-clip)"'); // dotted ball
     expect(avatarSvg(DEFAULT_AVATAR, 'y')).not.toContain('x="56" y="2"');
   });
