@@ -17,6 +17,8 @@ import { TabBar } from './TabBar';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
 import { MatchIcon } from './MatchIcon';
+import { ClubhouseMap } from './ClubhouseMap';
+import './Clubhouse.css';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -67,12 +69,12 @@ export function TitleScreen() {
       if (prof?.name && !cancelled) setName(prof.name);
       const fix = recallFix();
       const [kings, near, board] = await Promise.allSettled([
-        api.kings({ limit: 200 }),
+        api.profile(me),
         fix ? api.nearby(fix.lat, fix.lng, 25000) : Promise.resolve([]),
         played ? api.leaderboard(daily) : Promise.resolve([]),
       ]);
       if (cancelled) return;
-      if (kings.status === 'fulfilled') setThrones(kings.value.find((k) => k.user_id === me)?.thrones ?? 0);
+      if (kings.status === 'fulfilled' && kings.value) setThrones(kings.value.thrones);
       if (near.status === 'fulfilled' && fix)
         setNearby({
           total: near.value.length,
@@ -186,7 +188,7 @@ export function TitleScreen() {
         ))}
       </div>
       <div className="arcade-backdrop" aria-hidden="true" />
-      <div className="title-inner home2 compact-home open-home">
+      <div className="title-inner home2 compact-home open-home clubhouse-home">
         <header className="home-top">
           <div className="home-icons">
             <MenuVolume />
@@ -201,29 +203,26 @@ export function TitleScreen() {
           </button>
         </header>
         <div className="arcade-brand"><img src={`${import.meta.env.BASE_URL}art/arcade-logo.webp`} alt="Putt Putt Potty" draggable={false} /></div>
-        <div className="arcade-green" aria-hidden="true">
-          <svg viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet">
-            <path className="putt-trail" d="M72 213C230 208 291 123 291 80" fill="none" stroke="#fff9df" strokeWidth="4" strokeDasharray="10 13" strokeLinecap="round" />
-            <g stroke="#09233d" strokeWidth="4" strokeLinejoin="round">
-              <g transform="translate(256 8)"><path d="M9 19h53v44H12Z" fill="#fffdf0"/><path d="M15 27h41v27H17Z" fill="#e9ecde" strokeWidth="2"/><path d="M19 84h30l4 22H16Z" fill="#fdfaf0"/><path d="M4 65Q35 52 67 65L60 83Q34 108 11 83Z" fill="#fffdf0"/><ellipse cx="35" cy="67" rx="29" ry="11" fill="#fff"/><ellipse cx="35" cy="67" rx="18" ry="6" fill="#70b7ca"/><path d="M14 15 9-1 25 6 35-9 44 6 60-1 54 15Z" fill="#ffd044"/></g>
-              <circle cx="72" cy="213" r="22" fill="#f8fbff"/>
-            </g>
-            <g fill="#c7d9e2"><circle cx="65" cy="202" r="3"/><circle cx="76" cy="199" r="3"/><circle cx="83" cy="208" r="3"/><circle cx="69" cy="213" r="3"/><circle cx="60" cy="219" r="3"/><circle cx="78" cy="223" r="3"/></g>
-            <g stroke="#ffda4d" strokeWidth="4" strokeLinecap="round"><path d="m39 210-15-3m20 19-13 8m210-201-9-12m91 20 12-11"/></g>
-          </svg>
+        <div className="clubhouse-heading">
+          <h1>GO CLAIM YOUR CROWN</h1>
+          <p>Every bathroom is a course.</p>
         </div>
-        <section className="arcade-daily" aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`}>
-          <div className="challenge-label">{played ? 'ROUND COMPLETE' : "TODAY’S CHALLENGE"}</div>
-          <button className="arcade-play" onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            <strong>{played ? 'DAILY RESULTS' : 'PLAY DAILY'}</strong>
-            <small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See where you stand') : '9 holes. One shot at glory.'}</small>
+        <button className="clubhouse-invitation" aria-label={nearby ? `Open throne map, ${nearby.total} bathrooms nearby` : 'Open throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}>
+          <ClubhouseMap />
+          <span className="clubhouse-map-cta">OPEN THRONE MAP <span aria-hidden="true">→</span></span>
+        </button>
+        <p className="clubhouse-rule">Visit. Beat the record. Become king.</p>
+        <button className="clubhouse-kingdom" onClick={() => go(() => navigate('profile'))}>
+          <GameIcon kind="crown" /><strong>YOUR KINGDOM</strong>
+          <span>{thrones === null ? 'Loading…' : `${thrones} ${thrones === 1 ? 'throne' : 'thrones'} held`}</span>
+        </button>
+        <section className="clubhouse-secondary" aria-label="More ways to play">
+          <button aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
+            <GameIcon kind="flag" /><span><strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong><small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See your results') : 'A new course every day'}</small></span><b aria-hidden="true">›</b>
           </button>
+          <button onClick={() => go(() => navigate('match'), 'whoosh')}><MatchIcon /><span><strong>QUICK MATCH</strong><small>Find a challenger</small></span><b aria-hidden="true">›</b></button>
         </section>
-        <section className="arcade-modes" aria-label="More ways to play">
-          <button className="arcade-map" aria-label={nearby ? `Throne map, ${nearby.total} bathrooms nearby` : 'Throne map'} onClick={() => go(() => navigate('map'), 'whoosh')}><GameIcon kind="map" /><span>THRONE<br />MAP</span></button>
-          <button className="arcade-match" onClick={() => go(() => navigate('match'), 'whoosh')}><MatchIcon /><span>QUICK<br />MATCH</span></button>
-        </section>
-        <button className="arcade-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
+        <button className="clubhouse-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
       {custom && (
