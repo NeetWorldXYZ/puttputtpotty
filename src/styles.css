@@ -2723,6 +2723,8 @@ input[type='checkbox'] {
   left: 50%;
   top: calc(env(safe-area-inset-top, 0px) + 66px);
   transform: translateX(-50%);
+  min-width: 150px;
+  font-variant-numeric: tabular-nums;
   background: var(--ink);
   border: 2px solid #ffffff;
   border-radius: 14px;
