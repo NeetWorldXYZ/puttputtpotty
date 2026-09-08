@@ -97,16 +97,15 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
           ) : (
             <ol className="rows profile-thrones">
               {p.throne_list.map((t) => (
-                <li key={t.location_id} className="row profile-throne">
-                  <span className="rank throne-place-icon">{POI_ICON[t.poi_type] ?? '🚽'}</span>
-                  <span className="throne-place">
-                    <strong>{t.name}</strong>
-                    <small>Held {ago(t.since)}</small>
-                  </span>
-                  <span className="stat throne-record">
-                    <strong>{t.score}</strong>
-                    <small>par {t.par}{t.elapsed_ms ? ` · ${fmtElapsed(t.elapsed_ms)}` : ''}</small>
-                  </span>
+                <li key={t.location_id} className="throne-trophy-card">
+                  <div className="throne-trophy-label">♛ KING OF THE THRONE</div>
+                  <h3>{t.name}</h3>
+                  <div className="throne-trophy-meta"><span aria-hidden="true">{POI_ICON[t.poi_type] ?? '🚽'}</span> Held {ago(t.since)}</div>
+                  <div className="throne-trophy-stats">
+                    <div><small>Record</small><strong>{t.score}<span> strokes</span></strong></div>
+                    <div><small>Course par</small><strong>{t.par}</strong></div>
+                    {t.elapsed_ms !== null && <div><small>Round time</small><strong>{fmtElapsed(t.elapsed_ms)}</strong></div>}
+                  </div>
                 </li>
               ))}
             </ol>

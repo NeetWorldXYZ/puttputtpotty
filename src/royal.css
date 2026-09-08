@@ -207,21 +207,22 @@ button.primary,button.active { color:#14213d; background:linear-gradient(#ffe995
 .map-sheet .sheet-actions button.primary { color:#14213d;background:linear-gradient(#ffe98d,#ffc83d);border-color:#fff0ad; }
 
 /* Profile throne cards reserve the width for the place name and allow wrapping. */
-.profile-thrones .profile-throne {
-  grid-template-columns:42px minmax(0,1fr) auto;
-  gap:11px;padding:13px 14px;align-items:center;
-  background:linear-gradient(135deg,#fff6d9,#ffe5a0);
-  color:#14213d;border:1px solid #fff2bc;
+.profile-thrones .throne-trophy-card {
+  display:block;padding:18px;min-width:0;box-sizing:border-box;text-align:left;
+  background:linear-gradient(135deg,#fff7dc,#ffe8a5);color:#14213d;
+  border:3px solid #09263c;border-radius:20px;
+  box-shadow:inset 0 0 0 2px #fff9e5,0 5px 0 #09263c;
 }
-.profile-thrones .throne-place-icon {
-  display:flex;align-items:center;justify-content:center;width:40px;height:40px;
-  border-radius:12px;background:#fff;border:1px solid #d7bd79;font-size:22px;
+.throne-trophy-label { color:#785514;font:800 10px/1.5 system-ui,sans-serif;letter-spacing:.12em; }
+.throne-trophy-card h3 {
+  display:block;width:100%;margin:6px 0;color:#14213d;
+  font:800 24px/1.2 var(--game-font);white-space:normal;
+  overflow-wrap:break-word;word-break:normal;
 }
-.profile-thrones .throne-place { min-width:0;display:flex;flex-direction:column;gap:3px; }
-.profile-thrones .throne-place strong {
-  white-space:normal;overflow-wrap:anywhere;font-family:var(--game-font);
-  font-size:16px;line-height:1.15;color:#14213d;
-}
-.profile-thrones .throne-place small { color:#705f3b;font-size:10px;text-transform:uppercase;letter-spacing:.06em; }
-.profile-thrones .throne-record strong { color:#14213d;font-size:24px; }
-.profile-thrones .throne-record small { color:#705f3b;text-transform:none;letter-spacing:0;white-space:nowrap; }
+.throne-trophy-meta { display:flex;align-items:center;gap:7px;color:#665937;font:600 12px/1.5 system-ui,sans-serif; }
+.throne-trophy-meta > span { font-size:19px; }
+.throne-trophy-stats { display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid #c9ac6666; }
+.throne-trophy-stats > div { flex:1 1 75px;min-width:0; }
+.throne-trophy-stats small { display:block;color:#665937;font:700 10px/1.5 system-ui,sans-serif; }
+.throne-trophy-stats strong { display:block;color:#14213d;font:800 22px/1.3 var(--game-font); }
+.throne-trophy-stats strong span { font:600 10px/1.3 system-ui,sans-serif; }
