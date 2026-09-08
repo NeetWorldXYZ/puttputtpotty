@@ -1,0 +1,50 @@
+/* Scoped to Home: the existing navigation dock is intentionally untouched. */
+.title-inner.home2.open-home.clubhouse-home {
+  display:flex;flex-direction:column;gap:8px;box-sizing:border-box;
+  width:100%;max-width:500px;height:100dvh;overflow:hidden;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 18px calc(env(safe-area-inset-bottom,0px) + 78px);
+}
+.clubhouse-home .home-top { flex:0 0 38px;min-height:38px; }
+.clubhouse-home .player-chip { max-width:70%; }
+.clubhouse-home .arcade-brand { height:clamp(76px,15dvh,132px);flex:0 0 auto; }
+.clubhouse-heading { flex:0 0 auto;text-align:center;color:#fff8dc; }
+.clubhouse-heading h1 { margin:0;font:900 clamp(20px,5.8vw,30px)/1.12 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.2px;paint-order:stroke fill; -webkit-text-stroke:5px #08263c;text-shadow:0 3px 0 #08263c; }
+.clubhouse-heading p { margin:5px 0 0;font:800 13px/1.3 var(--game-font);text-shadow:0 2px 3px #08263c; }
+.clubhouse-home.home2 .clubhouse-invitation {
+  flex:1 1 0;min-height:120px;width:100%;display:flex;flex-direction:column;align-items:stretch;
+  padding:3px 8px 8px;border:4px solid #08263c;border-radius:30px;
+  background:linear-gradient(140deg,#15495b,#06253c);color:#08263c;
+  box-shadow:inset 0 0 0 3px #fff0be,0 5px 0 #08263c;
+}
+.clubhouse-map-art { display:block;flex:1 1 0;min-height:0;width:100%;overflow:visible; }
+.clubhouse-map-cta { display:flex;align-items:center;justify-content:center;gap:10px;flex:0 0 56px;border-radius:22px;border:2px solid #fff0ac;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);box-shadow:inset 0 -5px 0 #eaa519,0 3px 0 #071f35;font:900 clamp(21px,6vw,30px)/1 Impact,'Arial Narrow',sans-serif; }
+.clubhouse-map-cta > span { font-family:system-ui,sans-serif;font-weight:900; }
+.clubhouse-rule { flex:0 0 auto;margin:4px 0 0;text-align:center;font:800 12px/1.3 var(--game-font);color:#fff8dd;text-shadow:0 2px 2px #08263c; }
+.clubhouse-home .clubhouse-kingdom { display:flex;align-items:center;gap:9px;flex:0 0 44px;padding:4px 12px;border:3px solid #09273a;border-radius:17px;background:linear-gradient(120deg,#fff6dc,#fbeac4);color:#09273a;box-shadow:0 3px 0 #09273a;text-align:left; }
+.clubhouse-kingdom .game-icon { width:30px;height:30px;color:#ffd13c;flex:none; }
+.clubhouse-kingdom strong { font:900 clamp(15px,4.2vw,21px)/1 Impact,'Arial Narrow',sans-serif;font-style:italic; }
+.clubhouse-kingdom > span { margin-left:auto;padding-left:10px;border-left:1px solid #b9aa86;font:800 11px/1.2 var(--game-font); }
+.clubhouse-secondary { flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.clubhouse-secondary button { display:flex;align-items:center;gap:7px;min-width:0;min-height:64px;padding:8px;border:2px solid #497e97;border-radius:17px;background:linear-gradient(145deg,#12384c,#061f35);color:#fff7df;box-shadow:0 3px 0 #08263c;text-align:left; }
+.clubhouse-secondary svg { width:29px;height:34px;flex:none;color:#ffd044; }
+.clubhouse-secondary button > span { flex:1;min-width:0; }
+.clubhouse-secondary strong { display:block;font:900 clamp(14px,4vw,20px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic; }
+.clubhouse-secondary small { display:block;margin-top:4px;font:600 10px/1.2 system-ui,sans-serif;color:#b8cdd3; }
+.clubhouse-secondary b { font-size:25px; }
+.clubhouse-home .clubhouse-custom { flex:0 0 26px;align-self:center;min-height:26px;padding:2px 8px;border:0;background:none;color:#fff7df;font:700 11px/1.2 var(--game-font);text-shadow:0 2px 3px #08263c; }
+.clubhouse-invitation:active,.clubhouse-kingdom:active,.clubhouse-secondary button:active { transform:translateY(2px); }
+.clubhouse-gold-marker { animation:clubhouse-glimmer 3s ease-in-out infinite; }
+@keyframes clubhouse-glimmer { 50% { filter:brightness(1.2); } }
+@media(max-height:730px) {
+  .title-inner.home2.open-home.clubhouse-home { gap:6px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 75px); }
+  .clubhouse-home .arcade-brand { height:76px; }
+  .clubhouse-home .clubhouse-map-cta { flex-basis:46px; }
+  .clubhouse-secondary button { min-height:54px; }
+  .clubhouse-secondary small { display:none; }
+  .clubhouse-home .clubhouse-kingdom { flex-basis:40px; }
+}
+@media(max-height:530px) {
+  .title-inner.home2.open-home.clubhouse-home { overflow-y:auto; }
+  .clubhouse-home .clubhouse-invitation { flex:0 0 220px; }
+}
+@media(prefers-reduced-motion:reduce) { .clubhouse-gold-marker { animation:none; } }
