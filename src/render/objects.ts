@@ -12,7 +12,7 @@ export const COLORS = {
   ball: '#ffffff',
   aim: '#ffd166',
   tee: '#ffd166',
-  water: '#159ddd',
+  water: '#3a86ff',
   waterLight: '#9be1ff',
   drain: '#6c757d',
   drainDark: '#343a40',
@@ -21,23 +21,23 @@ export const COLORS = {
   pitRim: '#4a4d6a',
   overflow: '#4fb3a8',
   oob: '#e63946',
-  gum: '#ef5bbb',
+  gum: '#ff69b4',
   gumLight: '#ffb3d9',
   tile: '#bfe9ff',
   tileLight: '#e9f8ff',
   shag: '#f1d3a5',
   shagDark: '#d8b27c',
   wet: '#c7ecff',
-  sand: '#f4dfa1',
+  sand: '#e6d3a3',
   sandDot: '#c9ad6b',
   blocker: '#eef2f5',
-  blockerShade: '#a7c5e1',
+  blockerShade: '#c9d2da',
   deadWall: '#6b7280',
   deadWallDot: '#4b5563',
   curb: '#ffd60a',
   bumper: '#ffffff',
-  bumperCore: '#ffcf48',
-  plunger: '#ff4966',
+  bumperCore: '#d9a066',
+  plunger: '#e63946',
   plungerHandle: '#d9a066',
   pipe: '#2ec4b6',
   toilet: '#ffffff',
@@ -846,14 +846,6 @@ export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r:
   dropShadow(ctx, x, y, r * 1.05, r * 0.75);
   circle(ctx, x, y, r);
   chunky(ctx, style?.color ?? COLORS.ball, Math.max(0.12, r * 0.36));
-  // Inset dimples add depth without changing the ball's visible radius.
-  ctx.save();
-  ctx.fillStyle = 'rgba(39,73,109,0.18)';
-  for (const [dx, dy] of [[0.35,0.1],[-0.1,0.4],[0.36,0.48]]) {
-    circle(ctx, x + dx * r, y + dy * r, r * 0.1);
-    ctx.fill();
-  }
-  ctx.restore();
   if (style && style.pattern !== 'plain') {
     ctx.save();
     ctx.beginPath();
