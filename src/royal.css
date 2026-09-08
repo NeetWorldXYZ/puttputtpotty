@@ -110,9 +110,36 @@ button.primary,button.active { color:#14213d; background:linear-gradient(#ffe995
   box-shadow:0 0 0 6px #fbc02d99,0 0 34px 15px #ffd34cc4,0 5px 12px #06182d80!important;
 }
 .pin.mine .pin-score { border-color:#ffe886;box-shadow:0 0 0 2px #14213d,0 0 12px #ffd34c; }
+.pin.claimed:not(.mine) {
+  background:linear-gradient(145deg,#ff8aa0 0%,#ff6078 48%,#d92d50 100%)!important;
+  border-color:#ffe5ea!important;
+  box-shadow:0 0 0 4px #ff60785c,0 0 22px 8px #ff3f6485,0 5px 10px #06182d80!important;
+}
+.pin.claimed:not(.mine)::before {
+  content:"";
+  position:absolute;
+  inset:-9px;
+  border:3px solid #ff7890;
+  border-radius:50% 50% 50% 0;
+  opacity:.7;
+  animation:claimed-halo 2.15s ease-out infinite;
+  pointer-events:none;
+}
+.pin.claimed:not(.mine).selected {
+  outline-color:#ffd7df;
+  box-shadow:0 0 0 5px #ff607880,0 0 30px 12px #ff3f64a6,0 5px 12px #06182d80!important;
+}
+.pin.claimed:not(.mine) .pin-score {
+  background:#fff;color:#b61f40;border-color:#ff91a5;
+  box-shadow:0 0 0 2px #14213d,0 0 10px #ff6078;
+}
 @keyframes throne-halo {
   0% { transform:scale(.78);opacity:.85; }
   75%,100% { transform:scale(1.28);opacity:0; }
+}
+@keyframes claimed-halo {
+  0% { transform:scale(.82);opacity:.72; }
+  75%,100% { transform:scale(1.22);opacity:0; }
 }
 
 /* Clearer, more compact location card. */
