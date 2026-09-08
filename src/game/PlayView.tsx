@@ -215,21 +215,33 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
     if (!wrap || !canvas) return;
+    // Layout boxes (offsetTop/offsetHeight), not bounding rects: the stroke counter's bump
+    // animation and the clock's changing digits must not move the camera or clear the canvas.
+    const layoutBottom = (sel: string): number => {
+      const el = wrap.querySelector<HTMLElement>(sel);
+      return el ? el.offsetTop + el.offsetHeight : 0;
+    };
     const ro = new ResizeObserver(() => {
       const r = wrap.getBoundingClientRect();
-      const hud = wrap.querySelector('.hud')?.getBoundingClientRect();
-      const clock = wrap.querySelector('.race-clock')?.getBoundingClientRect();
-      const aim = wrap.querySelector('.aim-bar')?.getBoundingClientRect();
-      hudInsetsRef.current = {
-        top: Math.max(HUD_TOP, (hud?.bottom ?? r.top) - r.top + 16, (clock?.bottom ?? r.top) - r.top + 16),
-        bottom: Math.max(HUD_BOTTOM, aim ? r.bottom - aim.top + 16 : 0),
+      const aim = wrap.querySelector<HTMLElement>('.aim-bar');
+      const next = {
+        top: Math.max(HUD_TOP, layoutBottom('.hud') + 16, layoutBottom('.race-clock') + 16),
+        bottom: Math.max(HUD_BOTTOM, aim ? wrap.clientHeight - aim.offsetTop + 16 : 0),
       };
+      const cur = hudInsetsRef.current;
+      // A couple of pixels of HUD height is not worth a camera move.
+      if (Math.abs(next.top - cur.top) > 3 || Math.abs(next.bottom - cur.bottom) > 3) hudInsetsRef.current = next;
       const dpr = Math.min(3, window.devicePixelRatio || 1);
-      sizeRef.current = { w: r.width, h: r.height, dpr };
-      canvas.width = Math.round(r.width * dpr);
-      canvas.height = Math.round(r.height * dpr);
-      canvas.style.width = `${r.width}px`;
-      canvas.style.height = `${r.height}px`;
+      const w = Math.round(r.width);
+      const h = Math.round(r.height);
+      const prev = sizeRef.current;
+      // Setting canvas.width clears the canvas: only do it when the drawing surface really changed.
+      if (w === Math.round(prev.w) && h === Math.round(prev.h) && dpr === prev.dpr && canvas.width === Math.round(w * dpr)) return;
+      sizeRef.current = { w, h, dpr };
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
       setSizeTick((t) => t + 1);
     });
     ro.observe(wrap);

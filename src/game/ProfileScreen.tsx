@@ -1,34 +1,57 @@
 import { MenuVolume, GolferChip } from './MenuControls';
 import { useEffect, useState } from 'react';
 import { api, fmtElapsed, type PlayerProfile } from '../net/api';
-import { currentUserId } from '../net/supabase';
+import { currentUserId, ensureSession } from '../net/supabase';
 import { POI_ICON } from '../net/places';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { Avatar } from './Avatar';
+import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
+import './Profile.css';
 
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
 }
 
-/** A player's public page. Your own has an edit button; anyone else's has a report flag. */
+/** Bathroom royalty, by thrones held this season. */
+function royalTitle(thrones: number): string {
+  if (thrones >= 10) return 'King of Kings';
+  if (thrones >= 5) return 'Lord of the Loos';
+  if (thrones >= 3) return 'Porcelain Prince';
+  if (thrones >= 2) return 'Duke of Doo';
+  if (thrones >= 1) return 'Throne Holder';
+  return 'Squire';
+}
+
+function relPar(n: number | null): string {
+  if (n === null) return '–';
+  return n > 0 ? `+${n}` : n === 0 ? 'E' : String(n);
+}
+
+function memberSince(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+/** A player's royal card. Your own has an edit button; anyone else's has a report flag. */
 export function ProfileScreen({ userId }: { userId: string | null }) {
   const [me, setMe] = useState<string | null>(null);
   const [p, setP] = useState<PlayerProfile | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState(false);
   const [report, setReport] = useState(false);
+  const [thrones, setThrones] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    void currentUserId().then(setMe);
-  }, []);
+    // Your own page needs a session to know who "you" are; a first-ever visit gets one here.
+    void currentUserId().then((id) => (id || userId ? setMe(id) : ensureSession().then((s) => setMe(s.user.id)).catch((e: Error) => setError(e.message))));
+  }, [userId]);
   const id = userId ?? me;
   useEffect(() => {
     if (!id) return;
@@ -56,65 +79,118 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
       {!error && p === null && <div className="lb-note">No such player.</div>}
       {p && (
         <div className="profile-body">
-          <div className="profile-hero">
-            <Avatar av={p.avatar} size={132} />
-            <div className="profile-name">{p.name}</div>
-            {p.slogan && <div className="profile-slogan">&ldquo;{p.slogan}&rdquo;</div>}
-            {mine ? (
-              <button className="primary small" onClick={() => setEdit(true)}>
-                Edit my look and name
-              </button>
-            ) : (
-              <button className="quiet-btn" onClick={() => setReport(true)}>
-                ⚑ Report
-              </button>
-            )}
+          <section className="pf-hero" aria-label={`${p.name}'s card`}>
+            <div className="pf-avatar">
+              <Avatar av={p.avatar} size={116} />
+              {p.thrones > 0 && (
+                <span className="pf-crown" aria-hidden="true">
+                  <GameIcon kind="crown" />
+                </span>
+              )}
+            </div>
+            <h1 className="pf-name">{p.name}</h1>
+            {p.slogan && <div className="pf-slogan">&ldquo;{p.slogan}&rdquo;</div>}
+            <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
+            <span className="pf-since">Playing since {memberSince(p.since)}</span>
+            <div className="pf-hero-actions">
+              {mine ? (
+                <button className="primary" onClick={() => setEdit(true)}>
+                  Edit my look
+                </button>
+              ) : (
+                <button className="ghost" onClick={() => setReport(true)}>
+                  ⚑ Report
+                </button>
+              )}
+            </div>
+          </section>
+
+          <button className="pf-kingdom" onClick={() => setThrones(true)} aria-label={`${mine ? 'Your' : `${p.name}'s`} kingdom: ${p.thrones} thrones. See the list.`}>
+            <span className="pf-kingdom-title">
+              <GameIcon kind="crown" />
+              {mine ? 'Your kingdom' : `${p.name}'s kingdom`}
+              <span>See thrones ›</span>
+            </span>
+            <span className="pf-stats">
+              <span>
+                <b>{p.thrones}</b>
+                {p.thrones === 1 ? 'throne' : 'thrones'}
+              </span>
+              <span>
+                <b>{p.aces}</b>
+                {p.aces === 1 ? 'ace' : 'aces'}
+              </span>
+              <span>
+                <b>
+                  {p.matches_won}
+                  <small>/{p.matches}</small>
+                </b>
+                matches won
+              </span>
+            </span>
+          </button>
+
+          <div className="pf-tiles">
+            <div className="pf-tile">
+              <span className="pf-emoji" aria-hidden="true">
+                ⛳
+              </span>
+              <span>
+                <strong>{relPar(p.best_rel)}</strong>
+                <small>Best round</small>
+              </span>
+            </div>
+            <div className="pf-tile">
+              <span className="pf-emoji" aria-hidden="true">
+                🧻
+              </span>
+              <span>
+                <strong>{p.runs}</strong>
+                <small>Rounds played</small>
+              </span>
+            </div>
           </div>
-          <div className="stat-grid">
-            <div className="stat-tile">
-              <strong>{p.thrones}</strong>
-              <small>{p.thrones === 1 ? 'throne held' : 'thrones held'}</small>
-            </div>
-            <div className="stat-tile">
-              <strong>{p.aces}</strong>
-              <small>{p.aces === 1 ? 'ace' : 'aces'}</small>
-            </div>
-            <div className="stat-tile">
-              <strong>{p.best_rel === null ? '–' : p.best_rel > 0 ? `+${p.best_rel}` : p.best_rel === 0 ? 'E' : p.best_rel}</strong>
-              <small>best round</small>
-            </div>
-            <div className="stat-tile">
-              <strong>
-                {p.matches_won}
-                <span className="of">/{p.matches}</span>
-              </strong>
-              <small>matches won</small>
-            </div>
-          </div>
-          <div className="lb-title">Thrones this season</div>
-          {p.throne_list.length === 0 ? (
-            <div className="lb-note">{mine ? 'No thrones yet. Open the map and go take one.' : 'No thrones yet.'}</div>
-          ) : (
-            <ol className="rows profile-thrones">
-              {p.throne_list.map((t) => (
-                <li key={t.location_id} className="throne-trophy-card">
-                  <div className="throne-trophy-label">♛ KING OF THE THRONE</div>
-                  <h3>{t.name}</h3>
-                  <div className="throne-trophy-meta"><span aria-hidden="true">{POI_ICON[t.poi_type] ?? '🚽'}</span> Held {ago(t.since)}</div>
-                  <div className="throne-trophy-stats">
-                    <div><small>Record</small><strong>{t.score}<span> strokes</span></strong></div>
-                    <div><small>Course par</small><strong>{t.par}</strong></div>
-                    {t.elapsed_ms !== null && <div><small>Round time</small><strong>{fmtElapsed(t.elapsed_ms)}</strong></div>}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          {mine && p.throne_list.length === 0 && (
-            <button className="primary" onClick={() => navigate('map')}>
-              Open the map
+
+          {mine && (
+            <button className="pf-cta" onClick={() => navigate('map')}>
+              {p.thrones === 0 ? 'GO TAKE A THRONE' : 'DEFEND YOUR THRONES'} <span aria-hidden="true">→</span>
             </button>
           )}
+          {mine && p.thrones === 0 && <div className="pf-note">Open the map, find a bathroom, sink it faster than anyone.</div>}
+        </div>
+      )}
+
+      {thrones && p && (
+        <div className="overlay" onClick={() => setThrones(false)}>
+          <div className="card pop pf-sheet" role="dialog" aria-modal="true" aria-label="Thrones held" onClick={(e) => e.stopPropagation()}>
+            <h2>{mine ? 'Your thrones' : `${p.name}'s thrones`}</h2>
+            <div className="sub">{p.thrones === 0 ? (mine ? 'None yet. The map is full of empty ones.' : 'None yet.') : `${p.thrones} held this season`}</div>
+            {p.throne_list.length > 0 && (
+              <ul className="pf-thrones">
+                {p.throne_list.map((t) => (
+                  <li key={t.location_id} className="pf-throne">
+                    <span className="pf-emoji" aria-hidden="true">
+                      {POI_ICON[t.poi_type] ?? '🚽'}
+                    </span>
+                    <span className="pf-throne-text">
+                      <strong>{t.name}</strong>
+                      <span>
+                        par {t.par}
+                        {t.elapsed_ms !== null ? ` · ${fmtElapsed(t.elapsed_ms)}` : ''} · held {ago(t.since)}
+                      </span>
+                    </span>
+                    <b>
+                      {t.score}
+                      <small>{relPar(t.score - t.par)}</small>
+                    </b>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button className={mine ? 'primary' : ''} onClick={() => (mine ? navigate('map') : setThrones(false))}>
+              {mine ? 'Open the map' : 'Close'}
+            </button>
+          </div>
         </div>
       )}
 
