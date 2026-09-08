@@ -3,7 +3,10 @@
 
 /** Tag set -> our place type and a default label, or null when the object is not a bathroom venue. */
 export function classify(tags) {
+  if (tags.access === 'private' || tags.access === 'no' || tags.toilets === 'no' || tags['toilets:access'] === 'private' || ['disused', 'abandoned', 'demolished', 'closed'].some(k => tags[k] === 'yes')) return null;
   const a = tags.amenity;
+  if (tags.toilets === 'yes') return { poiType: 'toilets', label: 'Bathroom' };
+  if (a === 'library' || a === 'community_centre' || a === 'cinema') return { poiType: 'retail', label: 'Public venue' };
   if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
   if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };
   if (a === 'fast_food') return { poiType: 'fast_food', label: 'Fast food' };
@@ -12,13 +15,13 @@ export function classify(tags) {
   if (tags.tourism === 'hotel' || tags.tourism === 'motel') return { poiType: 'hotel', label: 'Hotel' };
   if (tags.aeroway === 'terminal' || tags.aeroway === 'aerodrome') return { poiType: 'airport', label: 'Airport' };
   if (tags.leisure === 'stadium' || tags.building === 'stadium') return { poiType: 'stadium', label: 'Stadium' };
-  if (tags.shop === 'supermarket' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
+  if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
   if (tags.highway === 'rest_area' || tags.highway === 'services') return { poiType: 'park', label: 'Rest stop' };
   return null;
 }
 
 /** The osmium tags-filter expression that keeps exactly what classify() accepts. */
-export const OSMIUM_FILTER = ['nw/amenity=toilets,fuel,fast_food,bar,pub,nightclub,restaurant,cafe', 'nw/tourism=hotel,motel', 'nw/aeroway=terminal,aerodrome', 'nw/leisure=stadium', 'nw/building=stadium', 'nw/shop=supermarket,mall,department_store', 'nw/highway=rest_area,services'];
+export const OSMIUM_FILTER = ['nw/toilets=yes', 'nw/amenity=toilets,fuel,fast_food,bar,pub,nightclub,restaurant,cafe,library,community_centre,cinema', 'nw/tourism=hotel,motel', 'nw/aeroway=terminal,aerodrome', 'nw/leisure=stadium', 'nw/building=stadium', 'nw/shop=supermarket,mall,department_store,convenience', 'nw/highway=rest_area,services'];
 
 /** POI type -> environment + difficulty band. */
 export function bandFor(poiType, id) {

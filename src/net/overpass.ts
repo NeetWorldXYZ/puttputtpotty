@@ -23,7 +23,10 @@ const TTL = 15 * 60 * 1000;
 const PER_ENDPOINT_TIMEOUT_MS = 14000;
 
 function classify(tags: Record<string, string>): { poiType: string; label: string } | null {
+  if (tags.access === 'private' || tags.access === 'no' || tags.toilets === 'no' || tags['toilets:access'] === 'private' || ['disused', 'abandoned', 'demolished', 'closed'].some(k => tags[k] === 'yes')) return null;
   const a = tags.amenity;
+  if (tags.toilets === 'yes') return { poiType: 'toilets', label: 'Bathroom' };
+  if (a === 'library' || a === 'community_centre' || a === 'cinema') return { poiType: 'retail', label: 'Public venue' };
   if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
   if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };
   if (a === 'fast_food') return { poiType: 'fast_food', label: 'Fast food' };
@@ -32,7 +35,7 @@ function classify(tags: Record<string, string>): { poiType: string; label: strin
   if (tags.tourism === 'hotel' || tags.tourism === 'motel') return { poiType: 'hotel', label: 'Hotel' };
   if (tags.aeroway === 'terminal' || tags.aeroway === 'aerodrome') return { poiType: 'airport', label: 'Airport' };
   if (tags.leisure === 'stadium' || tags.building === 'stadium') return { poiType: 'stadium', label: 'Stadium' };
-  if (tags.shop === 'supermarket' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
+  if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
   if (tags.highway === 'rest_area' || tags.highway === 'services') return { poiType: 'park', label: 'Rest stop' };
   return null;
 }
@@ -113,26 +116,30 @@ async function race(q: string): Promise<OsmPlace[]> {
   });
 }
 
-export async function fetchBathrooms(lat: number, lng: number, radiusM = 3000): Promise<OsmPlace[]> {
+export async function fetchBathrooms(lat: number, lng: number, radiusM = 3000, refresh = false): Promise<OsmPlace[]> {
   const key = cellKey(lat, lng, radiusM);
   const cached = readCache(key);
-  if (cached) return cached;
+  if (cached && !refresh) return cached;
   const around = `(around:${radiusM},${lat},${lng})`;
   const tags: [string, string[]][] = [
-    ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe']],
+    ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe', 'library', 'community_centre', 'cinema']],
+    ['toilets', ['yes']],
     ['tourism', ['hotel', 'motel']],
     ['aeroway', ['terminal', 'aerodrome']],
     ['leisure', ['stadium']],
-    ['shop', ['supermarket', 'mall', 'department_store']],
+    ['shop', ['supermarket', 'mall', 'department_store', 'convenience']],
     ['highway', ['rest_area', 'services']],
   ];
   const clauses: string[] = [];
   for (const [k, vals] of tags) for (const v of vals) clauses.push(`node["${k}"="${v}"]${around};way["${k}"="${v}"]${around};`);
-  const q = `[out:json][timeout:12];(${clauses.join('')});out center 200;`;
+  const q = `[out:json][timeout:12];(${clauses.join('')});out center 1000;`;
   let places: OsmPlace[];
   try {
-    places = (await api.bathrooms(lat, lng, radiusM)).places;
+    const answer = await api.bathrooms(lat, lng, radiusM, refresh);
+    if (refresh && !answer.refreshSupported) throw new Error('Nearby refresh is not enabled on the server yet. Saved places are still available.');
+    places = answer.places;
   } catch (serverErr) {
+    if (refresh) throw serverErr;
     try {
       places = await race(q);
     } catch (directErr) {

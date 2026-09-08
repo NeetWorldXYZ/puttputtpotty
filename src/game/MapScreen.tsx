@@ -1,3 +1,5 @@
+import { LocationReviewSheet, LocationReviewQueue } from './LocationReviewSheet';
+import { loadCorrections, canReviewLocations, type Correction } from '../net/locationReviews';
 import { MenuVolume } from './MenuControls';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
@@ -248,6 +250,10 @@ export function MapScreen() {
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const correctionsRef = useRef(new Map<string, Correction>());
+  const [locationReport, setLocationReport] = useState<OsmPlace | null>(null);
+  const [reviewer, setReviewer] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [places, setPlaces] = useState<OsmPlace[]>([]);
   const [kings, setKings] = useState<Record<string, NearbyLocation>>({});
   const kingsRef = useRef<Record<string, NearbyLocation>>({});
@@ -338,12 +344,29 @@ export function MapScreen() {
   }, []);
 
   const [osmLoading, setOsmLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshNearby = async () => {
+    const center = mapRef.current?.getCenter();
+    if (!center || refreshing) return;
+    setRefreshing(true);
+    try {
+      const fresh = await fetchBathrooms(center.lat, center.lng, SEARCH_RADIUS_M, true);
+      addPlaces(center.lat, center.lng, fresh);
+      setNotice(`Nearby places refreshed: ${fresh.length} found. Missing one? Use Found one.`);
+    } catch (e) { setNotice((e as Error).message); }
+    finally { setRefreshing(false); }
+  };
   const [, setWide] = useState(false);
 
   /** Adds places to the pin set, dropping the farthest from the search centre past the cap. */
   const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
     const m = placesRef.current;
     for (const p of incoming) m.set(p.id, p);
+    for (const [id, p] of m) {
+      const correction = correctionsRef.current.get(id);
+      if (correction?.hidden) m.delete(id);
+      else if (correction?.name) m.set(id, {...p, name:correction.name});
+    }
     // Claimed bathrooms must never be absorbed: keep them ahead of anything else.
     const claimedIds = new Set(Object.values(kingsRef.current).filter((k) => k.king_name).map((k) => k.id));
     const all = [...m.values()];
@@ -359,6 +382,19 @@ export function MapScreen() {
     }
     setPlaces([...m.values()]);
   }, []);
+
+  const refreshCorrections = async () => {
+    try {
+      correctionsRef.current = await loadCorrections();
+      const center = lastSearchRef.current ?? {lat:0,lng:0};
+      addPlaces(center.lat, center.lng, []);
+      setSelected(p => {
+        const c = p ? correctionsRef.current.get(p.id) : undefined;
+        return c?.hidden ? null : p && c?.name ? {...p,name:c.name} : p;
+      });
+    } catch { /* Older deployments may not have the correction tables yet. */ }
+  };
+  useEffect(() => { void refreshCorrections(); void canReviewLocations().then(setReviewer); }, []);
 
   const applyThrones = useCallback(
     (lat: number, lng: number, rows: NearbyLocation[]) => {
@@ -736,6 +772,8 @@ export function MapScreen() {
       <div className="map-tools">
         {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
         {thronesDown === 'stale' && <div className="map-tool quiet">reconnecting…</div>}
+        {reviewer && !selected && <button className="map-tool" onClick={()=>setReviewing(true)}>Review corrections</button>}
+        {!selected && <button className="map-tool" disabled={refreshing || osmLoading} onClick={() => void refreshNearby()}>{refreshing ? 'Refreshing…' : '↻ Refresh nearby'}</button>}
         <button className="map-tool" onClick={closest} title="Closest bathroom">
           🚽 Closest
         </button>
@@ -751,6 +789,8 @@ export function MapScreen() {
 
       {notice && <div className="map-toast">{notice}</div>}
 
+      {locationReport && <LocationReviewSheet place={locationReport} onClose={message=>{setLocationReport(null);if(message)setNotice(message);}} />}
+      {reviewing && <LocationReviewQueue onClose={()=>{setReviewing(false);void refreshCorrections();}} />}
       {report && (
         <ReportSheet
           userId={report.id}
@@ -910,6 +950,7 @@ export function MapScreen() {
             )}
             {checkinError && <div className="sheet-err">{checkinError}</div>}
             <button onClick={playPractice}>Practice this course</button>
+            <button onClick={()=>setLocationReport(selected)}>Report this location</button>
           </div>
         </div>
       )}
