@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TabBar } from './TabBar';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
@@ -420,7 +419,6 @@ export function MatchScreen({ code, matchId }: Props) {
         )}
       </div>
 
-      <TabBar active="match" />
       {askName && (
         <NamePrompt
           title="Name for the match"

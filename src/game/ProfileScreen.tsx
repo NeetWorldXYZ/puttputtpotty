@@ -149,7 +149,7 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
         />
       )}
       {toast && <div className="map-toast">{toast}</div>}
-      <TabBar active="profile" />
+      <TabBar active="leaders" />
     </div>
   );
 }
