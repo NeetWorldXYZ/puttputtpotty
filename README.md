@@ -442,3 +442,36 @@ asks the public Overpass mirrors live for areas that have not been imported.
 Both need repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 Dry runs need nothing: `node scripts/osm-import.mjs --region x --file f.geojsonseq --dry-run`
 and `node scripts/prebuild.mjs --dry-run`.
+
+Pre-build also runs on Sundays for Michigan, after Monday's import, so new
+places there never make a player wait. Elsewhere a bathroom's course is built
+on first visit (one hole per request, a few seconds); the map warms up the
+nearest unbuilt bathrooms in the background as you move, so the wait is
+usually gone by the time you walk in. Each course is about 3 KB in the
+database: build more states with the workflow's `regions` input when there
+are players there.
+
+### Keeping places current
+
+OpenStreetMap is the seed; players keep it honest.
+
+- **Closed businesses** that mappers flagged (`disused:amenity=*`,
+  `disused=yes`, `abandoned=yes`, `end_date`) are skipped at import and by
+  the live Overpass search.
+- **Found one**: a player names a bathroom the map lacks. It goes where they
+  stand, or where they drop the pin (up to 200 m away). Their find is
+  `pending`: on their own map at once, on everyone's after an admin
+  approves it. An admin's find is live immediately, with no pin limit.
+  A find with the same name within 25 m of an existing place is refused as
+  a duplicate; a different business next door is fine.
+- **Reports** on any place: closed, renamed (with the new name), or not a
+  bathroom. Three different players agreeing apply it (the place is hidden,
+  or renamed); an admin's report applies at once. Hidden places keep their
+  history but hold no throne and never show on the map, even after the next
+  import. A renamed imported place keeps its id, course and throne.
+- **Admins** (`profiles.role = 'admin'`, set in SQL) see a **Review** button
+  on the map: pending finds to approve or remove, reported places to
+  remove, rename, or keep. Approve/Remove also sit on a pending place's
+  sheet.
+- **Claim radius** is 25 m plus GPS accuracy (capped at 25 m), for check-in
+  and for submitting a round.

@@ -9,6 +9,10 @@ describe('OpenStreetMap import helpers', () => {
     expect(classify({ shop: 'mall' })?.poiType).toBe('retail');
     expect(classify({ highway: 'services' })?.poiType).toBe('park');
     expect(classify({ shop: 'bakery' })).toBeNull();
+    // closed places that mappers flagged rather than deleted
+    expect(classify({ amenity: 'restaurant', disused: 'yes' })).toBeNull();
+    expect(classify({ amenity: 'fuel', 'disused:amenity': 'fuel' })).toBeNull();
+    expect(classify({ amenity: 'bar', end_date: '2024-01-01' })).toBeNull();
     // every filter value classifies
     for (const f of OSMIUM_FILTER as string[]) {
       const [key, vals] = f.replace('nw/', '').split('=');
