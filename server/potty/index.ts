@@ -100,7 +100,10 @@ type OsmPlace = { id: string; name: string; poiType: string; lat: number; lng: n
 type Element = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
 
 function classify(tags: Record<string, string>): { poiType: string; label: string } | null {
+  if (tags.access === 'private' || tags.access === 'no' || tags.toilets === 'no' || tags['toilets:access'] === 'private' || ['disused', 'abandoned', 'demolished', 'closed'].some(k => tags[k] === 'yes')) return null;
   const a = tags.amenity;
+  if (tags.toilets === 'yes') return { poiType: 'toilets', label: 'Bathroom' };
+  if (a === 'library' || a === 'community_centre' || a === 'cinema') return { poiType: 'retail', label: 'Public venue' };
   if (a === 'toilets') return { poiType: 'toilets', label: 'Public toilet' };
   if (a === 'fuel') return { poiType: 'fuel', label: 'Gas station' };
   if (a === 'fast_food') return { poiType: 'fast_food', label: 'Fast food' };
@@ -109,7 +112,7 @@ function classify(tags: Record<string, string>): { poiType: string; label: strin
   if (tags.tourism === 'hotel' || tags.tourism === 'motel') return { poiType: 'hotel', label: 'Hotel' };
   if (tags.aeroway === 'terminal' || tags.aeroway === 'aerodrome') return { poiType: 'airport', label: 'Airport' };
   if (tags.leisure === 'stadium' || tags.building === 'stadium') return { poiType: 'stadium', label: 'Stadium' };
-  if (tags.shop === 'supermarket' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
+  if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'mall' || tags.shop === 'department_store') return { poiType: 'retail', label: 'Store' };
   if (tags.highway === 'rest_area' || tags.highway === 'services') return { poiType: 'park', label: 'Rest stop' };
   return null;
 }
@@ -129,11 +132,12 @@ function parsePlaces(elements: Element[]): OsmPlace[] {
 }
 
 const POI_TAGS: [string, string[]][] = [
-  ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe']],
-  ['tourism', ['hotel', 'motel']],
+  ['amenity', ['toilets', 'fuel', 'fast_food', 'bar', 'pub', 'nightclub', 'restaurant', 'cafe', 'library', 'community_centre', 'cinema']],
+  ['toilets', ['yes']],
+    ['tourism', ['hotel', 'motel']],
   ['aeroway', ['terminal', 'aerodrome']],
   ['leisure', ['stadium']],
-  ['shop', ['supermarket', 'mall', 'department_store']],
+  ['shop', ['supermarket', 'mall', 'department_store', 'convenience']],
   ['highway', ['rest_area', 'services']],
 ];
 
@@ -146,7 +150,7 @@ function overpassQuery(lat: number, lng: number, radius: number): string {
   const around = `(around:${radius},${lat},${lng})`;
   const clauses: string[] = [];
   for (const [k, vals] of POI_TAGS) for (const v of vals) clauses.push(`node["${k}"="${v}"]${around};way["${k}"="${v}"]${around};`);
-  return `[out:json][timeout:12];(${clauses.join('')});out center 200;`;
+  return `[out:json][timeout:12];(${clauses.join('')});out center 1000;`;
 }
 
 // ---- Nominatim fallback: one category per request, inside a bounding box.
@@ -277,25 +281,26 @@ function overpassRace(q: string): Promise<OsmPlace[]> {
   });
 }
 
-async function bathrooms(lat: number, lng: number, radius: number): Promise<{ places: OsmPlace[]; cached: boolean; source?: string }> {
+async function bathrooms(lat: number, lng: number, radius: number, refresh = false): Promise<{ places: OsmPlace[]; cached: boolean; source?: string }> {
+  let imported: OsmPlace[] | null = null;
   // Imported OpenStreetMap data first (scripts/osm-import.mjs): inside a covered region it is the answer.
   try {
     const { data, error } = await admin.rpc('bathrooms_near', { in_lat: lat, in_lng: lng, radius_m: radius, lim: 400 });
     if (error) throw new Error(error.message);
     const near = data as { covered: boolean; places: OsmPlace[] } | null;
-    if (near?.covered) return { places: dedupePlaces(near.places ?? []), cached: true, source: 'import' };
+    if (near?.covered) imported = dedupePlaces(near.places ?? []);
   } catch (e) {
     console.warn('imported places lookup failed', (e as Error).message);
   }
   const key = `${Math.round(lat * 200) / 200},${Math.round(lng * 200) / 200},${radius}`;
   const { data: hit } = await admin.from('osm_cells').select('places, fetched_at').eq('key', key).maybeSingle();
-  if (hit && Date.now() - new Date(hit.fetched_at).getTime() < OSM_TTL_MS) return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
+  if (hit && Date.now() - new Date(hit.fetched_at).getTime() < (refresh ? 5 * 60000 : OSM_TTL_MS)) return { places: dedupePlaces(hit.places as OsmPlace[]), cached: true };
+  if (imported && !refresh) return { places: imported, cached: true, source: 'import' };
   const q = overpassQuery(lat, lng, radius);
   // Every Overpass route at once (database-routed and direct); Nominatim only if all of them fail.
   const strategies: [string, () => Promise<OsmPlace[]>][] = [
     ['overpass', () => firstSuccess([['overpass-db', () => overpassViaDb(q)], ['overpass-edge', () => overpassRace(q)]])],
-    ['nominatim-db', () => nominatimPlaces(lat, lng, radius, dbGet)],
-    ['nominatim-edge', () => nominatimPlaces(lat, lng, radius, edgeGet)],
+
   ];
   let places: OsmPlace[] | null = null;
   let source = '';
@@ -311,6 +316,7 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
     }
   }
   if (!places) {
+    if (refresh) throw new Error('Could not refresh nearby places. Your saved map is still available; try again shortly.');
     // Nothing is answering: an old answer beats no answer.
     if (hit && Array.isArray(hit.places) && hit.places.length) {
       console.warn('bathrooms', key, 'serving stale cache;', errors.join(' | '));
@@ -571,9 +577,9 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'bathrooms') {
       const { lat, lng, radius } = body;
-      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'bad position' }, 400);
-      const r = Math.min(20000, Math.max(500, typeof radius === 'number' ? Math.round(radius) : 3000));
-      return json(await bathrooms(lat, lng, r));
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return json({ error: 'bad position' }, 400);
+      const r = Math.min(20000, Math.max(500, typeof radius === 'number' && Number.isFinite(radius) ? Math.round(radius) : 3000));
+      return json({ ...await bathrooms(lat, lng, r, body.refresh === true), refreshSupported: true });
     }
 
     if (action === 'checkin') {
@@ -581,6 +587,9 @@ Deno.serve(async (req: Request) => {
       if (typeof locationId !== 'string' || typeof lat !== 'number' || typeof lng !== 'number') return json({ error: 'bad checkin' }, 400);
       const { data: loc } = await admin.from('locations').select('lat,lng').eq('id', locationId).maybeSingle();
       if (!loc) return json({ error: 'unknown location' }, 404);
+      const { data: correction, error: correctionError } = await admin.from('location_corrections').select('hidden').eq('id', locationId).maybeSingle();
+      if (correctionError) throw correctionError;
+      if (correction?.hidden) return json({ error: 'This location has been retired from the map.' }, 409);
       const dist = haversine(lat, lng, loc.lat, loc.lng);
       const acc = typeof accuracy === 'number' ? accuracy : 999;
       if (acc > MAX_ACCURACY_M) return json({ error: `GPS accuracy too low (${Math.round(acc)} m)` }, 400);

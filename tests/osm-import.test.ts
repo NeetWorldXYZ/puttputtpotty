@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { classify, centroid, osmId, placeFromFeature, OSMIUM_FILTER } from '../scripts/lib/poi.mjs';
 
 describe('OpenStreetMap import helpers', () => {
+  it('excludes explicitly inaccessible and retired venues but keeps customer access', () => {
+    for (const extra of [{access:'private'},{access:'no'},{toilets:'no'},{'toilets:access':'private'},{disused:'yes'},{abandoned:'yes'},{demolished:'yes'},{closed:'yes'}]) {
+      expect(classify({amenity:'restaurant',...extra})).toBeNull();
+    }
+    expect(classify({amenity:'restaurant',access:'customers'})).not.toBeNull();
+    expect(classify({'disused:amenity':'restaurant'})).toBeNull();
+    expect(classify({shop:'bakery',toilets:'yes'})).not.toBeNull();
+    expect(classify({shop:'convenience'})).not.toBeNull();
+  });
   it('classifies the same tags the server accepts, and nothing else', () => {
     expect(classify({ amenity: 'toilets' })).toEqual({ poiType: 'toilets', label: 'Public toilet' });
     expect(classify({ amenity: 'nightclub' })).toEqual({ poiType: 'bar', label: 'Club' });

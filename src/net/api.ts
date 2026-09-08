@@ -197,7 +197,7 @@ export const api = {
   checkin: (locationId: string, lat: number, lng: number, accuracy: number) =>
     call<{ ok: true; distance: number }>({ action: 'checkin', locationId, lat, lng, accuracy }),
   /** Bathrooms near a point, fetched from OpenStreetMap by the server and cached there. */
-  bathrooms: (lat: number, lng: number, radius: number) => call<{ places: { id: string; name: string; poiType: string; lat: number; lng: number }[]; cached: boolean }>({ action: 'bathrooms', lat, lng, radius }),
+  bathrooms: (lat: number, lng: number, radius: number, refresh = false) => call<{ places: { id: string; name: string; poiType: string; lat: number; lng: number }[]; cached: boolean; refreshSupported?: boolean }>({ action: 'bathrooms', lat, lng, radius, refresh }),
   courseHole: (seed: string, index: number) => call<{ hole: Hole }>({ action: 'course-hole', seed, index }),
   /** Starts the server-side round clock for a throne run (needs a check-in). */
   start: (locationId: string) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId }),

@@ -1,0 +1,6 @@
+.card.location-review{width:min(440px,92vw);max-height:80dvh;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:12px;background:#12384c;color:#fff6d8;border:2px solid #83bbaa;border-radius:24px;text-align:left}
+.location-review h2,.location-review p{margin:0;overflow-wrap:anywhere}
+.location-review label{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.location-review input,.location-review textarea,.location-review select{box-sizing:border-box;width:100%;min-height:44px;padding:10px;border-radius:10px;background:#fff6dc;color:#092b40;border:2px solid #83bbaa;font:inherit}
+.location-review textarea{min-height:90px}.location-review .review-note,.location-review small{font:13px/1.4 system-ui;color:#c2d8dd}
+.location-review button{min-height:44px}.location-review article{display:flex;flex-direction:column;gap:10px;border-top:1px solid #83bbaa;padding-top:16px}.location-review .review-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}

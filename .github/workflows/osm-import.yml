@@ -10,6 +10,7 @@ on:
         default: 'usa'
         required: true
   schedule:
+    - cron: '0 9 * * 2-7' # Refresh Michigan daily between national runs
     - cron: '0 9 * * 1' # Mondays 09:00 UTC
 
 jobs:
@@ -19,10 +20,15 @@ jobs:
       regions: ${{ steps.plan.outputs.regions }}
     steps:
       - id: plan
+        env:
+          INPUT_REGIONS: ${{ github.event.inputs.regions || (github.event.schedule == '0 9 * * 2-7' && 'michigan' || 'usa') }}
         run: |
           USA="alabama alaska arizona arkansas california colorado connecticut delaware district-of-columbia florida georgia hawaii idaho illinois indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri montana nebraska nevada new-hampshire new-jersey new-mexico new-york north-carolina north-dakota ohio oklahoma oregon pennsylvania puerto-rico rhode-island south-carolina south-dakota tennessee texas utah vermont virginia washington west-virginia wisconsin wyoming"
-          IN="${{ github.event.inputs.regions || 'usa' }}"
+          IN="$(echo "$INPUT_REGIONS" | tr '[:upper:]' '[:lower:]')"
           if [ "$IN" = "usa" ]; then LIST="$USA"; else LIST="$(echo "$IN" | tr ',' ' ')"; fi
+          for region in $LIST; do
+            case " $USA " in *" $region "*) ;; *) echo "Unknown region: $region" >&2; exit 1 ;; esac
+          done
           echo "regions=$(echo $LIST | tr ' ' '\n' | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
 
   import:
@@ -55,7 +61,7 @@ jobs:
           R="${{ matrix.region }}"
           for url in "https://download.geofabrik.de/north-america/us/$R-latest.osm.pbf" "https://download.openstreetmap.fr/extracts/north-america/us/$R-latest.osm.pbf"; do
             for attempt in $(seq 1 12); do
-              if curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o region.pbf "$url"; then
+              if curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors -o region.pbf "$url" && osmium fileinfo region.pbf >/dev/null; then
                 echo "downloaded $url ($(du -h region.pbf | cut -f1))"
                 exit 0
               fi
