@@ -9,7 +9,7 @@ import { currentUserId, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
-import { CLAIM_RADIUS_M, DWELL_SECONDS } from '../net/config';
+import { CLAIM_RADIUS_M } from '../net/config';
 import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
 import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
@@ -618,7 +618,7 @@ export function MapScreen() {
     });
   }, [fix, selected, mapLoaded]);
 
-  // Dwell countdown ticks once a second while a sheet is open.
+  // Keep check-in expiry current while a sheet is open.
   useEffect(() => {
     if (!selected) return;
     const id = setInterval(() => setCheckinTick((t) => t + 1), 1000);
@@ -635,9 +635,7 @@ export function MapScreen() {
   const inRange = distance !== null && fix !== null && distance <= CLAIM_RADIUS_M + Math.min(fix.accuracy, CLAIM_RADIUS_M);
   const ci = selected ? checkinAt(selected.id) : null;
   void checkinTick;
-  const dwellLeft = ci ? Math.max(0, DWELL_SECONDS - (Date.now() - ci) / 1000) : null;
   const checkinFresh = ci !== null && Date.now() - ci < 45 * 60 * 1000;
-  const ready = inRange && checkinFresh && dwellLeft === 0;
 
   const doCheckin = async () => {
     if (!selected || !fix) return;
@@ -904,10 +902,6 @@ export function MapScreen() {
             ) : !checkinFresh ? (
               <button className="primary" disabled={checkinBusy} onClick={() => void doCheckin()}>
                 {checkinBusy ? 'Checking in…' : "Check in · I'm here"}
-              </button>
-            ) : !ready ? (
-              <button className="primary" disabled>
-                Warming the seat… {Math.ceil(dwellLeft ?? 0)} s
               </button>
             ) : (
               <button className="primary throne" onClick={playThrone}>

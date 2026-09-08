@@ -12,7 +12,6 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: 
 
 const CLAIM_RADIUS_M = 50;
 const MAX_ACCURACY_M = 150;
-const DWELL_SECONDS = 20;
 const CHECKIN_MAX_AGE_S = 45 * 60;
 const COOLDOWN_HOURS = 1;
 const MAX_SPEED_MPS = 70;
@@ -662,11 +661,10 @@ Deno.serve(async (req: Request) => {
         if (acc > MAX_ACCURACY_M) return json({ error: 'GPS accuracy too low' }, 400);
         const dist = haversine(lat, lng, loc.lat, loc.lng);
         if (dist > CLAIM_RADIUS_M + Math.min(acc, CLAIM_RADIUS_M)) return json({ error: `too far away (${Math.round(dist)} m)` }, 400);
-        // Dwell: a check-in at this location at least DWELL_SECONDS ago and not stale.
+        // Require a valid, unexpired check-in; no minimum wait before playing.
         const { data: ci } = await admin.from('checkins').select('at, started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
         if (!ci) return json({ error: 'check in first' }, 400);
         const age = (Date.now() - new Date(ci.at).getTime()) / 1000;
-        if (age < DWELL_SECONDS) return json({ error: `stay a little longer (${Math.ceil(DWELL_SECONDS - age)} s)` }, 400);
         if (age > CHECKIN_MAX_AGE_S) return json({ error: 'check-in expired, check in again' }, 400);
         // Round time, measured here: from the start action to this submission.
         if (!ci.started_at) return json({ error: 'round was not started' }, 400);
