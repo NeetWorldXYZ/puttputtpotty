@@ -59,49 +59,5 @@
 @media(max-height:740px){.match-duel{height:77px}.match-duel > .avatar{height:76px;width:76px}.match-hero h1{font-size:32px}.match-hero p{font-size:12px;margin-bottom:9px}.match-find{min-height:55px;font-size:18px}.match-hero{padding-bottom:8px}.friend-card{padding:12px}.rank-context{min-height:85px;padding-top:16px}.rank-context>strong{font-size:22px}}
 @media(min-width:600px){.rank-context,.your-standing{max-width:568px}.leaders:not(.match-screen)>.board{max-width:600px}.match-duel{height:120px}.match-duel > .avatar{height:110px;width:110px}}
 
-/* Match lobby: one screen, one colour. The whole page shares a single tint over the
-   course art (no darker band at the top), the lobby never scrolls, and the cards use
-   the Clubhouse navy with yellow for the actions. */
+/* Match: the waiting and result phases share one tint over the course art (no darker band at the top). */
 .leaders.match-screen{background:linear-gradient(#0d2b40d6,#0d2b40d6),url('/art/arcade-course.webp') center/cover no-repeat}
-.leaders.match-screen .map-head{padding-bottom:4px}
-.leaders.match-screen .match-board{display:flex;flex-direction:column;gap:9px;flex:1 1 auto;min-height:0;overflow:hidden;padding:2px 16px calc(env(safe-area-inset-bottom,0px) + 90px)!important;overscroll-behavior:none}
-.match-screen .match-hero{background:none;padding:0 2px 4px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:stretch;justify-content:center}
-.match-screen .match-hero>*{flex:0 0 auto}
-.match-screen .match-eyebrow{font:800 10px/1.2 var(--game-font);letter-spacing:.16em;color:#ffe17d;text-shadow:0 2px 0 #08263c}
-.match-screen .match-duel{height:auto;margin:2px 0 0;gap:8px}
-.match-screen .match-duel:before{width:clamp(150px,50vw,220px);height:clamp(40px,7dvh,60px);bottom:2px}
-.match-screen .match-duel > .avatar{width:clamp(64px,11dvh,100px);height:clamp(64px,11dvh,100px)}
-.match-screen .match-duel b{font-size:clamp(22px,4.5dvh,30px)}
-.match-screen .match-hero h1{font-size:clamp(28px,5dvh,38px);margin:4px 0 4px}
-.match-screen .match-hero p{font-size:12px;line-height:1.4;margin:0 0 10px;color:#dbe8f7;text-shadow:0 2px 2px #08263c}
-.match-screen .match-find{min-height:56px;border:2px solid #fff0b2;border-radius:20px;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);box-shadow:inset 0 -5px 0 #eaa519,0 4px 0 #071f35;font:900 clamp(18px,5vw,22px) Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;text-transform:uppercase;color:#08263c;padding:8px 18px}
-.match-screen .match-hero>small{margin-top:7px;color:#a9c4df;font:700 11px/1.2 var(--game-font);text-shadow:none}
-.match-screen .friend-card,.match-screen .join-card{margin:0;padding:12px 14px;border:2px solid #497e97;border-radius:19px;background:linear-gradient(145deg,#12384c,#061f35);box-shadow:0 3px 0 #08263c;color:#fff7df;flex:0 0 auto}
-.match-screen .match-section-icon{width:38px;height:38px;font-size:24px;transform:rotate(-9deg);background:#0f2440;border:1px solid #3f6390;color:#ffd34c}
-.match-screen .friend-card h2{font:900 20px/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;text-transform:uppercase;color:#fff8dc}
-.match-screen .friend-card p{color:#b8cdd3;font:600 11px/1.3 var(--game-font)}
-.match-screen .friend-controls{margin-top:10px;gap:8px}
-.match-screen .friend-controls .len-chips button{min-height:44px;border:1px solid #3b5c81;background:#10243e;color:#dbe8f7;box-shadow:none;font:800 16px/1 var(--game-font)}
-.match-screen .friend-controls .len-chips button.active{background:#ffda60;color:#14213d;border-color:#ffe9a0;box-shadow:inset 0 -3px 0 #e9af2b}
-.match-screen .len-chips button small{font:600 9px/1 var(--game-font);margin-top:3px;opacity:.8}
-.match-screen .invite-create{min-height:44px;border:1px solid #ffe9a0;background:linear-gradient(#ffe995,#ffc934);color:#14213d;box-shadow:0 3px 0 #a97718;font:800 13px var(--game-font);padding:8px 12px;white-space:nowrap}
-.match-screen .join-card label{font:800 14px/1.2 var(--game-font);color:#fff8dc;margin-bottom:8px}
-.match-screen .join-card .code-input{min-height:44px;background:#0f2440;color:#fff;border:1px solid #3f6390;box-shadow:none;font:800 16px/1.2 var(--game-font);letter-spacing:3px}
-.match-screen .code-input::placeholder{color:#8fb0d1;font:700 12px var(--game-font);letter-spacing:.04em}
-.match-screen .join-card button{min-height:44px;border:1px solid #ffe9a0;background:linear-gradient(#ffe995,#ffc934);color:#14213d;box-shadow:0 3px 0 #a97718;font:800 14px var(--game-font)}
-.match-screen .join-card button:disabled{background:#2d4c73;border-color:#567499;color:#9fb6cf;box-shadow:none;opacity:1}
-@media(max-height:700px){
-  .leaders.match-screen .match-board{gap:7px}
-  .match-screen .match-eyebrow,.match-screen .match-hero>small,.match-screen .friend-card p{display:none}
-  .match-screen .match-duel > .avatar{width:62px;height:62px}
-  .match-screen .match-duel:before{height:36px}
-  .match-screen .match-hero h1{font-size:27px;margin:2px 0 3px}
-  .match-screen .match-hero p{margin-bottom:7px;font-size:11px}
-  .match-screen .match-find{min-height:48px}
-  .match-screen .friend-card,.match-screen .join-card{padding:9px 12px}
-  .match-screen .match-section-icon{width:32px;height:32px;font-size:20px}
-  .match-screen .friend-card h2{font-size:18px}
-  .match-screen .friend-controls{margin-top:8px}
-  .match-screen .friend-controls .len-chips button,.match-screen .invite-create,.match-screen .join-card .code-input,.match-screen .join-card button{min-height:42px}
-  .match-screen .join-card label{font-size:13px;margin-bottom:5px}
-}
