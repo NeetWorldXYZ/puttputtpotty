@@ -190,8 +190,6 @@ export function LocationPlay({ locationId, throne }: Props) {
       .catch((e: Error) => setSubmit({ state: 'error', message: e.message }));
   };
 
-  const coursePar = holes ? holes.reduce((a, h) => a + h.par, 0) : 0;
-
   if (!place) return null;
 
   if (loadError) {
@@ -238,13 +236,11 @@ export function LocationPlay({ locationId, throne }: Props) {
       )}
       {submit.state === 'done' &&
         (submit.isKing ? (
-          <div className="king-banner">
-            <div className="king-crown">👑</div>
-            <div className="king-title">King of the Throne</div>
-            <div className="sub">
-              {place.name} · {submit.score} (par {coursePar}) · {submit.holeScores.join('-')}
-              {submit.elapsedMs !== null && ` · ${fmtElapsed(submit.elapsedMs)}`}
-            </div>
+          <div className="throne-victory">
+            <span className="victory-crown" aria-hidden="true">👑</span>
+            <div className="victory-eyebrow">THE THRONE IS YOURS</div>
+            <h3>{place.name}</h3>
+            <p>You hold the course record.</p>
           </div>
         ) : (
           <div className="sub">

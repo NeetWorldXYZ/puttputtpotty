@@ -208,6 +208,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const sizeRef = useRef({ w: 390, h: 844, dpr: 1 });
+  const hudInsetsRef = useRef({ top: HUD_TOP, bottom: HUD_BOTTOM });
   const [, setSizeTick] = useState(0);
 
   useEffect(() => {
@@ -216,6 +217,13 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     if (!wrap || !canvas) return;
     const ro = new ResizeObserver(() => {
       const r = wrap.getBoundingClientRect();
+      const hud = wrap.querySelector('.hud')?.getBoundingClientRect();
+      const clock = wrap.querySelector('.race-clock')?.getBoundingClientRect();
+      const aim = wrap.querySelector('.aim-bar')?.getBoundingClientRect();
+      hudInsetsRef.current = {
+        top: Math.max(HUD_TOP, (hud?.bottom ?? r.top) - r.top + 16, (clock?.bottom ?? r.top) - r.top + 16),
+        bottom: Math.max(HUD_BOTTOM, aim ? r.bottom - aim.top + 16 : 0),
+      };
       const dpr = Math.min(3, window.devicePixelRatio || 1);
       sizeRef.current = { w: r.width, h: r.height, dpr };
       canvas.width = Math.round(r.width * dpr);
@@ -225,22 +233,24 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       setSizeTick((t) => t + 1);
     });
     ro.observe(wrap);
+    wrap.querySelectorAll('.hud, .race-clock, .aim-bar').forEach((el) => ro.observe(el));
     return () => ro.disconnect();
-  }, []);
+  }, [timerFrom]);
 
   const computeCamera = useCallback((bx: number, by: number, scaleMul = 1): { cam: Camera; follow: boolean } => {
     const { w, h } = sizeRef.current;
     const b = worldRef.current.hole.bounds;
+    const { top, bottom } = hudInsetsRef.current;
     const viewW = w - SIDE_PAD * 2;
-    const viewH = h - HUD_TOP - HUD_BOTTOM;
+    const viewH = Math.max(80, h - top - bottom);
     const fs = fitScale(b, viewW, viewH);
     if (fs >= MIN_FIT_SCALE && scaleMul === 1) {
       const cam = fitCamera(b, viewW, viewH);
-      return { cam: { scale: cam.scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + HUD_TOP }, follow: false };
+      return { cam: { scale: cam.scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + top }, follow: false };
     }
     const scale = (fs >= MIN_FIT_SCALE ? fs : Math.max(viewW / b.w, 12)) * scaleMul;
     const cam = followCamera(b, viewW, viewH, scale, bx, by);
-    return { cam: { scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + HUD_TOP }, follow: fs < MIN_FIT_SCALE };
+    return { cam: { scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + top }, follow: fs < MIN_FIT_SCALE };
   }, []);
 
   const handleEvent = useCallback(
