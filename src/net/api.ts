@@ -23,6 +23,8 @@ export interface NearbyLocation {
   king_elapsed_ms: number | null;
   king_avatar: Avatar | null;
   run_count: number;
+  /** 'pending' finds show only to their finder and admins until approved. */
+  status?: 'live' | 'pending' | 'hidden';
 }
 
 export interface King {
@@ -250,9 +252,16 @@ export const api = {
     if (error) throw new Error(error.message);
     return (data ?? []) as LocationRow[];
   },
-  /** A bathroom the map doesn't know about, at your feet. */
-  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number) =>
-    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number } }>({ action: 'found', name, poiType, lat, lng, accuracy }),
+  /** A bathroom the map doesn't know about: at your feet, or where you drop the pin. Players' finds wait for approval. */
+  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number, pin?: { lat: number; lng: number } | null) =>
+    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number }; status: 'live' | 'pending' }>({ action: 'found', name, poiType, lat, lng, accuracy, pin: pin ?? undefined }),
+  /** "This place is closed" (or its pin is wrong). Three players retire it; an admin does it alone. */
+  reportPlace: (place: { id: string; name: string; poiType: string; lat: number; lng: number }, reason: 'closed' | 'wrong') =>
+    call<{ ok: true; hidden: boolean; reports?: number }>({ action: 'report-place', place, reason }),
+  /** Admin: approve a player's find, or take a place off the map. */
+  curate: (locationId: string, decision: 'approve' | 'hide') => call<{ ok: true; status: string }>({ action: 'curate', locationId, decision }),
+  /** Who am I, according to the server (includes the admin flag). */
+  me: () => call<{ id: string; displayName: string | null; slogan: string | null; avatar: Avatar | null; role: 'player' | 'admin' }>({ action: 'me' }),
   /** Six digits another phone can enter to take over this account. */
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),

@@ -288,7 +288,10 @@ export function drawFloor(ctx: CanvasRenderingContext2D, b: Rect, t: Theme, seed
 
 /** Out-of-play area inside the bounds: darker theme colour with a faint texture. */
 export function drawSurround(ctx: CanvasRenderingContext2D, b: Rect, t: Theme): void {
-  ctx.fillStyle = t.surround;
+  const light = ctx.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h);
+  light.addColorStop(0, t.surround);
+  light.addColorStop(1, t.surroundB);
+  ctx.fillStyle = light;
   ctx.fillRect(b.x, b.y, b.w, b.h);
   ctx.strokeStyle = t.surroundB;
   ctx.lineWidth = 0.9;
@@ -298,4 +301,13 @@ export function drawSurround(ctx: CanvasRenderingContext2D, b: Rect, t: Theme): 
     ctx.lineTo(d + b.h, b.y + b.h);
   }
   ctx.stroke();
+  // Soft edge shading is cached with the scenery, outside the playable floor.
+  ctx.save();
+  const edge = ctx.createLinearGradient(0, b.y, 0, b.y + b.h);
+  edge.addColorStop(0, 'rgba(255,255,255,0.07)');
+  edge.addColorStop(0.45, 'rgba(20,33,61,0)');
+  edge.addColorStop(1, 'rgba(20,33,61,0.22)');
+  ctx.fillStyle = edge;
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.restore();
 }
