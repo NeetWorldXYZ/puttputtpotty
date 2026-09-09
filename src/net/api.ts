@@ -404,7 +404,7 @@ export const api = {
   },
   async inviteFriend(userId: string, matchId: string): Promise<string> {
     await ensureSession();
-    const { data, error } = await supabase.rpc('invite_friend', { to_user: userId, in_match: matchId });
+    const { data, error } = await supabase.rpc('invite_friend', { in_to: userId, in_match: matchId });
     if (error) throw new Error(error.message.replace(/^.*?: /, ''));
     return String(data);
   },
