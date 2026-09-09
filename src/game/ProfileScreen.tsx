@@ -186,7 +186,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
               </span>
               <span>
                 <strong>{relPar(p.best_rel)}</strong>
-                <small>Best round</small>
+                <small>Best 9 holes</small>
               </span>
             </div>
             <div className="pf-tile">
