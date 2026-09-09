@@ -80,6 +80,36 @@ export interface MatchRow {
   bot_times?: number[] | null;
 }
 
+export type FriendRelation = 'me' | 'none' | 'friend' | 'incoming' | 'outgoing' | 'blocked';
+export interface FriendRow {
+  user_id: string;
+  display_name: string;
+  avatar: Avatar | null;
+  relation: FriendRelation;
+  last_seen_at: string | null;
+  thrones: number;
+  /** An open invite from this friend, if they asked you to play. */
+  invite_id: string | null;
+  invite_code: string | null;
+  invite_holes: number | null;
+}
+export interface FriendLookupRow {
+  user_id: string;
+  display_name: string;
+  avatar: Avatar | null;
+  relation: FriendRelation;
+}
+export interface MatchInvite {
+  id: string;
+  match_id: string;
+  code: string;
+  holes: number;
+  from_user: string;
+  from_name: string;
+  from_avatar: Avatar | null;
+  created_at: string;
+}
+
 export interface KingRow {
   user_id: string;
   display_name: string;
@@ -328,6 +358,68 @@ export const api = {
     const row = (Array.isArray(data) ? data[0] : data) as { rank: number; of_players: number; total: number; par: number } | undefined;
     return row ? { rank: Number(row.rank), of: Number(row.of_players), total: row.total, par: row.par } : null;
   },
+  // ---- friends
+  async friends(): Promise<FriendRow[]> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('friends_list');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as FriendRow[];
+  },
+  async friendLookup(q: string): Promise<FriendLookupRow[]> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('friend_lookup', { q });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as FriendLookupRow[];
+  },
+  async friendRequest(userId: string): Promise<FriendRelation> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('friend_request', { target: userId });
+    if (error) throw new Error(error.message.replace(/^.*?: /, ''));
+    return data as FriendRelation;
+  },
+  async friendRespond(userId: string, accept: boolean): Promise<FriendRelation> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('friend_respond', { other: userId, accept });
+    if (error) throw new Error(error.message);
+    return data as FriendRelation;
+  },
+  async friendRemove(userId: string): Promise<void> {
+    await ensureSession();
+    const { error } = await supabase.rpc('friend_remove', { other: userId });
+    if (error) throw new Error(error.message);
+  },
+  async friendBlock(userId: string): Promise<void> {
+    await ensureSession();
+    const { error } = await supabase.rpc('friend_block', { other: userId });
+    if (error) throw new Error(error.message);
+  },
+  async myFriendCode(): Promise<string> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('my_friend_code');
+    if (error) throw new Error(error.message);
+    return String(data);
+  },
+  async heartbeat(): Promise<void> {
+    await supabase.rpc('heartbeat');
+  },
+  async inviteFriend(userId: string, matchId: string): Promise<string> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('invite_friend', { to_user: userId, in_match: matchId });
+    if (error) throw new Error(error.message.replace(/^.*?: /, ''));
+    return String(data);
+  },
+  async myInvites(): Promise<MatchInvite[]> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('my_invites');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as MatchInvite[];
+  },
+  async inviteRespond(id: string, accept: boolean): Promise<void> {
+    await ensureSession();
+    const { error } = await supabase.rpc('invite_respond', { in_id: id, accept });
+    if (error) throw new Error(error.message);
+  },
+
   async leaderboard(seed: string): Promise<DailyRow[]> {
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);

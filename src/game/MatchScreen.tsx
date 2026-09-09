@@ -692,6 +692,46 @@ const fmtClock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
+/** After a match against a person: one tap to be friends. */
+function AddFriend({ userId, name }: { userId: string; name: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'sent' | 'friends' | 'error'>('idle');
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    // Already friends, or already asked: say so instead of offering again.
+    api
+      .friendLookup(name)
+      .then((rows) => {
+        const r = rows.find((x) => x.user_id === userId);
+        if (r?.relation === 'friend') setState('friends');
+        else if (r?.relation === 'outgoing') setState('sent');
+      })
+      .catch(() => {});
+  }, [userId, name]);
+  if (state === 'friends') return <div className="verdict-friend done">✓ Friends with {name}</div>;
+  if (state === 'sent') return <div className="verdict-friend done">Friend request sent</div>;
+  return (
+    <button
+      className="verdict-friend"
+      disabled={state === 'busy'}
+      onClick={() => {
+        setState('busy');
+        api
+          .friendRequest(userId)
+          .then((rel) => {
+            sfx.pop();
+            setState(rel === 'friend' ? 'friends' : 'sent');
+          })
+          .catch((e: Error) => {
+            setMsg(e.message);
+            setState('error');
+          });
+      }}
+    >
+      {state === 'error' ? msg : `＋ Add ${name} as a friend`}
+    </button>
+  );
+}
+
 function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side: 'p1' | 'p2' }) {
   const other = side === 'p1' ? 'p2' : 'p1';
   const mine = { score: match[`${side}_score`], holes: match[`${side}_holes`], t: match[`${side}_elapsed_ms`] };
@@ -721,6 +761,7 @@ function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side
           </small>
         </div>
       </div>
+      {!match.p2_bot && match[other] && <AddFriend userId={match[other] as string} name={theirs.name} />}
     </div>
   );
 }
