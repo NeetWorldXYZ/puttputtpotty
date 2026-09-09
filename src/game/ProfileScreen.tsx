@@ -10,6 +10,7 @@ import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
+import { ChallengesSheet } from './ChallengesSheet';
 
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -45,6 +46,7 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
   const [edit, setEdit] = useState(false);
   const [report, setReport] = useState(false);
   const [thrones, setThrones] = useState(false);
+  const [challenges, setChallenges] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
@@ -92,6 +94,11 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
             {p.slogan && <div className="pf-slogan">&ldquo;{p.slogan}&rdquo;</div>}
             <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
             <span className="pf-since">Playing since {memberSince(p.since)}</span>
+            {(p.points ?? 0) > 0 || (p.streak ?? 0) > 0 ? (
+              <span className="pf-points">
+                <b>★ {p.points ?? 0}</b> royal points{(p.streak ?? 0) > 0 ? <> · 🔥 {p.streak}-day streak</> : null}
+              </span>
+            ) : null}
             <div className="pf-hero-actions">
               {mine ? (
                 <button className="primary" onClick={() => setEdit(true)}>
@@ -130,6 +137,18 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
             </span>
           </button>
 
+          {mine && (
+            <button className="pf-challenges" onClick={() => setChallenges(true)}>
+              <span className="pf-emoji" aria-hidden="true">
+                🎯
+              </span>
+              <span>
+                <strong>Challenges</strong>
+                <small>Daily and weekly · earn royal points</small>
+              </span>
+              <b>›</b>
+            </button>
+          )}
           <div className="pf-tiles">
             <div className="pf-tile">
               <span className="pf-emoji" aria-hidden="true">
@@ -194,6 +213,14 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
         </div>
       )}
 
+      {challenges && (
+        <ChallengesSheet
+          onClose={() => {
+            setChallenges(false);
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
       {edit && (
         <AccountSheet
           onClose={() => {
