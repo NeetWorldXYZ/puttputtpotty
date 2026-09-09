@@ -1,4 +1,5 @@
 import { MenuVolume } from './MenuControls';
+import { placeNameProblem } from '../net/wordfilter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -200,6 +201,11 @@ function FoundSheet({
   const gpsBad = fix.accuracy > 100 && !isAdmin;
   const pinDist = pin ? haversine(fix.lat, fix.lng, pin.lat, pin.lng) : 0;
   const submit = async () => {
+    const problem = trimmed.length < 2 ? 'Give it a name.' : placeNameProblem(trimmed);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -247,6 +253,13 @@ function PlaceReportSheet({ place, isAdmin, onClose }: { place: OsmPlace; isAdmi
   const [error, setError] = useState<string | null>(null);
   const trimmed = newName.trim();
   const submit = async () => {
+    if (reason === 'renamed') {
+      const problem = trimmed.length < 2 ? 'What is it called now?' : placeNameProblem(trimmed);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nameProblem, sloganProblem, textProblem } from '../src/net/wordfilter';
+import { nameProblem, placeNameProblem, sloganProblem, textProblem } from '../src/net/wordfilter';
 
 describe('name and slogan filter', () => {
   it('lets ordinary names through, including ones that contain awkward substrings', () => {
@@ -26,5 +26,14 @@ describe('name and slogan filter', () => {
     expect(sloganProblem('x'.repeat(61))).toMatch(/60/);
     expect(sloganProblem('you are a cunt')).not.toBeNull();
     expect(textProblem('pure gold', 'slogan')).toBeNull();
+  });
+
+  it('lets business names keep their punctuation but still filters them', () => {
+    for (const ok of ['Hourglass Coffee + Kitchen', "Joe's Bar & Grill", '7-Eleven (24h)', 'Bagels, Etc.', 'Bob/Ann Diner', 'Wash #2', 'Woo! Cafe', 'Gate B: Restroom'])
+      expect(placeNameProblem(ok), ok).toBeNull();
+    expect(placeNameProblem('Fuck Cafe')).not.toBeNull();
+    expect(placeNameProblem('A')).not.toBeNull();
+    expect(placeNameProblem('Bad <script> name')).not.toBeNull();
+    expect(nameProblem('Hourglass Coffee + Kitchen')).not.toBeNull();
   });
 });

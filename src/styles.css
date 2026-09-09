@@ -2459,13 +2459,26 @@ input[type='checkbox'] {
 }
 .verdict-rows > div {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'av name score' 'av sub score';
   gap: 2px 10px;
-  align-items: baseline;
+  align-items: center;
   padding: 4px 0;
+  text-align: left;
+}
+.verdict-avatar {
+  grid-area: av;
+}
+.verdict-rows > div > span {
+  grid-area: name;
+  align-self: end;
+}
+.verdict-rows > div > strong {
+  grid-area: score;
 }
 .verdict-rows > div > small {
-  grid-column: 1 / -1;
+  grid-area: sub;
+  align-self: start;
   color: var(--dim);
   font-size: 12px;
 }

@@ -4,7 +4,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
-import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem, normalizeAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/8993d37b72e4cca0b182f62261ad1f51df2398ba/server/potty/engine.js';
+import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, placeNameProblem, sloganProblem, normalizeAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/8993d37b72e4cca0b182f62261ad1f51df2398ba/server/potty/engine.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -834,7 +834,7 @@ Deno.serve(async (req: Request) => {
       }
       const cleanName = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
       if (cleanName.length < 2) return json({ error: 'give it a name' }, 400);
-      if (nameProblem(cleanName)) return json({ error: "that name won't fly here" }, 400);
+      if (placeNameProblem(cleanName)) return json({ error: placeNameProblem(cleanName) }, 400);
       const type = typeof poiType === 'string' && ['toilets', 'fuel', 'fast_food', 'bar', 'restaurant', 'hotel', 'retail', 'park', 'stadium', 'airport'].includes(poiType) ? poiType : 'toilets';
       await ensureProfile(user.id);
       if (!adminUser) {
@@ -866,7 +866,8 @@ Deno.serve(async (req: Request) => {
       const details = reason === 'renamed' ? String(body.details ?? '').trim().replace(/\s+/g, ' ').slice(0, 40) : '';
       if (!place || typeof place.id !== 'string' || !/^(osm:(node|way|relation):\d+|ppp:[a-f0-9]{12})$/.test(place.id) || typeof place.lat !== 'number' || typeof place.lng !== 'number')
         return json({ error: 'bad place' }, 400);
-      if (reason === 'renamed' && (details.length < 2 || nameProblem(details))) return json({ error: 'what is it called now?' }, 400);
+      if (reason === 'renamed' && details.length < 2) return json({ error: 'what is it called now?' }, 400);
+      if (reason === 'renamed' && placeNameProblem(details)) return json({ error: placeNameProblem(details) }, 400);
       await ensureProfile(user.id);
       const adminUser = await isAdmin(user.id);
       const day = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -940,7 +941,8 @@ Deno.serve(async (req: Request) => {
       else if (decision === 'hide') patch = { status: 'hidden' };
       else if (decision === 'rename') {
         const name = String(body.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
-        if (name.length < 2 || nameProblem(name)) return json({ error: 'give it a name' }, 400);
+        if (name.length < 2) return json({ error: 'give it a name' }, 400);
+        if (placeNameProblem(name)) return json({ error: placeNameProblem(name) }, 400);
         patch = { name };
       } else if (decision !== 'dismiss') return json({ error: 'bad request' }, 400);
       if (patch) {
