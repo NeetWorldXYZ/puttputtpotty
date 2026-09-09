@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { COURSE_STYLE, circlePolygon } from './mapStyle';
 import { themeById } from '../render/themes';
 import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type NearbyLocation, type PlaceQueue, type PlaceReason } from '../net/api';
-import { currentUserId, getSavedAvatar } from '../net/supabase';
+import { currentUserId, ensureSession, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
@@ -19,6 +19,8 @@ import { ReportSheet } from './ReportSheet';
 import { Avatar } from './Avatar';
 import { TabBar } from './TabBar';
 import { sfx, unlockAudio } from './sound';
+import { GameIcon } from './GameIcon';
+import './ThroneSheet.css';
 
 const SEARCH_RADIUS_M = 3000;
 const WIDE_RADIUS_M = 12000;
@@ -422,6 +424,21 @@ function cartElement(): HTMLElement {
   return el;
 }
 
+/** An empty throne waiting for a king: the pin's crowned toilet, uncrowned, with the crown's outline hovering above. */
+function EmptyThroneArt() {
+  return (
+    <svg className="ts-empty-art" viewBox="0 0 80 84" aria-hidden="true">
+      <ellipse cx="40" cy="76" rx="26" ry="5" fill="#08263b" opacity=".35" />
+      <path d="m26 22-3-11 9 5 8-9 8 9 9-5-3 11Z" fill="none" stroke="#ffd34c" strokeWidth="2.5" strokeLinejoin="round" strokeDasharray="4 3" className="ts-ghost-crown" />
+      <rect x="22" y="30" width="36" height="22" rx="4" fill="#fffdf3" stroke="#08263b" strokeWidth="3" />
+      <path d="M18 50h44q0 18-16 20l4 7H30l4-7Q18 68 18 50Z" fill="#fffdf3" stroke="#08263b" strokeWidth="3" strokeLinejoin="round" />
+      <ellipse cx="40" cy="51" rx="18" ry="6" fill="#fff" stroke="#08263b" strokeWidth="3" />
+      <ellipse cx="40" cy="51" rx="10" ry="3" fill="#5fd0e7" stroke="#08263b" strokeWidth="1.5" />
+      <text x="40" y="45" textAnchor="middle" fontFamily="Impact, 'Arial Narrow', sans-serif" fontSize="14" fill="#08263b">?</text>
+    </svg>
+  );
+}
+
 export function MapScreen() {
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -458,7 +475,8 @@ export function MapScreen() {
   const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
-    void currentUserId().then(setMe);
+    // A first-ever visit has no session yet: open one so your own thrones read as yours.
+    void currentUserId().then((id) => (id ? setMe(id) : ensureSession().then((s) => setMe(s.user.id)).catch(() => {})));
     void loadProfile().then((p) => p?.name && setName(p.name));
   }, []);
   const [moved, setMoved] = useState(false);
@@ -1174,16 +1192,19 @@ export function MapScreen() {
       )}
 
       {selected && (
-        <div className="map-sheet pop">
-          <button className="sheet-close" onClick={() => setSelected(null)}>
+        <div className="map-sheet pop ts">
+          <button className="sheet-close" onClick={() => setSelected(null)} aria-label="Close">
             ✕
           </button>
-          <div className="sheet-head">
-            <span className="sheet-icon">{POI_ICON[selected.poiType] ?? '🚽'}</span>
-            <div>
-              <div className="sheet-name">{selected.name}</div>
-              <div className="sheet-sub">
-                {POI_LABEL[selected.poiType] ?? 'Bathroom'} · {themeName}
+          <div className="ts-head">
+            <span className="ts-icon" aria-hidden="true">
+              {POI_ICON[selected.poiType] ?? '🚽'}
+            </span>
+            <div className="ts-head-text">
+              <h2 className="ts-name">{selected.name}</h2>
+              <div className="ts-sub">
+                {POI_LABEL[selected.poiType] ?? 'Bathroom'}
+                {themeName && themeName.toLowerCase() !== (POI_LABEL[selected.poiType] ?? '').toLowerCase() ? ` · ${themeName} course` : ''}
                 {` · ${HOLES_PER_COURSE} holes`}
                 {preview?.id === selected.id ? ` · par ${preview.par}` : king?.par ? ` · par ${king.par}` : ''}
                 {king?.status === 'pending' ? ' · awaiting approval' : ''}
@@ -1191,53 +1212,73 @@ export function MapScreen() {
             </div>
           </div>
 
-          {distance !== null && (
-            <div className={`sheet-dist${inRange ? ' here' : ''}`}>
-              <span className="dist-num">{fmtDistance(distance)}</span>
-              <span className="dist-sub">{inRange ? "you're here" : `about ${Math.max(1, Math.round(distance / 80))} min walk`}</span>
+          {king?.king_name ? (
+            <div className={`ts-throne held${king.king_user === me ? ' mine' : ''}`}>
+              <span className="ts-shine" aria-hidden="true" />
+              <div className="ts-king-avatar">
+                <Avatar av={king.king_avatar} size={72} />
+                <span className="ts-crown" aria-hidden="true">
+                  <GameIcon kind="crown" />
+                </span>
+              </div>
+              <div className="ts-king-text">
+                <div className="ts-eyebrow">{king.king_user === me ? 'You hold this throne' : 'King of the throne'}</div>
+                <button className="ts-king-name" onClick={() => navigate('profile', null, null, { user: king.king_user ?? undefined })}>
+                  {king.king_name}
+                </button>
+                <div className="ts-king-line">
+                  <b>{king.king_score}</b>
+                  {king.par ? <span>on par {king.par}</span> : null}
+                  {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span>⏱ {fmtElapsed(king.king_elapsed_ms)}</span>}
+                  {king.king_since && <span>· crowned {ago(king.king_since)}</span>}
+                </div>
+              </div>
+              {king.king_user && king.king_user !== me && (
+                <button className="ts-flag" title="Report this player" aria-label="Report this player" onClick={() => setReport({ id: king.king_user!, name: king.king_name! })}>
+                  ⚑
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="ts-throne vacant">
+              <EmptyThroneArt />
+              <div className="ts-king-text">
+                <div className="ts-eyebrow">No king yet</div>
+                <div className="ts-empty-title">The throne is empty</div>
+                <div className="ts-empty-sub">Sink {HOLES_PER_COURSE} holes faster than anyone and it&apos;s yours.</div>
+              </div>
             </div>
           )}
 
-          <div className={`king-banner${king?.king_name ? (king.king_user === me ? ' mine' : ' held') : ' empty'}`}>
-            {king?.king_name ? (
-              <>
-                {king.king_user === me && <span className="mine-shine" aria-hidden="true">✦</span>}
-                <Avatar av={king.king_avatar} size={76} className="kb-avatar" />
-                <div className="kb-text">
-                  <div className="kb-label">👑 {king.king_user === me ? 'You are King of the Throne' : 'King of the Throne'}</div>
-                  <button className="kb-name" onClick={() => navigate('profile', null, null, { user: king.king_user ?? undefined })}>
-                    {king.king_name}
-                  </button>
-                  <div className="kb-score">
-                    <strong>{king.king_score}</strong>
-                    {king.par ? <span> on par {king.par}</span> : null}
-                    {king.king_elapsed_ms !== null && king.king_elapsed_ms !== undefined && <span className="dim"> · ⏱ {fmtElapsed(king.king_elapsed_ms)}</span>}
-                  </div>
-                  {king.king_since && <div className="kb-since">holding it {ago(king.king_since)}</div>}
-                </div>
-                {king.king_user && king.king_user !== me && (
-                  <button className="flag-btn kb-flag" title="Report this player" onClick={() => setReport({ id: king.king_user!, name: king.king_name! })}>
-                    ⚑
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <span className="kb-empty-icon">🪑</span>
-                <div className="kb-text">
-                  <div className="kb-label">No king yet</div>
-                  <div className="kb-name static">The throne is empty</div>
-                  <div className="kb-score dim">Three holes. Fewest strokes takes it; ties go to the faster round.</div>
-                </div>
-              </>
-            )}
-          </div>
+          {(king?.king_score !== null && king?.king_score !== undefined) || myBest !== null || (king?.run_count ?? 0) > 0 ? (
+            <div className="ts-facts">
+              {king?.king_score !== null && king?.king_score !== undefined && (
+                <span className="ts-fact">
+                  <b>{king.king_score}</b> record
+                </span>
+              )}
+              {myBest !== null && (
+                <span className="ts-fact you">
+                  <b>{myBest}</b> your best
+                </span>
+              )}
+              {king?.run_count !== undefined && king.run_count > 0 && (
+                <span className="ts-fact">
+                  <b>{king.run_count}</b> {king.run_count === 1 ? 'round' : 'rounds'}
+                </span>
+              )}
+            </div>
+          ) : null}
 
-          <div className="facts">
-            {king?.king_score !== null && king?.king_score !== undefined && <span className="fact"><small>Course record</small><strong>{king.king_score}</strong></span>}
-            {myBest !== null && <span className="fact you"><small>Your best</small><strong>{myBest}</strong></span>}
-            {king?.run_count !== undefined && king.run_count > 0 && <span className="fact"><small>Rounds played</small><strong>{king.run_count}</strong></span>}
-          </div>
+          {distance !== null && (
+            <div className={`ts-dist${inRange ? ' here' : ''}`}>
+              <span className="ts-dist-emoji" aria-hidden="true">
+                {inRange ? '📍' : '🚶'}
+              </span>
+              <strong>{inRange ? "You're here" : `${fmtDistance(distance)} away`}</strong>
+              <span>{inRange ? 'check in below' : `about ${Math.max(1, Math.round(distance / 80))} min walk`}</span>
+            </div>
+          )}
 
           {board?.id === selected.id && board.rows.length > 0 && (
             <div className="sheet-leaders">
@@ -1260,26 +1301,28 @@ export function MapScreen() {
 
           {previewError && <div className="sheet-err">Course details will load when you play.</div>}
 
-          <div className="sheet-actions">
+          <div className="sheet-actions ts-actions">
             {!fix ? (
-              <button className="primary" disabled>
+              <button className="ts-cta" disabled>
                 Waiting for GPS…
               </button>
             ) : !inRange ? (
-              <button className="primary" disabled>
-                Get within {CLAIM_RADIUS_M} m · you&apos;re {distance !== null ? fmtDistance(distance) : '?'} away
+              <button className="ts-cta far" disabled>
+                Get within {fmtDistance(CLAIM_RADIUS_M)} <small>· you&apos;re {distance !== null ? fmtDistance(distance) : '?'} away</small>
               </button>
             ) : !checkinFresh ? (
-              <button className="primary" disabled={checkinBusy} onClick={() => void doCheckin()}>
-                {checkinBusy ? 'Checking in…' : "Check in · I'm here"}
+              <button className="ts-cta" disabled={checkinBusy} onClick={() => void doCheckin()}>
+                {checkinBusy ? 'Checking in…' : "Check in · I'm here"} <span aria-hidden="true">→</span>
               </button>
             ) : (
-              <button className="primary throne" onClick={playThrone}>
-                {king?.king_name ? (king.king_user === me ? '👑 Defend your throne' : `⚔️ Challenge ${king.king_name}`) : '👑 Claim the empty throne'}
+              <button className="ts-cta go" onClick={playThrone}>
+                {king?.king_name ? (king.king_user === me ? 'Defend your throne' : `Challenge ${king.king_name}`) : 'Claim the empty throne'} <span aria-hidden="true">→</span>
               </button>
             )}
             {checkinError && <div className="sheet-err">{checkinError}</div>}
-            <button onClick={playPractice}>Practice this course</button>
+            <button className="ts-secondary" onClick={playPractice}>
+              ⛳ Practice this course
+            </button>
             {isAdmin && king?.status === 'pending' && (
               <div className="admin-row">
                 <button className="primary" onClick={() => void curate(selected, 'approve')}>

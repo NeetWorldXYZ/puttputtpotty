@@ -1,0 +1,56 @@
+/* The throne sheet on the map, in the Clubhouse look: display-face name, an illustrated throne card,
+   a cream distance strip and the yellow action bar. Presentation only. */
+.map-sheet.ts{padding:14px 14px 12px;display:flex;flex-direction:column;gap:9px}
+.ts-head{display:flex;align-items:center;gap:12px;min-height:52px;padding-right:40px}
+.ts-icon{display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;border-radius:15px;font-size:28px;background:linear-gradient(145deg,#f7fbff,#dcecff);border:2px solid #08263c;box-shadow:inset 0 0 0 2px #fff,0 3px 0 #08263c}
+.ts-head-text{min-width:0}
+.ts-name{margin:0;font:900 clamp(20px,5.6vw,26px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;color:#fff8dc;text-transform:uppercase;paint-order:stroke fill;-webkit-text-stroke:4px #08263c;text-shadow:0 3px 0 #08263c;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ts-sub{margin-top:3px;font:700 11px/1.35 var(--game-font);color:#afc9e4}
+.ts-throne{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;border:3px solid #08263c;overflow:hidden}
+.ts-throne.vacant{background:linear-gradient(140deg,#15495b,#06253c);box-shadow:inset 0 0 0 2px #fff0be,0 4px 0 #08263c;color:#fff8dc}
+.ts-throne.held{background:linear-gradient(120deg,#fff6dc,#ffe089 60%,#ffcb3d);box-shadow:inset 0 0 0 2px #fff7d0,0 4px 0 #08263c;color:#08263c}
+.ts-throne.held.mine{box-shadow:inset 0 0 0 2px #fff7d0,0 0 0 4px #ffd34c40,0 0 22px #ffd34c80,0 4px 0 #08263c}
+.ts-shine{display:none}
+.ts-throne.held.mine .ts-shine{display:block;position:absolute;inset:-40% -20%;background:linear-gradient(100deg,transparent 40%,#ffffff70 50%,transparent 60%);animation:ts-shine 3.2s ease-in-out infinite;pointer-events:none}
+@keyframes ts-shine{0%{transform:translateX(-60%)}60%,100%{transform:translateX(60%)}}
+.ts-throne.vacant{flex-wrap:nowrap}
+.ts-empty-art{flex:0 0 72px;width:72px;max-width:72px;height:76px;overflow:visible}
+.ts-ghost-crown{animation:ts-hover 2.4s ease-in-out infinite;transform-origin:40px 20px}
+@keyframes ts-hover{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.ts-king-avatar{position:relative;flex:none}
+.ts-king-avatar .avatar{display:block;filter:drop-shadow(0 3px 0 #08263b55)}
+.ts-crown{position:absolute;right:-8px;top:-10px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#08263c;border:2px solid #fff0b2;transform:rotate(12deg)}
+.ts-crown .game-icon{width:18px;height:18px;color:#ffd34c;filter:none}
+.ts-king-text{min-width:0;flex:1;text-align:left}
+.ts-eyebrow{font:800 10px/1.2 var(--game-font);letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.ts-throne.vacant .ts-eyebrow{color:#ffe17d}
+.ts-king-name{display:block;margin:2px 0 0;padding:0;border:0;background:none;color:inherit;text-align:left;font:900 clamp(20px,5.6vw,26px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;letter-spacing:.3px;text-decoration:underline dotted;text-underline-offset:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ts-king-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 7px;margin-top:2px;font:700 12px/1.3 var(--game-font)}
+.ts-king-line b{font:900 26px/1 Impact,'Arial Narrow',sans-serif;font-style:italic}
+.ts-king-line span{opacity:.8}
+.ts-flag{flex:none;align-self:flex-start;width:34px;height:34px;border-radius:10px;border:2px solid #08263c;background:#fff8dc;color:#08263c;font-size:15px;box-shadow:0 2px 0 #08263c}
+.ts-empty-title{margin-top:2px;font:900 clamp(19px,5.2vw,24px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;letter-spacing:.3px;color:#fff8dc;text-shadow:0 2px 0 #08263c}
+.ts-empty-sub{margin-top:4px;font:700 11px/1.35 var(--game-font);color:#c5d8ee}
+.ts-facts{display:flex;gap:6px;flex-wrap:wrap}
+.ts-fact{display:inline-flex;align-items:baseline;gap:5px;padding:5px 10px;border-radius:999px;background:#10243e;border:1px solid #3f6390;color:#b8cdd3;font:700 11px/1 var(--game-font)}
+.ts-fact b{font:900 15px/1 Impact,'Arial Narrow',sans-serif;font-style:italic;color:#ffdb66}
+.ts-fact.you{background:#163f3a;border-color:#4fd6a1}
+.ts-fact.you b{color:#8ff0c4}
+.ts-dist{display:flex;align-items:center;gap:8px;min-height:40px;padding:4px 12px;border:3px solid #09273a;border-radius:15px;background:linear-gradient(120deg,#fff6dc,#fbeac4);color:#09273a;box-shadow:0 3px 0 #09273a}
+.ts-dist-emoji{font-size:20px;flex:none}
+.ts-dist strong{font:900 clamp(15px,4.2vw,19px)/1 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;white-space:nowrap}
+.ts-dist>span:last-child{margin-left:auto;padding-left:10px;border-left:1px solid #b9aa86;font:800 11px/1.2 var(--game-font);text-align:right}
+.ts-dist.here{background:linear-gradient(120deg,#43ce7a,#23a766);border-color:#08263c;color:#08263c;box-shadow:inset 0 0 0 1px #adf0b5,0 3px 0 #08263c}
+.ts-dist.here>span:last-child{border-left-color:#1a7a4a}
+.map-sheet.ts .sheet-section-title{font:800 10px/1.2 var(--game-font);letter-spacing:.14em;text-transform:uppercase;color:#ffe17d;margin:0 0 4px}
+.map-sheet.ts .sheet-leaders{margin:0}
+.ts-actions{margin-top:2px;gap:8px}
+.map-sheet.ts .sheet-actions button.ts-cta{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:8px 14px;border-radius:20px;border:2px solid #fff0ac;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);box-shadow:inset 0 -5px 0 #eaa519,0 3px 0 #071f35;color:#08263c;font:900 clamp(16px,4.8vw,21px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;text-transform:uppercase;text-align:center}
+.map-sheet.ts .sheet-actions button.ts-cta span{font-family:system-ui,sans-serif;font-style:normal}
+.map-sheet.ts .sheet-actions button.ts-cta small{font:700 11px/1.2 var(--game-font);text-transform:none;letter-spacing:0}
+.map-sheet.ts .sheet-actions button.ts-cta:disabled{opacity:1;background:linear-gradient(135deg,#2d4c73,#1c3455);border-color:#567499;color:#c9d8ee;box-shadow:0 3px 0 #08263c}
+.map-sheet.ts .sheet-actions button.ts-cta.far{flex-direction:column;gap:2px}
+.map-sheet.ts .sheet-actions button.ts-cta.go{box-shadow:inset 0 -5px 0 #eaa519,0 0 0 4px #ffd34c33,0 0 18px #ffd34c66,0 3px 0 #071f35}
+.map-sheet.ts .sheet-actions button.ts-secondary{min-height:44px;border:2px solid #497e97;border-radius:15px;background:linear-gradient(145deg,#12384c,#061f35);color:#fff7df;box-shadow:0 3px 0 #08263c;font:800 14px/1 var(--game-font)}
+.map-sheet.ts .sheet-actions button.ts-cta:active:not(:disabled),.map-sheet.ts .sheet-actions button.ts-secondary:active{transform:translateY(2px)}
+@media(prefers-reduced-motion:reduce){.ts-ghost-crown,.ts-throne.held.mine .ts-shine{animation:none}}
