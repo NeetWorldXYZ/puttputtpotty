@@ -46,13 +46,15 @@ function recallThrones(lat: number, lng: number, radiusM: number): NearbyLocatio
     return [];
   }
 }
-function rememberThrones(rows: NearbyLocation[]): void {
-  if (!rows.length) return;
+function rememberThrones(rows: NearbyLocation[], gone: string[] = []): void {
+  if (!rows.length && !gone.length) return;
   try {
     const have = JSON.parse(localStorage.getItem(THRONES_CACHE_KEY) ?? '[]') as NearbyLocation[];
     const m = new Map<string, NearbyLocation>();
     for (const r of have) m.set(r.id, r);
     for (const r of rows) m.set(r.id, r);
+    // Places the server no longer lists (hidden, closed) leave the cache too, or they would haunt the map.
+    for (const id of gone) m.delete(id);
     localStorage.setItem(THRONES_CACHE_KEY, JSON.stringify([...m.values()].slice(-THRONES_CACHE_MAX)));
   } catch {
     /* ignore */
@@ -223,7 +225,7 @@ function FoundSheet({
       <div className="card pop found" onClick={(e) => e.stopPropagation()}>
         <h2>Found a bathroom?</h2>
         <div className="sub">
-          {pin ? `The pin is set, ${fmtDistance(pinDist)} from you.` : `It goes on the map right where you're standing${gpsBad ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}.`}
+          {pin ? `The pin is set, ${fmtDistance(pinDist)} from you.` : `It goes where you're standing${gpsBad ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}. Somewhere else? Drop a pin on the map.`}
           {!isAdmin && ' New places show up for everyone once they are approved.'}
         </div>
         <input className="name-input" maxLength={40} placeholder="What's it called?" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
@@ -238,7 +240,7 @@ function FoundSheet({
         <button className="primary" disabled={trimmed.length < 2 || busy || gpsBad} onClick={() => void submit()}>
           {busy ? 'Adding…' : 'Put it on the map'}
         </button>
-        <button onClick={onDropPin}>{pin ? 'Move the pin' : "It's not where I'm standing"}</button>
+        <button onClick={onDropPin}>{pin ? '📍 Move the pin' : '📍 Drop a pin on the map'}</button>
         <button onClick={onClose}>Cancel</button>
       </div>
     </div>
@@ -579,6 +581,7 @@ export function MapScreen() {
 
   /** Drops a place from the map and the throne list after it was hidden. */
   const forgetPlace = useCallback((id: string) => {
+    rememberThrones([], [id]);
     placesRef.current.delete(id);
     setPlaces([...placesRef.current.values()]);
     setKings((k) => {
@@ -663,8 +666,12 @@ export function MapScreen() {
       }
       try {
         const rows = await api.nearby(lat, lng, WIDE_RADIUS_M);
+        // The live answer is the truth: anything remembered here that the server no longer lists is gone.
+        const live = new Set(rows.map((r) => r.id));
+        const gone = cached.filter((c) => !live.has(c.id)).map((c) => c.id);
+        for (const id of gone) forgetPlace(id);
         applyThrones(lat, lng, rows);
-        rememberThrones(rows);
+        rememberThrones(rows, gone);
         setThronesDown('none');
       } catch {
         setThronesDown(cached.length || Object.keys(kingsRef.current).length ? 'stale' : 'empty');
@@ -676,7 +683,7 @@ export function MapScreen() {
       setLoading(false);
       setThronesSettled(true);
     },
-    [applyThrones],
+    [applyThrones, forgetPlace],
   );
 
   const search = useCallback(
@@ -1101,8 +1108,11 @@ export function MapScreen() {
           onDropPin={() => {
             setFounding(false);
             setPlacing(true);
-            const at = pin ?? fix;
-            mapRef.current?.flyTo({ center: [at.lng, at.lat], zoom: Math.max(mapRef.current.getZoom(), 17), duration: 400 });
+            // Start from where the map already is (the player may have panned to the spot); only an existing pin pulls the view.
+            const map = mapRef.current;
+            if (!map) return;
+            if (pin) map.flyTo({ center: [pin.lng, pin.lat], zoom: Math.max(map.getZoom(), 16), duration: 400 });
+            else if (map.getZoom() < 15) map.easeTo({ zoom: 16, duration: 300 });
           }}
           onClose={() => setFounding(false)}
           onFound={(p, status) => {
@@ -1127,7 +1137,11 @@ export function MapScreen() {
               className="primary"
               onClick={() => {
                 const c = mapRef.current?.getCenter();
-                if (c) setPin({ lat: c.lat, lng: c.lng });
+                if (!c) {
+                  setNotice('The map is not ready yet, try again.');
+                  return;
+                }
+                setPin({ lat: c.lat, lng: c.lng });
                 setPlacing(false);
                 setFounding(true);
               }}
