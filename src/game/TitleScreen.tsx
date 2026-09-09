@@ -18,6 +18,8 @@ import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
 import { MatchIcon } from './MatchIcon';
 import { ClubhouseMap } from './ClubhouseMap';
+import { checkProgress, type PromoEvent } from './progress';
+import { PromoSheet } from './PromoSheet';
 import './Clubhouse.css';
 import { ChallengesSheet, claimable } from './ChallengesSheet';
 import type { ChallengeBoard } from '../net/api';
@@ -60,6 +62,7 @@ export function TitleScreen() {
   } | null>(null);
   const [record, setRecord] = useState<{ won: number; lost: number } | null>(null);
   const [board, setBoard] = useState<ChallengeBoard | null>(null);
+  const [promo, setPromo] = useState<PromoEvent | null>(null);
   const [challenges, setChallenges] = useState(false);
   const daily = dailySeed();
   const edition = dailyEdition(daily);
@@ -88,6 +91,7 @@ export function TitleScreen() {
       if (cancelled) return;
       if (kings.status === 'fulfilled' && kings.value) {
         setThrones(kings.value.thrones);
+        setPromo(checkProgress(kings.value));
         setRecord({ won: kings.value.matches_won ?? 0, lost: Math.max(0, (kings.value.matches ?? 0) - (kings.value.matches_won ?? 0)) });
       }
       if (ch.status === 'fulfilled' && ch.value) setBoard(ch.value);
@@ -270,6 +274,7 @@ export function TitleScreen() {
         <button className="clubhouse-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
+      {promo && <PromoSheet event={promo} onClose={() => setPromo(null)} />}
       {challenges && (
         <ChallengesSheet
           initial={board}

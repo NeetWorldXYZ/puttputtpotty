@@ -11,6 +11,8 @@ import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
 import { ChallengesSheet } from './ChallengesSheet';
+import { checkProgress, levelProgress, nextRank, royalTitle, type PromoEvent } from './progress';
+import { PromoSheet } from './PromoSheet';
 import { useOnline } from '../net/presence';
 
 function ago(iso: string): string {
@@ -18,16 +20,6 @@ function ago(iso: string): string {
   if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`;
   if (s < 86400) return `${Math.round(s / 3600)}h`;
   return `${Math.round(s / 86400)}d`;
-}
-
-/** Bathroom royalty, by thrones held this season. */
-function royalTitle(thrones: number): string {
-  if (thrones >= 10) return 'King of Kings';
-  if (thrones >= 5) return 'Lord of the Loos';
-  if (thrones >= 3) return 'Porcelain Prince';
-  if (thrones >= 2) return 'Duke of Doo';
-  if (thrones >= 1) return 'Throne Holder';
-  return 'Squire';
 }
 
 function relPar(n: number | null): string {
@@ -49,6 +41,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
   const [thrones, setThrones] = useState(false);
   const [challenges, setChallenges] = useState(false);
   const [friends, setFriends] = useState<boolean>(!!addCode);
+  const [promo, setPromo] = useState<PromoEvent | null>(null);
   const [friendRows, setFriendRows] = useState<{ user_id: string; relation: string }[]>([]);
   const isOnline = useOnline();
   const [toast, setToast] = useState<string | null>(null);
@@ -73,7 +66,11 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
     setError(null);
     api
       .profile(id)
-      .then((r) => !cancelled && setP(r))
+      .then((r) => {
+        if (cancelled) return;
+        setP(r);
+        if (r && (userId === null || userId === me)) setPromo(checkProgress(r));
+      })
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
       cancelled = true;
@@ -113,11 +110,16 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
               <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
             )}
             <span className="pf-since">Playing since {memberSince(p.since)}</span>
-            {(p.points ?? 0) > 0 || (p.streak ?? 0) > 0 ? (
-              <span className="pf-points">
-                <b>★ {p.points ?? 0}</b> royal points{(p.streak ?? 0) > 0 ? <> · 🔥 {p.streak}-day streak</> : null}
+            <span className="pf-level">
+              <span className="pf-level-badge">LVL {levelProgress(p.points ?? 0).level}</span>
+              <span className="pf-level-bar" role="progressbar" aria-valuemin={0} aria-valuemax={levelProgress(p.points ?? 0).span} aria-valuenow={levelProgress(p.points ?? 0).into}>
+                <i style={{ width: `${Math.round((100 * levelProgress(p.points ?? 0).into) / levelProgress(p.points ?? 0).span)}%` }} />
               </span>
-            ) : null}
+              <small>
+                <b>{p.points ?? 0}</b> TP · {levelProgress(p.points ?? 0).toNext} to next
+                {(p.streak ?? 0) > 0 ? <> · 🔥 {p.streak}-day</> : null}
+              </small>
+            </span>
             <div className="pf-hero-actions">
               {mine ? (
                 <button className="primary" onClick={() => setEdit(true)}>
@@ -135,7 +137,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             <span className="pf-kingdom-title">
               <GameIcon kind="crown" />
               {mine ? 'Your kingdom' : `${p.name}'s kingdom`}
-              <span>See thrones ›</span>
+              <span>{mine && nextRank(p.thrones) ? `${nextRank(p.thrones)!.title} at ${nextRank(p.thrones)!.at} · ` : ''}See thrones ›</span>
             </span>
             <span className="pf-stats">
               <span>
@@ -181,7 +183,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
               </span>
               <span>
                 <strong>Challenges</strong>
-                <small>Daily and weekly · earn royal points</small>
+                <small>Daily and weekly · earn TP</small>
               </span>
               <b>›</b>
             </button>
@@ -250,6 +252,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
         </div>
       )}
 
+      {promo && <PromoSheet event={promo} onClose={() => setPromo(null)} />}
       {friends && (
         <AccountSheet
           initialMode="friends"
