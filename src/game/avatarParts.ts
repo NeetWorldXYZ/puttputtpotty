@@ -147,7 +147,7 @@ function hatSvg(hat: string): string {
 }
 
 function faceSvg(face: string): string {
-  const eyes = `<path d="M66 69 v2 M94 69 v2" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
+  const eyes = `<ellipse cx="66" cy="70" rx="3.5" ry="4.5" fill="${INK}"/><ellipse cx="94" cy="70" rx="3.5" ry="4.5" fill="${INK}"/><circle cx="65" cy="68.5" r="1" fill="#fff"/><circle cx="93" cy="68.5" r="1" fill="#fff"/>`;
   const smile = `<path d="M67 84 Q80 97 93 84" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
   if (face === 'cool') return `<path d="M52 63 h25 v9 q-12 14 -25 0 Z M83 63 h25 v9 q-12 14 -25 0 Z" fill="${INK}"/><path d="M77 66 h6" stroke="${INK}" stroke-width="4"/>${smile}`;
   if (face === 'sleepy') return `<path d="M59 70 q7 6 14 0 M87 70 q7 6 14 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="88" rx="5" ry="6" fill="${INK}"/>`;
@@ -219,11 +219,15 @@ export function avatarSvg(input: Avatar | null | undefined, id = 'av'): string {
   const av = normalizeAvatar(input);
   const tone = headTones(av.head)[av.porcelain] ?? PORCELAIN[av.porcelain];
   const shirt = SEATS[av.seat].color;
-  return `<path d="M25 151 C25 120 47 104 80 104 C113 104 135 120 135 151 Z" fill="${shirt}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
-<path d="M30 144 H130 V149 H30 Z" fill="${INK}" opacity=".12"/>
+  return `<path d="M52 107 Q80 99 108 107 L129 122 L140 144 L123 151 L114 134 L116 157 Q80 163 44 157 L46 134 L37 151 L20 144 L31 122 Z" fill="${shirt}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
+<path d="M108 111L122 126L132 143L123 146L113 127L111 153Q79 158 48 153L47 158Q82 164 116 157L114 134L123 151L140 144L129 122Z" fill="${INK}" opacity=".15"/>
+<path d="M50 117L39 128L32 140" fill="none" stroke="#fff" opacity=".35" stroke-width="4" stroke-linecap="round"/>
+<path d="M65 108Q80 123 95 108" fill="none" stroke="${INK}" stroke-width="4"/>
+<path d="M88 134L86 121L93 126L98 118L103 126L110 121L108 134Z" fill="#ffd447" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/>
 ${headSvg(av.head, tone)}
 ${faceSvg(av.face)}
 ${hatSvg(av.hat)}
+${av.hat === 'crown' ? '<path d="M51 35H109" stroke="#fff2a2" stroke-width="3" stroke-linecap="round"/>' : ''}
 ${ballSvg(ballLook(av), 132, 146, 13, id)}`;
 }
 

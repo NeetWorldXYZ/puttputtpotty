@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { BALLS, DEFAULT_AVATAR, HEADS, avatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
 
 describe('avatars', () => {
+  it('polishes every existing head without changing saved selections', () => {
+    for (const head of Object.keys(HEADS)) {
+      const av = {...DEFAULT_AVATAR,head,hat:'crown'};
+      const before = JSON.stringify(av);
+      const svg = avatarSvg(av,`polish-${head}`);
+      expect(svg).toContain('M88 134'); // shirt crest
+      expect(svg).toContain('cx="66" cy="70"'); // visible happy eyes
+      expect(svg).not.toContain('NaN');
+      expect(JSON.stringify(av)).toBe(before);
+    }
+  });
   it('normalizes anything into a valid avatar', () => {
     expect(normalizeAvatar(null)).toEqual(DEFAULT_AVATAR);
     expect(normalizeAvatar({ porcelain: 'mint', hat: 'crown', ball: 'tiger', face: 'nope', seat: 42 })).toEqual({ porcelain: 'mint', seat: 'white', hat: 'crown', face: 'happy', ball: 'tiger', head: 'classic' });
