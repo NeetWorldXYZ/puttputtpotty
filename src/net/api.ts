@@ -136,7 +136,7 @@ export interface PlayerProfile {
   best_rel: number | null;
   matches_won: number;
   matches: number;
-  /** Royal points from daily and weekly challenges, and the current daily streak. */
+  /** Throne Points (TP) from challenges, matches, aces, throne runs and daily courses, and the current daily streak. */
   points?: number;
   streak?: number;
   throne_list: { location_id: string; name: string; poi_type: string; score: number; par: number; elapsed_ms: number | null; since: string }[];
@@ -338,7 +338,7 @@ export const api = {
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),
   /** A player's public page: identity, season stats and thrones held. */
-  /** Today's and this week's challenges with your progress, plus royal points and streak. */
+  /** Today's and this week's challenges with your progress, plus challenge TP and streak. */
   async challenges(): Promise<ChallengeBoard | null> {
     await ensureSession();
     const b = await readRpc<ChallengeBoard | null>('challenge_board', {});

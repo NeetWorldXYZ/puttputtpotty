@@ -93,7 +93,7 @@ export function ChallengesSheet({ onClose, initial }: { onClose: (board: Challen
         <h2>Challenges</h2>
         <div className="ch-top">
           <span>
-            <b>{board?.points ?? '–'}</b> royal points
+            <b>{board?.points ?? '–'}</b> TP from challenges
           </span>
           <span>
             <b>🔥 {board?.streak ?? '–'}</b> day streak
