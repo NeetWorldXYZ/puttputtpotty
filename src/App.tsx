@@ -6,6 +6,8 @@ import { stopTheme } from './game/music';
 import { EditorView } from './editor/EditorView';
 import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
+import { InviteBanner } from './game/InviteBanner';
+import { startPresence } from './net/presence';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
@@ -30,6 +32,17 @@ export function App() {
   const loc = useLocation();
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
   useEffect(() => { if (!menu) stopTheme(); }, [menu]);
+  // Friends see you online, and their invites reach you, on every screen.
+  useEffect(() => { startPresence(); }, []);
+  return (
+    <>
+      <Screen loc={loc} />
+      <InviteBanner />
+    </>
+  );
+}
+
+function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
   if (loc.route === 'editor') return <EditorView onExit={() => navigate('play')} />;
   if (loc.route === 'map')
     return (
@@ -46,7 +59,7 @@ export function App() {
   if (loc.route === 'profile')
     return (
       <Suspense fallback={<Loading />}>
-        <ProfileScreen key={loc.user ?? 'me'} userId={loc.user} />
+        <ProfileScreen key={loc.user ?? 'me'} userId={loc.user} addCode={loc.add} />
       </Suspense>
     );
   if (loc.route === 'leaders')

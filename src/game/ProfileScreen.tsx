@@ -11,6 +11,8 @@ import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
 import { ChallengesSheet } from './ChallengesSheet';
+import { FriendsSheet } from './FriendsSheet';
+import { useOnline } from '../net/presence';
 
 function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -39,7 +41,7 @@ function memberSince(iso: string): string {
 }
 
 /** A player's royal card. Your own has an edit button; anyone else's has a report flag. */
-export function ProfileScreen({ userId }: { userId: string | null }) {
+export function ProfileScreen({ userId, addCode = null }: { userId: string | null; addCode?: string | null }) {
   const [me, setMe] = useState<string | null>(null);
   const [p, setP] = useState<PlayerProfile | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,9 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
   const [report, setReport] = useState(false);
   const [thrones, setThrones] = useState(false);
   const [challenges, setChallenges] = useState(false);
+  const [friends, setFriends] = useState<boolean>(!!addCode);
+  const [friendRows, setFriendRows] = useState<{ user_id: string; relation: string }[]>([]);
+  const isOnline = useOnline();
   const [toast, setToast] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
@@ -55,6 +60,14 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
     void currentUserId().then((id) => (id || userId ? setMe(id) : ensureSession().then((s) => setMe(s.user.id)).catch((e: Error) => setError(e.message))));
   }, [userId]);
   const id = userId ?? me;
+  const mineNow = !!me && (userId === null || userId === me);
+  useEffect(() => {
+    if (!mineNow || friends) return;
+    api
+      .friends()
+      .then((rows) => setFriendRows(rows.map((r) => ({ user_id: r.user_id, relation: r.relation }))))
+      .catch(() => {});
+  }, [mineNow, friends]);
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -138,6 +151,24 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
           </button>
 
           {mine && (
+            <button className="pf-challenges pf-friends" onClick={() => setFriends(true)}>
+              <span className="pf-emoji" aria-hidden="true">
+                👥
+              </span>
+              <span>
+                <strong>Friends</strong>
+                <small>{friendRows.filter((f) => f.relation === 'friend').length === 0 ? 'Add friends, see who is on, invite them to a match' : `${friendRows.filter((f) => f.relation === 'friend').length} friends`}</small>
+              </span>
+              {friendRows.some((f) => f.relation === 'incoming') && <span className="pf-badge">{friendRows.filter((f) => f.relation === 'incoming').length}</span>}
+              {friendRows.some((f) => f.relation === 'friend' && isOnline(f.user_id)) && (
+                <span className="pf-count">
+                  <i /> {friendRows.filter((f) => f.relation === 'friend' && isOnline(f.user_id)).length} online
+                </span>
+              )}
+              <b>›</b>
+            </button>
+          )}
+          {mine && (
             <button className="pf-challenges" onClick={() => setChallenges(true)}>
               <span className="pf-emoji" aria-hidden="true">
                 🎯
@@ -213,6 +244,15 @@ export function ProfileScreen({ userId }: { userId: string | null }) {
         </div>
       )}
 
+      {friends && (
+        <FriendsSheet
+          initialQuery={addCode}
+          onClose={() => {
+            setFriends(false);
+            if (addCode) navigate('profile', null, null, { replace: true });
+          }}
+        />
+      )}
       {challenges && (
         <ChallengesSheet
           onClose={() => {

@@ -26,6 +26,8 @@ export interface Location {
   match: string | null;
   /** Player id for the profile page. */
   user: string | null;
+  /** A friend code from a shared link: open the profile with the friends sheet on it. */
+  add: string | null;
 }
 
 export interface NavigateOptions {
@@ -37,6 +39,7 @@ export interface NavigateOptions {
   code?: string | null;
   match?: string | null;
   user?: string | null;
+  add?: string | null;
   /** Replace the history entry instead of pushing one. */
   replace?: boolean;
 }
@@ -50,7 +53,7 @@ function read(): Location {
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
   const nRaw = Number(q.get('n'));
   const n = Number.isInteger(nRaw) && nRaw >= 1 && nRaw <= 36 ? nRaw : null;
-  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n, code: clean(q.get('code')), match: clean(q.get('match')), user: clean(q.get('user')) };
+  return { route, seed: clean(q.get('seed')), course: clean(q.get('course')), loc: clean(q.get('loc')), mode: clean(q.get('mode')), n, code: clean(q.get('code')), match: clean(q.get('match')), user: clean(q.get('user')), add: clean(q.get('add')) };
 }
 
 export function navigate(route: Route, seed: string | null = null, course: string | null = null, extra: NavigateOptions = {}): void {
@@ -67,6 +70,7 @@ export function navigate(route: Route, seed: string | null = null, course: strin
   if (extra.code) q.set('code', extra.code);
   if (extra.match) q.set('match', extra.match);
   if (extra.user) q.set('user', extra.user);
+  if (extra.add) q.set('add', extra.add);
   const qs = q.toString();
   const url = path + (qs ? `?${qs}` : '');
   if (extra.replace) window.history.replaceState(null, '', url);

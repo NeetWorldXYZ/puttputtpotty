@@ -1,0 +1,47 @@
+/* ---- Friends sheet ---- */
+.card.pf-sheet.friends-sheet{position:relative;padding-top:20px}
+.fr-close{position:absolute;top:10px;right:10px}
+.friends-sheet h2{margin-bottom:0}
+.fr-sub{text-align:center;color:#b8cdd3;font:600 12px/1.4 var(--game-font);margin:2px 0 12px}
+.fr-code{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(120deg,#fff6dc,#fbeac4);border:1px solid #09273a;color:#14213d}
+.fr-code>span{flex:1;min-width:0}
+.fr-code small{display:block;font:800 10px/1.3 var(--game-font);letter-spacing:.12em;text-transform:uppercase;color:#735516}
+.fr-code b{display:block;font:900 22px/1.1 Impact,'Arial Narrow',sans-serif;letter-spacing:.06em;color:#14213d;user-select:all}
+.fr-code button.primary{min-height:40px;padding:0 16px;margin:0;border-radius:12px;font:800 14px var(--game-font)}
+.fr-search{margin:10px 0 4px}
+.fr-search .name-input{width:100%;box-sizing:border-box;min-height:44px;border-radius:12px;border:1px solid #45658b;background:#0f2540;color:#fff;padding:0 12px;font:600 15px var(--game-font)}
+.fr-head{margin:12px 0 6px;font:800 10px/1.3 var(--game-font);letter-spacing:.13em;text-transform:uppercase;color:#f8dc85}
+.fr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.fr-row{position:relative;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;border-radius:14px;background:#1b3456;border:1px solid #45658b}
+.fr-row.online{border-color:#4f8a6d;background:#1f3f46}
+.fr-row.invited{border-color:#ffd166;background:#3a3420}
+.fr-row.muted{opacity:.75}
+.fr-av{position:relative;flex:none;display:inline-flex}
+.fr-dot{position:absolute;right:-1px;bottom:2px;width:10px;height:10px;border-radius:50%;background:#6f7f99;border:2px solid #1b3456}
+.fr-row.online .fr-dot{background:#5be3a3;box-shadow:0 0 6px #5be3a3;border-color:#1f3f46}
+.fr-who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
+.fr-who strong{font:800 15px var(--game-font);color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-who small{font:600 11px var(--game-font);color:#b8cdd3;margin-top:2px}
+.fr-row.online .fr-who small{color:#9ff0c6}
+.fr-row.invited .fr-who small{color:#ffe17d}
+.fr-btn{flex:none;min-height:36px;min-width:0;padding:0 14px;margin:0;border-radius:11px;font:800 13px var(--game-font);border:1px solid #45658b;background:#10243e;color:#dbe8f7;box-shadow:0 2px 0 #091a30}
+.fr-btn.primary{border:1px solid #ffe9a0;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);color:#14213d;box-shadow:inset 0 -3px 0 #eaa519,0 2px 0 #a97718}
+.fr-more{flex:none;width:34px;min-width:0;min-height:36px;padding:0;margin:0;border-radius:11px;border:1px solid #45658b;background:transparent;color:#dbe8f7;font-size:18px;line-height:1}
+.fr-menu{position:absolute;right:8px;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;min-width:160px;padding:6px;border-radius:12px;background:#0f2540;border:1px solid #45658b;box-shadow:0 6px 16px #00000066}
+.fr-menu button{min-height:36px;margin:0;padding:0 10px;border:0;border-radius:8px;background:transparent;color:#fff;text-align:left;font:700 13px var(--game-font);box-shadow:none}
+.fr-menu button.danger{color:#ffb3c6}
+.fr-empty{padding:10px 12px;border-radius:12px;border:1px dashed #45658b;color:#b8cdd3;font:600 12px/1.4 var(--game-font)}
+.fr-toast{position:sticky;bottom:0;margin-top:10px;padding:8px 12px;border-radius:12px;background:#ffd166;color:#14213d;font:800 13px var(--game-font);text-align:center}
+.friends-sheet .err{margin-top:8px}
+
+/* ---- Friends tile on the profile ---- */
+.pf-friends .pf-count{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:800 12px var(--game-font);color:#ffe17d;white-space:nowrap}
+.pf-friends .pf-count i{width:8px;height:8px;border-radius:50%;background:#5be3a3;box-shadow:0 0 6px #5be3a3}
+.pf-friends .pf-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#ff5f7e;color:#fff;font:900 11px var(--game-font)}
+
+/* ---- Invite banner ---- */
+.invite-banner{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:1200;display:flex;align-items:center;gap:10px;padding:10px 10px 10px 12px;border-radius:18px;background:linear-gradient(145deg,#12384c,#061f35);border:2px solid #ffd166;box-shadow:0 6px 0 #08263c,0 10px 24px #00000066;color:#fff7df;animation:invite-in .35s cubic-bezier(.2,1.3,.4,1)}
+@keyframes invite-in{from{transform:translateY(-120%);opacity:0}}
+.invite-banner .fr-who strong{font-size:14px}
+.invite-banner .fr-who small{color:#ffe17d}
+.invite-banner .fr-btn{min-height:38px}
