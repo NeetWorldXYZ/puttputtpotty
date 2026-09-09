@@ -137,7 +137,11 @@ export function unlockAudio(): void {
     master.connect(ctx.destination);
     loadCheerSamples();
     // Render the theme loop now, during the tap, so it starts without a pause and never depends on timers.
-    primeTheme(ctx.sampleRate);
+    try {
+      primeTheme(ctx.sampleRate);
+    } catch {
+      /* the theme falls back to its timer scheduler */
+    }
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
     syncAudioVisibility();
   } catch {

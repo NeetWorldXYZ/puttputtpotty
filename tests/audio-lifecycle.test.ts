@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../src/game/music', () => ({ stinger: vi.fn() }));
+vi.mock('../src/game/music', () => ({ stinger: vi.fn(), primeTheme: vi.fn() }));
 
 class FakeContext {
   static last: FakeContext;
