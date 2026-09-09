@@ -98,7 +98,26 @@ export interface PlayerProfile {
   best_rel: number | null;
   matches_won: number;
   matches: number;
+  /** Royal points from daily and weekly challenges, and the current daily streak. */
+  points?: number;
+  streak?: number;
   throne_list: { location_id: string; name: string; poi_type: string; score: number; par: number; elapsed_ms: number | null; since: string }[];
+}
+
+export interface ChallengeItem {
+  key: string;
+  title: string;
+  emoji: string;
+  goal: number;
+  progress: number;
+  points: number;
+  claimed: boolean;
+}
+export interface ChallengeBoard {
+  daily: { period: string; resets_at: string; items: ChallengeItem[] };
+  weekly: { period: string; resets_at: string; items: ChallengeItem[] };
+  points: number;
+  streak: number;
 }
 
 export interface DailyRow {
@@ -275,6 +294,18 @@ export const api = {
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),
   /** A player's public page: identity, season stats and thrones held. */
+  /** Today's and this week's challenges with your progress, plus royal points and streak. */
+  async challenges(): Promise<ChallengeBoard | null> {
+    await ensureSession();
+    return await readRpc<ChallengeBoard | null>('challenge_board', {});
+  },
+  /** Collects the points for a finished challenge. The server re-checks progress. */
+  async claimChallenge(period: string, key: string): Promise<number> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('claim_challenge', { in_period: period, in_key: key });
+    if (error) throw new Error(error.message.replace(/^.*?: /, ''));
+    return Number(data ?? 0);
+  },
   async profile(userId: string): Promise<PlayerProfile | null> {
     return await readRpc<PlayerProfile | null>('player_profile', { in_user: userId });
   },

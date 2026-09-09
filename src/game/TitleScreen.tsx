@@ -19,6 +19,8 @@ import { GameIcon } from './GameIcon';
 import { MatchIcon } from './MatchIcon';
 import { ClubhouseMap } from './ClubhouseMap';
 import './Clubhouse.css';
+import { ChallengesSheet, claimable } from './ChallengesSheet';
+import type { ChallengeBoard } from '../net/api';
 
 const SHOW_THEMES = ['diveBar', 'spaceship', 'tropical', 'castle', 'stadium', 'grandma'];
 const FLOATERS = ['🧻', '🪠', '🦆', '⛳', '🧼', '🚽', '🧻', '🪠', '⛳', '🦆'];
@@ -50,6 +52,8 @@ export function TitleScreen() {
     rank: number;
     of: number;
   } | null>(null);
+  const [board, setBoard] = useState<ChallengeBoard | null>(null);
+  const [challenges, setChallenges] = useState(false);
   const daily = dailySeed();
   const edition = dailyEdition(daily);
   const best = getBest(daily);
@@ -68,13 +72,15 @@ export function TitleScreen() {
       const prof = await loadProfile();
       if (prof?.name && !cancelled) setName(prof.name);
       const fix = recallFix();
-      const [kings, near, board] = await Promise.allSettled([
+      const [kings, near, board, ch] = await Promise.allSettled([
         api.profile(me),
         fix ? api.nearby(fix.lat, fix.lng, 25000) : Promise.resolve([]),
         played ? api.leaderboard(daily) : Promise.resolve([]),
+        api.challenges(),
       ]);
       if (cancelled) return;
       if (kings.status === 'fulfilled' && kings.value) setThrones(kings.value.thrones);
+      if (ch.status === 'fulfilled' && ch.value) setBoard(ch.value);
       if (near.status === 'fulfilled' && fix)
         setNearby({
           total: near.value.length,
@@ -195,6 +201,9 @@ export function TitleScreen() {
             <button className="icon-btn" aria-label="How to play" onClick={() => go(() => setHelp(true))}>
               ❓
             </button>
+            <button className="icon-btn ch-btn" aria-label={`Challenges${claimable(board) ? `, ${claimable(board)} ready to claim` : ''}`} onClick={() => go(() => setChallenges(true))}>
+              🎯{claimable(board) > 0 && <span className="ch-badge">{claimable(board)}</span>}
+            </button>
           </div>
           <button className="player-chip corner" onClick={() => go(() => setAskName(true))}>
             <Avatar av={avatar} size={26} className="chip-avatar" />
@@ -225,6 +234,15 @@ export function TitleScreen() {
         <button className="clubhouse-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
       <TabBar active="play" />
+      {challenges && (
+        <ChallengesSheet
+          initial={board}
+          onClose={(b) => {
+            setChallenges(false);
+            if (b) setBoard(b);
+          }}
+        />
+      )}
       {custom && (
         <div className="overlay" onClick={() => setCustom(false)}>
           <div className="card pop custom-sheet" role="dialog" aria-modal="true" aria-label="Custom game" onClick={(e) => e.stopPropagation()}>
