@@ -74,6 +74,7 @@ export interface MatchRow {
   finished_at: string | null;
   p1_avatar: Avatar | null;
   p2_avatar: Avatar | null;
+  created_at?: string;
   /** Set when the opponent is a bot; the bot's cumulative hole clock (ms) is only sent to the player who faces it. */
   p2_bot?: boolean;
   bot_times?: number[] | null;
@@ -269,8 +270,9 @@ export const api = {
   async cancelMatch(id: string): Promise<void> {
     await supabase.rpc('cancel_match', { in_id: id });
   },
-  async matchState(id: string): Promise<MatchRow> {
-    const { data, error } = await supabase.rpc('match_state', { in_id: id });
+  /** The match as the server sees it. `quick` seats a bot after two seconds instead of ten (testing alone). */
+  async matchState(id: string, quick = false): Promise<MatchRow> {
+    const { data, error } = await supabase.rpc('match_state', quick ? { in_id: id, in_quick: true } : { in_id: id });
     if (error) throw new Error(error.message);
     return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },
