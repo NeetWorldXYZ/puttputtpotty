@@ -11,7 +11,6 @@ import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
 import { ChallengesSheet } from './ChallengesSheet';
-import { FriendsSheet } from './FriendsSheet';
 import { useOnline } from '../net/presence';
 
 function ago(iso: string): string {
@@ -245,15 +244,17 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
       )}
 
       {friends && (
-        <FriendsSheet
-          initialQuery={addCode}
+        <AccountSheet
+          initialMode="friends"
+          addCode={addCode}
           onClose={() => {
             setFriends(false);
+            setReload((n) => n + 1);
             if (addCode) navigate('profile', null, null, { replace: true });
           }}
         />
       )}
-      {challenges && (
+            {challenges && (
         <ChallengesSheet
           onClose={() => {
             setChallenges(false);
@@ -263,6 +264,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
       )}
       {edit && (
         <AccountSheet
+          initialMode="look"
           onClose={() => {
             setEdit(false);
             setReload((n) => n + 1);

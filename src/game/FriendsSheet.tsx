@@ -28,9 +28,9 @@ function relationLabel(r: FriendRelation): string {
 /**
  * Your friends: who is on, who wants in, and a Play button that opens an
  * invite match and pokes them. Add people by their code (shared from here)
- * or by the start of their name.
+ * or by the start of their name. Lives inside the player locker.
  */
-export function FriendsSheet({ initialQuery, onClose }: { initialQuery?: string | null; onClose: (count?: { friends: number; online: number }) => void }) {
+export function FriendsPanel({ initialQuery }: { initialQuery?: string | null }) {
   const [rows, setRows] = useState<FriendRow[] | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [query, setQuery] = useState(initialQuery ?? '');
@@ -153,15 +153,9 @@ export function FriendsSheet({ initialQuery, onClose }: { initialQuery?: string 
   const incoming = rows?.filter((r) => r.relation === 'incoming') ?? [];
   const outgoing = rows?.filter((r) => r.relation === 'outgoing') ?? [];
   const onlineCount = friends.filter((f) => isOnline(f.user_id)).length;
-  const close = () => onClose(rows ? { friends: friends.length, online: onlineCount } : undefined);
 
   return (
-    <div className="overlay" onClick={close}>
-      <div className="card pop pf-sheet friends-sheet" role="dialog" aria-modal="true" aria-label="Friends" onClick={(e) => e.stopPropagation()}>
-        <button className="sheet-close fr-close" onClick={close} aria-label="Close">
-          ×
-        </button>
-        <h2>Friends</h2>
+    <div className="friends-panel">
         <div className="fr-sub">{rows === null ? 'Loading…' : friends.length === 0 ? 'Nobody yet. Share your code or find a name.' : `${friends.length} ${friends.length === 1 ? 'friend' : 'friends'} · ${onlineCount} online`}</div>
 
         <div className="fr-code">
@@ -284,7 +278,6 @@ export function FriendsSheet({ initialQuery, onClose }: { initialQuery?: string 
 
         {err && <div className="err">{err}</div>}
         {toast && <div className="fr-toast">{toast}</div>}
-      </div>
     </div>
   );
 }
