@@ -1,4 +1,5 @@
-/** Human golfer portraits. Legacy porcelain/seat keys retain saved profile compatibility. */
+/** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
+import { renderAvatarArt, renderAvatarPart } from './avatarArt';
 
 export interface Avatar {
   /** Skin tone for the classic golfer; for the other heads, that head's colour. */
@@ -75,32 +76,34 @@ export const PORCELAIN: Record<string, { top: string; bottom: string; label: str
 };
 
 export const SEATS: Record<string, { color: string; label: string }> = {
-  white: { color: '#63bdcb', label: 'Teal' },
+  white: { color: '#fff8e5', label: 'White' },
   ink: { color: '#1f2a44', label: 'Black' },
   red: { color: '#ff5f7e', label: 'Red' },
   blue: { color: '#4db8ff', label: 'Blue' },
-  wood: { color: '#c8874a', label: 'Clay' },
+  wood: { color: '#ffc943', label: 'Pizza' },
   gold: { color: '#ffd447', label: 'Gold' },
 };
 
-export const HATS: Record<string, string> = { none: 'No hat', crown: 'Crown', cap: 'Cap', tophat: 'Top hat', plunger: 'Plunger', halo: 'Halo' };
-export const FACES: Record<string, string> = { happy: 'Happy', cool: 'Cool', sleepy: 'Sleepy', angry: 'Fired up', wink: 'Wink' };
+export const HATS: Record<string, string> = { none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo' };
+// The old sleepy slot becomes the moustache design; other face choices retain their identity.
+export const FACES: Record<string, string> = { happy: 'Default', cool: 'Cool', wink: 'Wink', angry: 'Angry', sleepy: 'Mustache' };
 
 export interface BallLook {
   color: string;
   pattern: 'plain' | 'stripe' | 'dots';
   accent: string;
   label: string;
+  motif?: 'eight' | 'fire' | 'gold';
 }
 export const BALLS: Record<string, BallLook> = {
   white: { color: '#ffffff', pattern: 'plain', accent: '#c4cfdb', label: 'Classic' },
-  tomato: { color: '#ff6f3c', pattern: 'plain', accent: '#ffb08a', label: 'Tomato' },
-  lemon: { color: '#ffd447', pattern: 'plain', accent: '#fff0a8', label: 'Lemon' },
-  lime: { color: '#7ed957', pattern: 'plain', accent: '#c6f2a8', label: 'Lime' },
+  tomato: { color: '#ff6f3c', pattern: 'plain', accent: '#ffcf51', label: 'Fire', motif: 'fire' },
+  lemon: { color: '#ffd447', pattern: 'plain', accent: '#fff0a8', label: 'Gold', motif: 'gold' },
+  lime: { color: '#7ed957', pattern: 'plain', accent: '#c6f2a8', label: 'Green' },
   sky: { color: '#4db8ff', pattern: 'plain', accent: '#b3e1ff', label: 'Sky' },
   grape: { color: '#9b6bff', pattern: 'plain', accent: '#d4c1ff', label: 'Grape' },
   bubblegum: { color: '#ff8fc8', pattern: 'plain', accent: '#ffd0e8', label: 'Bubblegum' },
-  ink: { color: '#1f2a44', pattern: 'plain', accent: '#5a6474', label: 'Eight ball' },
+  ink: { color: '#1f2a44', pattern: 'plain', accent: '#5a6474', label: '8 Ball', motif: 'eight' },
   stripe: { color: '#ffffff', pattern: 'stripe', accent: '#ff5f7e', label: 'Racing stripe' },
   dots: { color: '#ffffff', pattern: 'dots', accent: '#4db8ff', label: 'Polka' },
   tiger: { color: '#ff9f1c', pattern: 'stripe', accent: '#1f2a44', label: 'Tiger' },
@@ -126,109 +129,18 @@ export function ballLook(av: Avatar | null | undefined): BallLook {
   return BALLS[av?.ball ?? ''] ?? BALLS.white;
 }
 
-const INK = '#1f2a44';
-
-function hatSvg(hat: string): string {
-  switch (hat) {
-    case 'crown':
-      return `<path d="M44 40 L52 16 L66 30 L80 8 L94 30 L108 16 L116 40 Z" fill="#ffc63a" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
-<circle cx="52" cy="16" r="4.5" fill="#ff6f3c" stroke="${INK}" stroke-width="3"/><circle cx="80" cy="8" r="5" fill="#ff6f3c" stroke="${INK}" stroke-width="3"/><circle cx="108" cy="16" r="4.5" fill="#ff6f3c" stroke="${INK}" stroke-width="3"/>`;
-    case 'cap':
-      return `<path d="M42 42 Q80 4 118 42 Z" fill="#ff5f7e" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/><rect x="104" y="34" width="30" height="9" rx="4.5" fill="#ff5f7e" stroke="${INK}" stroke-width="4"/><circle cx="80" cy="8" r="4" fill="#fff" stroke="${INK}" stroke-width="3"/>`;
-    case 'tophat':
-      return `<rect x="56" y="2" width="48" height="40" rx="4" fill="${INK}"/><rect x="44" y="34" width="72" height="10" rx="5" fill="${INK}"/><rect x="56" y="28" width="48" height="7" fill="#ff5f7e"/>`;
-    case 'plunger':
-      return `<rect x="76" y="0" width="8" height="30" rx="3" fill="#c8874a" stroke="${INK}" stroke-width="3"/><path d="M58 42 Q80 18 102 42 Z" fill="#c0392b" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>`;
-    case 'halo':
-      return `<ellipse cx="80" cy="12" rx="30" ry="7" fill="none" stroke="#ffd447" stroke-width="6"/><ellipse cx="80" cy="12" rx="30" ry="7" fill="none" stroke="${INK}" stroke-width="2" opacity="0.5"/>`;
-    default:
-      return '';
-  }
-}
-
-function faceSvg(face: string): string {
-  const eyes = `<ellipse cx="66" cy="70" rx="3.5" ry="4.5" fill="${INK}"/><ellipse cx="94" cy="70" rx="3.5" ry="4.5" fill="${INK}"/><circle cx="65" cy="68.5" r="1" fill="#fff"/><circle cx="93" cy="68.5" r="1" fill="#fff"/>`;
-  const smile = `<path d="M67 84 Q80 97 93 84" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`;
-  if (face === 'cool') return `<path d="M52 63 h25 v9 q-12 14 -25 0 Z M83 63 h25 v9 q-12 14 -25 0 Z" fill="${INK}"/><path d="M77 66 h6" stroke="${INK}" stroke-width="4"/>${smile}`;
-  if (face === 'sleepy') return `<path d="M59 70 q7 6 14 0 M87 70 q7 6 14 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/><ellipse cx="80" cy="88" rx="5" ry="6" fill="${INK}"/>`;
-  if (face === 'angry') return `${eyes}<path d="M59 60 l14 4 M101 60 l-14 4 M68 88 q12 -7 24 0" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
-  if (face === 'wink') return `<path d="M66 69 v2 M87 71 Q94 65 101 71" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>${smile}`;
-  return `${eyes}${smile}`;
-}
-
-function ballSvg(look: BallLook, cx: number, cy: number, r: number, id: string): string {
-  let pattern = '';
-  if (look.pattern === 'stripe') pattern = `<rect x="${cx - r}" y="${cy - r * 0.28}" width="${r * 2}" height="${r * 0.56}" fill="${look.accent}" clip-path="url(#${id}-clip)"/>`;
-  else if (look.pattern === 'dots')
-    pattern = [
-      [-0.45, -0.35],
-      [0.4, -0.45],
-      [-0.1, 0.15],
-      [0.45, 0.35],
-      [-0.5, 0.4],
-    ]
-      .map(([dx, dy]) => `<circle cx="${cx + dx * r}" cy="${cy + dy * r}" r="${r * 0.18}" fill="${look.accent}" clip-path="url(#${id}-clip)"/>`)
-      .join('');
-  else pattern = [[-0.38, -0.38], [0.24, -0.45], [-0.15, 0.15], [0.38, 0.23]].map(([dx, dy]) => `<circle cx="${cx + dx * r}" cy="${cy + dy * r}" r="${r * 0.14}" fill="${look.accent}" opacity="0.8"/>`).join('');
-  return `<clipPath id="${id}-clip"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath><circle cx="${cx}" cy="${cy}" r="${r}" fill="${look.color}" stroke="${INK}" stroke-width="4.5"/>${pattern}<circle cx="${cx - r * 0.35}" cy="${cy - r * 0.35}" r="${r * 0.22}" fill="#fff" opacity="0.85"/>`;
-}
-
-/** The head itself, no face: each one fills the same circle the classic golfer's head does, so faces and hats land right. */
-function headSvg(head: string, tone: { top: string; bottom: string }): string {
-  const shade = `<path d="M102 47 A36 36 0 0 1 59 103 A36 36 0 0 0 102 47" fill="${tone.bottom}" opacity=".35"/>`;
-  switch (head) {
-    case 'roll':
-      // A roll of paper seen a little from above: the body, the top with its hollow core, a loose sheet.
-      return `<path d="M122 95 q10 -4 12 12 q-8 6 -14 -2 Z" fill="${tone.top}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-<rect x="44" y="40" width="72" height="68" rx="10" fill="${tone.top}" stroke="${INK}" stroke-width="7"/>
-<path d="M104 44 v60 a12 6 0 0 1 -6 3 v-63 Z" fill="${tone.bottom}" opacity=".5"/>
-<ellipse cx="80" cy="40" rx="36" ry="12" fill="${tone.top}" stroke="${INK}" stroke-width="7"/>
-<ellipse cx="80" cy="40" rx="13" ry="4.5" fill="${tone.bottom}" stroke="${INK}" stroke-width="5"/>`;
-    case 'turd':
-      // A soft-serve swirl: one wide, smooth body carrying the face, a coil line either side, a curl on top.
-      return `<path d="M40 110 C28 110 30 92 44 90 C34 76 46 62 60 62 C58 48 74 38 84 40 C80 32 88 24 96 30 C102 34 100 42 94 44 C106 46 112 60 104 66 C120 70 122 90 112 92 C128 94 126 110 116 110 Z" fill="${tone.top}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
-<path d="M44 90 C56 86 70 84 80 84" fill="none" stroke="${tone.bottom}" stroke-width="4" stroke-linecap="round" opacity=".75"/>
-<path d="M104 66 C96 64 88 62 80 62" fill="none" stroke="${tone.bottom}" stroke-width="4" stroke-linecap="round" opacity=".75"/>
-<path d="M60 62 C66 58 74 56 80 56" fill="none" stroke="${tone.bottom}" stroke-width="3.5" stroke-linecap="round" opacity=".5"/>
-<path d="M112 92 C102 92 92 92 84 94" fill="none" stroke="${tone.bottom}" stroke-width="3.5" stroke-linecap="round" opacity=".5"/>
-<path d="M90 36 C92 30 98 30 98 34" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".55"/>`;
-    case 'alien':
-      // A big cranium and a small chin; the face sits low.
-      return `<path d="M80 28 C124 28 124 74 106 96 C98 107 62 107 54 96 C36 74 36 28 80 28 Z" fill="${tone.top}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
-<path d="M108 50 C114 70 104 90 96 98 C106 86 112 68 108 50 Z" fill="${tone.bottom}" opacity=".4"/>`;
-    case 'dawg':
-      // A bulldog: a wide head with heavy jowls, ears flopping out from the top corners, a broad muzzle and a big nose.
-      return `<path d="M50 46 C38 40 26 52 30 66 C32 76 42 82 52 78 Z" fill="${tone.bottom}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-<path d="M110 46 C122 40 134 52 130 66 C128 76 118 82 108 78 Z" fill="${tone.bottom}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-<path d="M44 58 C44 36 116 36 116 58 L118 84 C118 98 108 108 96 108 L64 108 C52 108 42 98 42 84 Z" fill="${tone.top}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
-<path d="M52 92 C52 78 108 78 108 92 C108 104 98 110 80 110 C62 110 52 104 52 92 Z" fill="#fff7ea" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
-<path d="M56 100 C60 108 72 110 80 110 C88 110 100 108 104 100" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round" opacity=".5"/>
-<ellipse cx="80" cy="79" rx="10" ry="6.5" fill="${INK}"/>
-<circle cx="76" cy="77" r="2.2" fill="#fff" opacity=".7"/>
-<path d="M80 85 v5" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>
-<path d="M62 50 q18 -8 36 0" fill="none" stroke="${tone.bottom}" stroke-width="4" stroke-linecap="round" opacity=".55"/>`;
-    default:
-      return `<circle cx="80" cy="73" r="36" fill="${tone.top}" stroke="${INK}" stroke-width="7"/>${shade}`;
-  }
-}
-
 export const AVATAR_VIEWBOX = '0 0 160 170';
 
-/** SVG markup for an avatar. `id` keeps gradient ids unique when several are on one page. */
+/** Shared artwork used by profiles, rankings, matches, and the dressing room. */
 export function avatarSvg(input: Avatar | null | undefined, id = 'av'): string {
   const av = normalizeAvatar(input);
-  const tone = headTones(av.head)[av.porcelain] ?? PORCELAIN[av.porcelain];
-  const shirt = SEATS[av.seat].color;
-  return `<path d="M52 107 Q80 99 108 107 L129 122 L140 144 L123 151 L114 134 L116 157 Q80 163 44 157 L46 134 L37 151 L20 144 L31 122 Z" fill="${shirt}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/>
-<path d="M108 111L122 126L132 143L123 146L113 127L111 153Q79 158 48 153L47 158Q82 164 116 157L114 134L123 151L140 144L129 122Z" fill="${INK}" opacity=".15"/>
-<path d="M50 117L39 128L32 140" fill="none" stroke="#fff" opacity=".35" stroke-width="4" stroke-linecap="round"/>
-<path d="M65 108Q80 123 95 108" fill="none" stroke="${INK}" stroke-width="4"/>
-<path d="M88 134L86 121L93 126L98 118L103 126L110 121L108 134Z" fill="#ffd447" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/>
-${headSvg(av.head, tone)}
-${faceSvg(av.face)}
-${hatSvg(av.hat)}
-${av.hat === 'crown' ? '<path d="M51 35H109" stroke="#fff2a2" stroke-width="3" stroke-linecap="round"/>' : ''}
-${ballSvg(ballLook(av), 132, 146, 13, id)}`;
+  return renderAvatarArt(av, headTones(av.head)[av.porcelain], SEATS[av.seat].color, ballLook(av), id);
+}
+
+export function avatarPartSvg(input: Avatar, part: keyof Avatar, id: string): {markup:string;viewBox:string} {
+  const av = normalizeAvatar(input);
+  const tone = part === 'face' ? PORCELAIN.white : headTones(av.head)[av.porcelain];
+  return renderAvatarPart(av, part, tone, SEATS[av.seat].color, ballLook(av), id);
 }
 
 /** A new player's first look: any of the five heads in any colour, the rest kept plain so the editor has somewhere to go. */

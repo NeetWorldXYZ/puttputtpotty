@@ -24,11 +24,6 @@
 .locker .sub{color:#b8cdd3;font:600 13px/1.5 var(--game-font);margin:0 0 10px}.locker .sub.small{font-size:12px}
 .locker .link-code{margin:10px 0;padding:12px;text-align:center;border-radius:14px;background:linear-gradient(120deg,#fff6dc,#fbeac4);border:1px solid #09273a;color:#14213d;font:900 36px Impact,'Arial Narrow',sans-serif;letter-spacing:5px;user-select:all}
 .locker .lb-note{color:#b8cdd3;font:600 13px var(--game-font);text-align:center;padding:10px}
-/* Look editor (opened from the profile's Edit my look) */
-.locker .look-preview{margin:0 0 10px;padding:10px;border:1px solid #09273a;border-radius:18px;background:repeating-linear-gradient(135deg,#ffffff08 0 24px,transparent 24px 48px),#217650;box-shadow:0 3px 0 #08263c;text-align:center}.locker .look-preview .avatar{filter:drop-shadow(0 7px 0 #092b4044)}
-.locker .locker-categories{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}.card.account.locker .locker-categories button{font:800 11px var(--game-font);padding:0 1px;min-height:38px;margin:0;border:1px solid #45658b;border-radius:10px;background:#1b3456;color:#dbe8f7;box-shadow:0 2px 0 #091a30}.card.account.locker .locker-categories button[aria-pressed=true]{background:linear-gradient(135deg,#ffed95,#ffd12b 65%);border-color:#ffe9a0;color:#14213d;box-shadow:inset 0 -3px 0 #eaa519}
-.locker .look-chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:3px}
-.card.account.locker .look-chips .chip{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;margin:0;padding:7px 3px;background:#1b3456;border:1px solid #45658b;color:#fff7df;border-radius:13px;font:700 11px var(--game-font);box-shadow:0 2px 0 #091a30;min-height:88px}.card.account.locker .look-chips .chip.active{background:#24483d;border-color:#ffd166;box-shadow:inset 0 0 0 1px #ffd166}.locker .look-chips .swatch{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;border:1px solid #08263c}
 /* Account tab */
 .locker-account-status{padding:16px;border-radius:16px;background:linear-gradient(120deg,#fff6dc,#fbeac4);border:1px solid #09273a;box-shadow:0 3px 0 #08263c;color:#14213d}.locker-account-status strong{display:block;font:900 24px/1.1 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;color:#14213d}.locker-account-status p{margin:6px 0 0;font:600 13px/1.5 var(--game-font);color:#5c5135;overflow-wrap:anywhere}
 .card.account.locker .acct-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card.account.locker .acct-links button{margin:0;min-height:58px;white-space:normal;padding:8px;border:1px solid #45658b;border-radius:14px;background:#1b3456;color:#dbe8f7;font:800 14px var(--game-font);box-shadow:0 3px 0 #091a30}
@@ -39,4 +34,4 @@
 .card.account.locker .friends-panel .fr-btn{padding:0 14px}
 .card.account.locker .friends-panel .fr-more{width:34px;padding:0}
 .card.account.locker .friends-panel .fr-menu button{width:100%}
-@media(max-height:620px){.card.account.locker{padding:12px}.locker .look-chips .chip{min-height:76px}}
+@media(max-height:620px){.card.account.locker{padding:12px}}
