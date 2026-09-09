@@ -621,7 +621,11 @@ export function MapScreen() {
   /** Adds places to the pin set, dropping the farthest from the search centre past the cap. */
   const addPlaces = useCallback((lat: number, lng: number, incoming: OsmPlace[]) => {
     const m = placesRef.current;
-    for (const p of incoming) m.set(p.id, p);
+    for (const p of incoming) {
+      // Our database's name for a place (renamed by players) beats the map source's.
+      const ours = kingsRef.current[p.id]?.name;
+      m.set(p.id, ours && ours !== p.name ? { ...p, name: ours } : p);
+    }
     // Claimed bathrooms and places players founded by hand must never be absorbed: keep them ahead of anything else.
     const claimedIds = new Set(Object.values(kingsRef.current).filter((k) => k.king_name).map((k) => k.id));
     for (const id of m.keys()) if (id.startsWith('ppp:')) claimedIds.add(id);
@@ -783,7 +787,8 @@ export function MapScreen() {
         el.addEventListener('click', (ev) => {
           ev.stopPropagation();
           unlockAudio();
-          setSelected(p);
+          // The freshest copy of the place (a rename since the marker was made must show).
+          setSelected(placesRef.current.get(p.id) ?? p);
         });
         const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lng, p.lat]).addTo(map);
         m = { marker, el };
