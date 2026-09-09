@@ -33,6 +33,10 @@ function untilTomorrowUtc(): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+const relPar = (d: number) => (d === 0 ? 'E' : d > 0 ? `+${d}` : `${d}`);
+const dailyStatLabel = (best: number | null, r: { rank: number; of: number; total: number; par: number } | null) =>
+  r ? `You shot ${r.total}, ${relPar(r.total - r.par)}, rank ${r.rank} of ${r.of}` : best !== null ? `You shot ${best}` : 'See your results';
+
 export function TitleScreen() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [name, setName] = useState(getSavedName());
@@ -51,7 +55,10 @@ export function TitleScreen() {
   const [dailyRank, setDailyRank] = useState<{
     rank: number;
     of: number;
+    total: number;
+    par: number;
   } | null>(null);
+  const [record, setRecord] = useState<{ won: number; lost: number } | null>(null);
   const [board, setBoard] = useState<ChallengeBoard | null>(null);
   const [challenges, setChallenges] = useState(false);
   const daily = dailySeed();
@@ -75,11 +82,14 @@ export function TitleScreen() {
       const [kings, near, board, ch] = await Promise.allSettled([
         api.profile(me),
         fix ? api.nearby(fix.lat, fix.lng, 25000) : Promise.resolve([]),
-        played ? api.leaderboard(daily) : Promise.resolve([]),
+        api.dailyStanding(daily),
         api.challenges(),
       ]);
       if (cancelled) return;
-      if (kings.status === 'fulfilled' && kings.value) setThrones(kings.value.thrones);
+      if (kings.status === 'fulfilled' && kings.value) {
+        setThrones(kings.value.thrones);
+        setRecord({ won: kings.value.matches_won ?? 0, lost: Math.max(0, (kings.value.matches ?? 0) - (kings.value.matches_won ?? 0)) });
+      }
       if (ch.status === 'fulfilled' && ch.value) setBoard(ch.value);
       if (near.status === 'fulfilled' && fix)
         setNearby({
@@ -87,10 +97,7 @@ export function TitleScreen() {
           claimed: near.value.filter((l) => l.king_name).length,
           mine: near.value.filter((l) => l.king_user === me).length,
         });
-      if (board.status === 'fulfilled') {
-        const i = board.value.findIndex((r) => r.user_id === me);
-        if (i >= 0) setDailyRank({ rank: i + 1, of: board.value.length });
-      }
+      if (board.status === 'fulfilled' && board.value) setDailyRank(board.value);
     })();
     return () => {
       cancelled = true;
@@ -227,9 +234,38 @@ export function TitleScreen() {
         </button>
         <section className="clubhouse-secondary" aria-label="More ways to play">
           <button aria-label={`Daily challenge · ${edition} · Next round in ${untilTomorrowUtc()}`} onClick={() => go(() => (played ? navigate('leaders') : goToCourse('daily')), played ? 'tap' : 'whoosh')}>
-            <GameIcon kind="flag" /><span><strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong><small>{played ? (best !== null ? `You shot ${best}${dailyRank ? ` · #${dailyRank.rank}` : ''}` : 'See your results') : 'A new course every day'}</small></span><b aria-hidden="true">›</b>
+            <GameIcon kind="flag" />
+            <span>
+              <strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong>
+              {played ? (
+                <span className="sec-stat" aria-label={dailyStatLabel(best, dailyRank)}>
+                  {(dailyRank?.total ?? best) !== null && <b className="sec-num">{dailyRank?.total ?? best}</b>}
+                  {dailyRank && <i className={dailyRank.total - dailyRank.par < 0 ? 'under' : dailyRank.total - dailyRank.par > 0 ? 'over' : ''}>{relPar(dailyRank.total - dailyRank.par)}</i>}
+                  {dailyRank ? <em className={dailyRank.rank === 1 ? 'top' : ''}>{dailyRank.rank === 1 ? '#1 today' : `#${dailyRank.rank} of ${dailyRank.of}`}</em> : <em>see results</em>}
+                </span>
+              ) : (
+                <small>A new course every day</small>
+              )}
+            </span>
+            <b aria-hidden="true">›</b>
           </button>
-          <button onClick={() => go(() => navigate('match'), 'whoosh')}><MatchIcon /><span><strong>QUICK MATCH</strong><small>Find a challenger</small></span><b aria-hidden="true">›</b></button>
+          <button onClick={() => go(() => navigate('match'), 'whoosh')}>
+            <MatchIcon />
+            <span>
+              <strong>QUICK MATCH</strong>
+              {record && record.won + record.lost > 0 ? (
+                <span className="sec-stat" aria-label={`All time: ${record.won} won, ${record.lost} lost`}>
+                  <b className="sec-num">{record.won}</b>
+                  <i className="dash">–</i>
+                  <b className="sec-num lost">{record.lost}</b>
+                  <em>all time</em>
+                </span>
+              ) : (
+                <small>Find a challenger</small>
+              )}
+            </span>
+            <b aria-hidden="true">›</b>
+          </button>
         </section>
         <button className="clubhouse-custom" onClick={() => go(() => setCustom(true))}>Custom round <span aria-hidden="true">→</span></button>
       </div>
