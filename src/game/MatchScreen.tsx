@@ -103,6 +103,8 @@ export function MatchScreen({ code, matchId }: Props) {
   }, [me, matchId, code]);
 
   const enter = (m: MatchRow) => {
+    // The server may have seated a bot itself (after 15 s of waiting): pick up its clock so we plan its round and show it moving.
+    if (m.p2_bot && !botRef.current) botRef.current = { times: m.bot_times ?? [], scores: [] };
     setMatch(m);
     setError(null);
     if (m.status === 'waiting') setPhase('waiting');

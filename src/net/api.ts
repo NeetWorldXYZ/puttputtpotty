@@ -74,6 +74,9 @@ export interface MatchRow {
   finished_at: string | null;
   p1_avatar: Avatar | null;
   p2_avatar: Avatar | null;
+  /** Set when the opponent is a bot; the bot's cumulative hole clock (ms) is only sent to the player who faces it. */
+  p2_bot?: boolean;
+  bot_times?: number[] | null;
 }
 
 export interface KingRow {
