@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Hole, Stroke } from '../sim/types';
 import { FIXED_DT, cupRadius, type PhysicsParams } from '../sim/params';
 import { compileHole, type World } from '../sim/world';
@@ -820,11 +820,13 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             <div className="chips">
               {holes.map((h, i) => {
                 const dlt = results[i] - h.par;
-                const cls = results[i] === 1 ? 'ace' : dlt < 0 ? 'under' : dlt === 0 ? 'par' : dlt >= 3 ? 'bad' : 'over';
+                const cls = results[i] === 1 ? 'ace' : dlt <= -2 ? 'eagle' : dlt < 0 ? 'under' : dlt === 0 ? 'par' : dlt >= 3 ? 'bad' : 'over';
+                const tag = cls === 'ace' ? 'ACE' : cls === 'eagle' ? 'EAGLE' : cls === 'under' ? 'BIRDIE' : cls === 'bad' ? 'OUCH' : null;
                 return (
-                  <div key={h.id} className={`chip ${cls}`} title={`${h.name} · par ${h.par}`}>
+                  <div key={h.id} className={`chip ${cls}`} title={`${h.name} · par ${h.par}`} style={{ '--i': i } as CSSProperties}>
                     <span className="chip-n">{i + 1}</span>
                     <span className="chip-s">{results[i]}</span>
+                    {tag && <span className="chip-tag">{tag}</span>}
                   </div>
                 );
               })}
