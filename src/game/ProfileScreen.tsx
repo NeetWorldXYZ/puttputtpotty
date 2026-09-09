@@ -7,9 +7,12 @@ import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
+import { ProfileStatIcon } from './ProfileStatIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
+import './ProfilePolish.css';
+import { ProfileCareer, ProfileStage, PublicProfileExtras } from './ProfileExtras';
 import { ChallengesSheet } from './ChallengesSheet';
 import { checkProgress, levelProgress, nextRank, royalTitle, type PromoEvent } from './progress';
 import { PromoSheet } from './PromoSheet';
@@ -64,6 +67,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
     if (!id) return;
     let cancelled = false;
     setError(null);
+    setP(undefined);
     api
       .profile(id)
       .then((r) => {
@@ -79,7 +83,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
 
   const mine = !!id && id === me;
   return (
-    <div className="leaders profile">
+    <div className={`leaders profile profile-polished ${mine ? 'pf-private' : 'pf-public'}`}>
       <div className="map-head menu-controls-only">
         <MenuVolume />
         <GolferChip />
@@ -92,14 +96,14 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
         <div className="profile-body">
           <section className="pf-hero" aria-label={`${p.name}'s card`}>
             <div className="pf-avatar">
-              <Avatar av={p.avatar} size={116} />
+              <ProfileStage /><Avatar av={p.avatar} size={156} />
               {p.thrones > 0 && (
                 <span className="pf-crown" aria-hidden="true">
                   <GameIcon kind="crown" />
                 </span>
               )}
             </div>
-            <h1 className="pf-name">{p.name}</h1>
+            <div className="pf-identity"><h1 className="pf-name">{p.name}</h1>
             {p.slogan && <div className="pf-slogan">&ldquo;{p.slogan}&rdquo;</div>}
             {p.house_tag ? (
               <span className="pf-titles">
@@ -112,7 +116,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             <span className="pf-since">Playing since {memberSince(p.since)}</span>
             <span className="pf-level">
               <span className="pf-level-badge">LVL {levelProgress(p.points ?? 0).level}</span>
-              <span className="pf-level-bar" role="progressbar" aria-valuemin={0} aria-valuemax={levelProgress(p.points ?? 0).span} aria-valuenow={levelProgress(p.points ?? 0).into}>
+              <span className="pf-level-bar" role="progressbar" aria-label="Progress to next level" aria-valuemin={0} aria-valuemax={levelProgress(p.points ?? 0).span} aria-valuenow={levelProgress(p.points ?? 0).into}>
                 <i style={{ width: `${Math.round((100 * levelProgress(p.points ?? 0).into) / levelProgress(p.points ?? 0).span)}%` }} />
               </span>
               <small>
@@ -123,16 +127,17 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             <div className="pf-hero-actions">
               {mine ? (
                 <button className="primary" onClick={() => setEdit(true)}>
-                  Edit my look
+                  Customize my look
                 </button>
               ) : (
                 <button className="ghost" onClick={() => setReport(true)}>
                   ⚑ Report
                 </button>
               )}
-            </div>
+            </div></div>
           </section>
 
+          {!mine && <PublicProfileExtras p={p} me={me} onFriends={()=>setFriends(true)} />}
           <button className="pf-kingdom" onClick={() => setThrones(true)} aria-label={`${mine ? 'Your' : `${p.name}'s`} kingdom: ${p.thrones} thrones. See the list.`}>
             <span className="pf-kingdom-title">
               <GameIcon kind="crown" />
@@ -141,14 +146,15 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             </span>
             <span className="pf-stats">
               <span>
-                <b>{p.thrones}</b>
+                <ProfileStatIcon kind="throne" /><b>{p.thrones}</b>
                 {p.thrones === 1 ? 'throne' : 'thrones'}
               </span>
               <span>
-                <b>{p.aces}</b>
+                <ProfileStatIcon kind="ace" /><b>{p.aces}</b>
                 {p.aces === 1 ? 'ace' : 'aces'}
               </span>
               <span>
+                <ProfileStatIcon kind="match" />
                 <b>
                   {p.matches_won}
                   <small>/{p.matches}</small>
@@ -188,7 +194,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
               <b>›</b>
             </button>
           )}
-          <div className="pf-tiles">
+          <div className="pf-tiles pf-legacy-tiles">
             <div className="pf-tile">
               <span className="pf-emoji" aria-hidden="true">
                 ⛳
@@ -209,12 +215,13 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             </div>
           </div>
 
+          {mine && <ProfileCareer p={p} />}
           {mine && (
             <button className="pf-cta" onClick={() => navigate('map')}>
-              {p.thrones === 0 ? 'GO TAKE A THRONE' : 'DEFEND YOUR THRONES'} <span aria-hidden="true">→</span>
+              {p.thrones === 0 ? 'GO TAKE A THRONE' : 'EXPLORE THE THRONE MAP'} <span aria-hidden="true">→</span>
             </button>
           )}
-          {mine && p.thrones === 0 && <div className="pf-note">Open the map, find a bathroom, sink it faster than anyone.</div>}
+          {mine && p.thrones === 0 && <div className="pf-note">Open the map, find a bathroom, beat the course record, claim your crown.</div>}
         </div>
       )}
 
@@ -256,7 +263,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
       {friends && (
         <AccountSheet
           initialMode="friends"
-          addCode={addCode}
+          addCode={addCode ?? (!mine ? p?.name ?? null : null)}
           onClose={() => {
             setFriends(false);
             setReload((n) => n + 1);
