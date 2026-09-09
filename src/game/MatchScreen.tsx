@@ -36,6 +36,8 @@ interface Progress {
 }
 
 const POLL_MS = 2000;
+/** Random matchmaking waits this long for a person before a bot is seated (shorter with ?bot=1 for testing). */
+const BOT_WAIT_MS = 12000 + Math.random() * 8000;
 
 /**
  * Quick match: two players, the same three server-generated holes, live
@@ -68,6 +70,8 @@ export function MatchScreen({ code, matchId }: Props) {
   const strokesRef = useRef<Stroke[][]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const totalRef = useRef(0);
+  /** The bot opponent's clock and hole scores, when the opponent is a bot. Its "live" progress is derived from these. */
+  const botRef = useRef<{ times: number[]; scores: (number | null)[] } | null>(null);
 
   useEffect(() => {
     void ensureSession()
@@ -106,6 +110,28 @@ export function MatchScreen({ code, matchId }: Props) {
     else setPhase('lobby');
     navigate('match', null, null, { match: m.id, replace: true });
   };
+
+  // Waiting: if nobody comes, seat a bot (random matchmaking only, never invites).
+  useEffect(() => {
+    if (phase !== 'waiting' || !match || match.code) return;
+    const quick = new URLSearchParams(location.search).get('bot') === '1';
+    const id = setTimeout(() => {
+      api
+        .botJoin(match.id)
+        .then((r) => {
+          if (r.status !== 'playing') return;
+          botRef.current = { times: r.holeTimes ?? [], scores: [] };
+          return api.matchState(match.id).then((m) => {
+            sfx.pop();
+            buzz(20);
+            enter(m);
+          });
+        })
+        .catch(() => {});
+    }, quick ? 1500 : BOT_WAIT_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, match?.id]);
 
   // Waiting: poll until an opponent joins.
   useEffect(() => {
@@ -161,6 +187,43 @@ export function MatchScreen({ code, matchId }: Props) {
     })();
     return () => {
       cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, match?.id]);
+
+  // Bot opponent: plan its round in the background (one hole per request), then let its clock run.
+  useEffect(() => {
+    const bot = botRef.current;
+    if (!match || !bot || (phase !== 'playing' && phase !== 'result')) return;
+    let cancelled = false;
+    const n = match.holes || 9;
+    if (bot.scores.length < n) {
+      void (async () => {
+        for (let i = 0; i < n && !cancelled; i++) {
+          if (bot.scores[i] !== undefined && bot.scores[i] !== null) continue;
+          try {
+            const r = await api.botPlan(match.id, i);
+            bot.scores[i] = r.score;
+          } catch {
+            await new Promise((res) => setTimeout(res, 1500));
+            i--; // try this hole again
+          }
+        }
+      })();
+    }
+    const startedAt = match.started_at ? new Date(match.started_at).getTime() : Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - startedAt;
+      const k = bot.times.filter((t) => t <= elapsed).length;
+      const total = bot.scores.slice(0, k).reduce<number>((a, b) => a + (b ?? 0), 0);
+      setOpp({ hole: Math.min(k + 1, n), strokes: k > 0 ? (bot.scores[k - 1] ?? 0) : 0, total, done: k >= n });
+      setOppOnline(true);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, match?.id]);

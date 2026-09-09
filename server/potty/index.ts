@@ -4,7 +4,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
-import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem, normalizeAvatar } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/6d3a6a27f03585109a9e26528d177244e9c4aa98/server/potty/engine.js';
+import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, sloganProblem, normalizeAvatar, randomAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/8993d37b72e4cca0b182f62261ad1f51df2398ba/server/potty/engine.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -26,6 +26,13 @@ const PIN_DRIFT_M = 200;
 /** Two places this close with the same name are one place. */
 const SAME_PLACE_M = 25;
 const LINK_CODE_TTL_MIN = 10;
+/** Quick match: how many bot profiles to keep around, and how a bot paces a hole (ms). */
+const BOT_POOL = 12;
+const BOT_HOLE_BASE_MS = 16000;
+const BOT_HOLE_PER_STROKE_MS = 7000;
+const BOT_NAMES = ['Kyle M.', 'Dee Plunge', 'Tanya P.', 'Marcus V.', 'Lou Flush', 'Big Sal', 'Rhonda K.', 'Petey', 'Ana Belle', 'Grumpy Gus', 'J. Wexford', 'Roxy', 'Duke Gilmore', 'Sinéad', 'Cornbread', 'Old Tom', 'Maddie Q.', 'Two-Putt Tony'];
+/** Light solver settings for a bot's hole: well inside the edge CPU budget. */
+const BOT_SOLVE = { randomShots: 40, randomCone: (75 * Math.PI) / 180, randomPlays: 10, runs: 6, candidatesPerStroke: 10, strongRuns: 1, strongCandidates: 24, trapProbeShots: 6 };
 const EPOCH = Date.UTC(2026, 8, 1); // 2026-09-01
 
 const cors = {
@@ -506,6 +513,37 @@ async function courseHole(seed: string, index: number) {
   return g.hole;
 }
 
+/** A bot profile that is not in a match right now; the pool grows to BOT_POOL as needed. */
+async function pickBot(): Promise<string> {
+  const { data: bots } = await admin.from('profiles').select('id, display_name').eq('is_bot', true);
+  const { data: busy } = await admin.from('matches').select('p2').eq('status', 'playing').in('p2', (bots ?? []).map((b) => b.id));
+  const busyIds = new Set((busy ?? []).map((b) => b.p2));
+  const free = (bots ?? []).filter((b) => !busyIds.has(b.id));
+  if (free.length && ((bots ?? []).length >= BOT_POOL || Math.random() < 0.7)) return free[Math.floor(Math.random() * free.length)].id;
+  // New bot: a name nobody has yet, a random look.
+  const taken = new Set((bots ?? []).map((b) => b.display_name));
+  const names = BOT_NAMES.filter((nm) => !taken.has(nm));
+  const name = names.length ? names[Math.floor(Math.random() * names.length)] : `Golfer ${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const id = crypto.randomUUID();
+  const { error } = await admin.from('profiles').insert({ id, display_name: name, avatar: randomAvatar(Math.random), is_bot: true });
+  if (error) {
+    if (free.length) return free[0].id;
+    throw new Error(error.message);
+  }
+  return id;
+}
+
+/** Above average, beatable: usually a solid competent line, sometimes the best one, never the worst. */
+function pickBotLine(report: { bestRun: { solution: Stroke[]; strokes: number | null } | null; runs: { solution: Stroke[]; strokes: number | null }[] }, seed: number): Stroke[] | null {
+  const ok = report.runs.filter((r) => r.strokes !== null && r.solution.length > 0).sort((a, b) => (a.strokes ?? 99) - (b.strokes ?? 99));
+  const r = ((seed * 1103515245 + 12345) >>> 0) / 4294967296;
+  if (report.bestRun && report.bestRun.solution.length > 0 && r < 0.3) return report.bestRun.solution;
+  if (!ok.length) return report.bestRun?.solution ?? null;
+  // Somewhere in the better half of the competent runs.
+  const i = Math.min(ok.length - 1, Math.floor(r * Math.max(1, ok.length / 2)));
+  return ok[i].solution;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -895,6 +933,71 @@ Deno.serve(async (req: Request) => {
       await admin.from('place_reports').delete().eq('location_id', locationId);
       const { data: row } = await admin.from('locations').select('name, status').eq('id', locationId).maybeSingle();
       return json({ ok: true, status: row?.status ?? null, name: row?.name ?? null });
+    }
+
+    if (action === 'bot-join') {
+      // Nobody came: seat a bot. It looks like any other player and plays the same holes.
+      const matchId = String(body.matchId ?? '');
+      if (!/^[0-9a-f-]{36}$/.test(matchId)) return json({ error: 'bad match' }, 400);
+      const { data: m } = await admin.from('matches').select('*').eq('id', matchId).maybeSingle();
+      if (!m) return json({ error: 'no such match' }, 404);
+      if (m.p1 !== user.id) return json({ error: 'not your match' }, 403);
+      if (m.status !== 'waiting') return json({ ok: true, status: m.status });
+      if (m.code) return json({ error: 'invites wait for the friend' }, 400);
+      const bot = await pickBot();
+      const n = Number(m.holes) || 9;
+      // The bot's clock: each hole takes a human-ish while; strokes refine nothing here, the pace is set now.
+      const holeTimes: number[] = [];
+      let t = 0;
+      for (let i = 0; i < n; i++) {
+        t += Math.round(BOT_HOLE_BASE_MS + BOT_HOLE_PER_STROKE_MS * (1.5 + Math.random() * 2) + Math.random() * 6000);
+        holeTimes.push(t);
+      }
+      const { data: seated } = await admin.from('matches').update({ p2: bot, status: 'playing', started_at: new Date().toISOString() }).eq('id', matchId).eq('status', 'waiting').is('p2', null).select('*').maybeSingle();
+      if (!seated) return json({ ok: true, status: 'taken' });
+      await admin.from('bot_plans').upsert({ match_id: matchId, bot_id: bot, hole_times: holeTimes, strokes: [], scores: [], planned: 0 });
+      return json({ ok: true, status: 'playing', holeTimes });
+    }
+
+    if (action === 'bot-plan') {
+      // Plans one hole of the bot's round: solve it, pick a good-not-perfect line, verify by replay.
+      const matchId = String(body.matchId ?? '');
+      const index = Number(body.index);
+      if (!/^[0-9a-f-]{36}$/.test(matchId) || !Number.isInteger(index) || index < 0 || index > 17) return json({ error: 'bad request' }, 400);
+      const { data: m } = await admin.from('matches').select('id, p1, seed, holes, started_at, status').eq('id', matchId).maybeSingle();
+      if (!m || m.p1 !== user.id) return json({ error: 'not your match' }, 403);
+      const { data: plan } = await admin.from('bot_plans').select('*').eq('match_id', matchId).maybeSingle();
+      if (!plan) return json({ error: 'no bot in this match' }, 404);
+      const n = Number(m.holes) || 9;
+      if (index >= n) return json({ error: 'bad hole' }, 400);
+      const strokesAll = (Array.isArray(plan.strokes) ? plan.strokes : []) as (Stroke[] | null)[];
+      const scores = (Array.isArray(plan.scores) ? plan.scores : []) as (number | null)[];
+      if (strokesAll[index]) return json({ ok: true, index, score: scores[index] ?? null, planned: plan.planned });
+      const hole = await courseHole(m.seed, index);
+      let seed = 0;
+      for (const ch of `${matchId}:${index}`) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+      const report = solveHole(hole, DEFAULT_PARAMS, { ...BOT_SOLVE, seed: seed || 1 });
+      const line = pickBotLine(report, seed);
+      let strokes: Stroke[] = line ?? [{ angle: Math.atan2(hole.cup.y - hole.tee.y, hole.cup.x - hole.tee.x), power: 0.7 }];
+      let st = replay(hole, 0, strokes, DEFAULT_PARAMS).state;
+      if (!st.done && line) {
+        // The chosen line did not hold up under the exact replay: fall back to the best known one.
+        strokes = report.bestRun?.solution ?? strokes;
+        st = replay(hole, 0, strokes, DEFAULT_PARAMS).state;
+      }
+      const score = st.done ? holeScore(st, hole.par) : STROKE_CAP + 1;
+      while (strokesAll.length < n) strokesAll.push(null);
+      while (scores.length < n) scores.push(null);
+      strokesAll[index] = strokes;
+      scores[index] = score;
+      const planned = strokesAll.filter((x) => x).length;
+      const patch: Record<string, unknown> = { strokes: strokesAll, scores: scores.map((x) => x ?? 0), planned };
+      if (planned >= n && m.started_at) {
+        const times = plan.hole_times as number[];
+        patch.settle_at = new Date(new Date(m.started_at).getTime() + times[times.length - 1]).toISOString();
+      }
+      await admin.from('bot_plans').update(patch).eq('match_id', matchId);
+      return json({ ok: true, index, score, planned });
     }
 
     if (action === 'link-code') {
