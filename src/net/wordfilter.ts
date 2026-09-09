@@ -50,11 +50,20 @@ export function textProblem(input: string, what: 'name' | 'slogan' = 'name'): st
 
 export const NAME_RE = /^[A-Za-z0-9 _.'\-]{2,24}$/;
 export const SLOGAN_MAX = 60;
+/** Business names: "Hourglass Coffee + Kitchen", "Joe's Bar & Grill", "7-Eleven (24h)". */
+export const PLACE_NAME_RE = /^[A-Za-z0-9 _.'&+,/()!:#\-]{2,40}$/;
 
 /** Full name check: shape plus the filter. */
 export function nameProblem(name: string): string | null {
   const n = name.trim();
   if (!NAME_RE.test(n)) return "Names are 2 to 24 characters: letters, numbers, spaces, _ - . '";
+  return textProblem(n, 'name');
+}
+
+/** A place's name: business punctuation allowed, filtered the same way. */
+export function placeNameProblem(name: string): string | null {
+  const n = name.trim();
+  if (!PLACE_NAME_RE.test(n)) return "Place names are 2 to 40 characters: letters, numbers and & + , / ( ) . ' -";
   return textProblem(n, 'name');
 }
 

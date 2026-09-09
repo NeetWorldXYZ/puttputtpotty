@@ -703,6 +703,7 @@ function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side
       <div className="verdict-title">{tie ? 'Dead heat' : won ? (match.forfeit ? 'Win by forfeit' : 'You win!') : match.forfeit ? 'Lost by forfeit' : `${theirs.name} wins`}</div>
       <div className="verdict-rows">
         <div className={won ? 'lead' : ''}>
+          <Avatar av={match[`${side}_avatar`]} size={34} className="verdict-avatar" />
           <span>You</span>
           <strong>{mine.score ?? '–'}</strong>
           <small>
@@ -711,6 +712,7 @@ function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side
           </small>
         </div>
         <div className={!won && !tie ? 'lead' : ''}>
+          <Avatar av={match[`${other}_avatar`]} size={34} className="verdict-avatar" />
           <span>{theirs.name}</span>
           <strong>{theirs.score ?? '–'}</strong>
           <small>

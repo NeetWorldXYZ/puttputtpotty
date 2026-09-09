@@ -5,6 +5,6 @@ export { validateHole } from '../src/sim/validate';
 export { DEFAULT_PARAMS } from '../src/sim/params';
 export { holeScore } from '../src/sim/sim';
 export type { Hole, Stroke } from '../src/sim/types';
-export { nameProblem, sloganProblem } from '../src/net/wordfilter';
+export { nameProblem, placeNameProblem, sloganProblem } from '../src/net/wordfilter';
 export { normalizeAvatar, randomAvatar } from '../src/game/avatarParts';
 export { solveHole } from '../src/solver/solver';
