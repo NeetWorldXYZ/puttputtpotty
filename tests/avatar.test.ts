@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALLS, DEFAULT_AVATAR, avatarSvg, ballLook, normalizeAvatar } from '../src/game/avatarParts';
+import { BALLS, DEFAULT_AVATAR, HEADS, avatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
 
 describe('avatars', () => {
   it('normalizes anything into a valid avatar', () => {
@@ -32,5 +32,16 @@ describe('avatars', () => {
       expect(svg, head).toContain('M52 63 h25'); // sunglasses
     }
     expect(avatarSvg({ ...DEFAULT_AVATAR, head: 'roll' }, 'r')).not.toContain('<circle cx="80" cy="73" r="36"');
+  });
+
+  it('starter looks cover every head and always normalize clean', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const av = starterAvatar(Math.random);
+      seen.add(av.head);
+      expect(normalizeAvatar(av)).toEqual(av);
+      expect(av.face).toBe('happy');
+    }
+    expect([...seen].sort()).toEqual(Object.keys(HEADS).sort());
   });
 });

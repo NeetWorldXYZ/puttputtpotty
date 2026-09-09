@@ -227,6 +227,20 @@ ${hatSvg(av.hat)}
 ${ballSvg(ballLook(av), 132, 146, 13, id)}`;
 }
 
+/** A new player's first look: any of the five heads in any colour, the rest kept plain so the editor has somewhere to go. */
+export function starterAvatar(r: () => number): Avatar {
+  const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
+  const head = pick(Object.keys(HEADS));
+  return {
+    head,
+    porcelain: pick(Object.keys(headTones(head))),
+    seat: pick(Object.keys(SEATS)),
+    hat: head === 'turd' || head === 'alien' || head === 'dawg' ? 'crown' : 'none',
+    face: 'happy',
+    ball: 'white',
+  };
+}
+
 /** A random look, from a 0..1 source: bots and previews. */
 export function randomAvatar(r: () => number): Avatar {
   const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];

@@ -5,16 +5,20 @@ import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOu
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
 import { getSavedAvatar, saveAvatar } from '../net/supabase';
 import { Avatar } from './Avatar';
-import { BALLS, DEFAULT_AVATAR, FACES, HATS, PORCELAIN, SEATS, type Avatar as AvatarSpec } from './avatarParts';
+import { BALLS, DEFAULT_AVATAR, FACES, HATS, HEADS, SEATS, headTones, type Avatar as AvatarSpec } from './avatarParts';
 
 type LookOption = readonly [string, string, string | null];
-const LOOK_GROUPS: readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] = [
-  ['Skin', 'porcelain', Object.entries(PORCELAIN).map(([id, v]) => [id, v.label, v.bottom] as const)],
-  ['Shirt', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
-  ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
-  ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
-  ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
-];
+/** The editor's categories. The colour row follows the head: skin for the classic golfer, paper, browns, greens or coat for the others. */
+function lookGroups(av: AvatarSpec): readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] {
+  return [
+    ['Head', 'head', Object.entries(HEADS).map(([id, v]) => [id, v.label, null] as const)],
+    [av.head === 'classic' ? 'Skin' : 'Colour', 'porcelain', Object.entries(headTones(av.head)).map(([id, v]) => [id, v.label, v.bottom] as const)],
+    ['Shirt', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
+    ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
+    ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
+    ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
+  ];
+}
 
 interface Props {
   onClose: (name: string | null) => void;
@@ -29,7 +33,7 @@ type Mode = 'name' | 'save' | 'signin' | 'code' | 'claim' | 'look' | 'account';
  */
 export function AccountSheet({ onClose }: Props) {
   const [mode, setMode] = useState<Mode>('name');
-  const [category, setCategory] = useState<keyof AvatarSpec>('porcelain');
+  const [category, setCategory] = useState<keyof AvatarSpec>('head');
   const [name, setName] = useState(getSavedName() ?? '');
   const [email, setEmail] = useState('');
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
@@ -191,9 +195,9 @@ export function AccountSheet({ onClose }: Props) {
               <Avatar av={avatar} size={120} />
             </div>
             <div className="locker-categories" aria-label="Appearance categories">
-              {LOOK_GROUPS.map(([title, key]) => <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>{title}</button>)}
+              {lookGroups(avatar).map(([title, key]) => <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>{title}</button>)}
             </div>
-            {LOOK_GROUPS.filter(([, key]) => key === category).map(([title, key, options]) => (
+            {lookGroups(avatar).filter(([, key]) => key === category).map(([title, key, options]) => (
               <div key={key} className="look-group">
                 <div className="field-label">{title}</div>
                 <div className="look-chips">
