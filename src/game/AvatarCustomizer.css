@@ -27,8 +27,8 @@
 .avatar-studio .studio-option[aria-pressed=true]{border-color:#ffe068;background:radial-gradient(ellipse at 50% 35%,#3c6669,#082a40 77%);box-shadow:0 0 0 1px #ffe36e,inset 0 0 12px #ffd95918,0 3px 0 #001b2b}
 .studio-option>.studio-part{display:block;width:100%;height:69px;overflow:visible;filter:drop-shadow(0 3px 1px #02152480);flex:1 1 auto}
 .studio-option>span{display:block;min-height:14px;line-height:1.1;overflow-wrap:normal;white-space:normal;text-align:center}
-.avatar-studio .studio-more{display:flex;align-items:center;justify-content:center;gap:7px;padding:7px 10px;min-height:32px;margin:3px auto 0;border:0;border-radius:8px;background:transparent;box-shadow:none;color:#c1e4ee;font-size:11px;font-weight:500}
-.studio-more span{color:#ffe279;font-size:17px}
+.avatar-studio .studio-more{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:10px 14px;min-height:46px;margin:10px 0 4px;border:2px solid #79d4ec;border-radius:12px;background:linear-gradient(135deg,#1b6682,#10455f);box-shadow:inset 0 1px 0 #a4eaff40,0 3px 0 #02192b;color:#fff7df;font-size:14px;font-weight:700}
+.studio-more span{display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#ffe279;color:#06273d;font-size:21px;line-height:1}
 .studio-footer{position:relative;flex:none;padding:10px 12px 13px;background:#041e34;box-shadow:0 -4px 8px #041e3440}
 .avatar-studio .studio-save{display:block;width:100%;min-height:48px;padding:10px 12px;border:2px solid #fff0a0;border-radius:13px;color:#06273d;background:linear-gradient(145deg,#fff1a0,#ffda51 65%,#ffcb38);font-size:17px;font-weight:700;box-shadow:inset 0 -3px 0 #e8b130,0 3px 0 #957023;transition:filter .12s,transform .12s}
 .avatar-studio .studio-save:active{transform:translateY(2px)}
