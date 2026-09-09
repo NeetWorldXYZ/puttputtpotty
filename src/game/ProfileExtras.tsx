@@ -3,6 +3,7 @@ import { api, fmtElapsed, type PlayerProfile, type FriendRelation } from '../net
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
+import { ProfileStatIcon } from './ProfileStatIcon';
 
 export function ProfileStage() {
   return <svg className="pf-stage" viewBox="0 0 220 210" aria-hidden="true">
@@ -18,8 +19,8 @@ export function ProfileStage() {
   </svg>;
 }
 export function ProfileCareer({p}:{p:PlayerProfile}) {
-  const stats=[['flag',p.best_rel===null?'–':p.best_rel>0?`+${p.best_rel}`:p.best_rel===0?'E':p.best_rel,'Best 9 holes'],['dice',p.runs,'Rounds played'],['trophy',p.matches?`${Math.round(p.matches_won/p.matches*100)}%`:'–','Win rate'],['crown',p.thrones,'Thrones held']] as const;
-  return <section className="pf-panel pf-career"><h2>Career stats</h2><div className="pf-career-grid">{stats.map(([icon,value,label])=><div key={label}><GameIcon kind={icon}/><strong>{value}</strong><small>{label}</small></div>)}</div></section>;
+  const stats=[['best',p.best_rel===null?'–':p.best_rel>0?`+${p.best_rel}`:p.best_rel===0?'E':p.best_rel,'Best 9 holes'],['rounds',p.runs,'Rounds played'],['win',p.matches?`${Math.round(p.matches_won/p.matches*100)}%`:'–','Win rate'],['throne',p.thrones,'Thrones held']] as const;
+  return <section className="pf-panel pf-career"><h2>Career stats</h2><div className="pf-career-grid">{stats.map(([icon,value,label])=><div key={label}><ProfileStatIcon kind={icon}/><strong>{value}</strong><small>{label}</small></div>)}</div></section>;
 }
 export function PublicProfileExtras({p,me,onFriends}:{p:PlayerProfile;me:string|null;onFriends:()=>void}) {
   const [own,setOwn]=useState<PlayerProfile|null>(null);

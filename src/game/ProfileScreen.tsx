@@ -7,6 +7,7 @@ import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
+import { ProfileStatIcon } from './ProfileStatIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
@@ -145,14 +146,15 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             </span>
             <span className="pf-stats">
               <span>
-                <GameIcon kind="crown" /><b>{p.thrones}</b>
+                <ProfileStatIcon kind="throne" /><b>{p.thrones}</b>
                 {p.thrones === 1 ? 'throne' : 'thrones'}
               </span>
               <span>
-                <GameIcon kind="flag" /><b>{p.aces}</b>
+                <ProfileStatIcon kind="ace" /><b>{p.aces}</b>
                 {p.aces === 1 ? 'ace' : 'aces'}
               </span>
               <span>
+                <ProfileStatIcon kind="match" />
                 <b>
                   {p.matches_won}
                   <small>/{p.matches}</small>
