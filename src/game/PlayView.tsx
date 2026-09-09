@@ -36,6 +36,8 @@ interface Props {
   renderDoneCard?: (info: HoleDoneInfo, actions: { next: () => void; retry: () => void }) => ReactNode;
   /** Extra content under the scorecard chips (leaderboards etc). */
   scorecardExtra?: ReactNode;
+  /** Replaces the scorecard's own buttons (share, play again, back) with the caller's. */
+  renderScorecardButtons?: (share: { share: () => void; shared: boolean }) => ReactNode;
   /** Hides the retry button on ranked holes. */
   noRetry?: boolean;
   /** Epoch ms the round clock started; shows a live timer in the HUD. */
@@ -99,7 +101,7 @@ function fmtClock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
@@ -225,7 +227,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       const r = wrap.getBoundingClientRect();
       const aim = wrap.querySelector<HTMLElement>('.aim-bar');
       const next = {
-        top: Math.max(HUD_TOP, layoutBottom('.hud') + 16, layoutBottom('.race-clock') + 16),
+        top: Math.max(HUD_TOP, layoutBottom('.hud') + 16, layoutBottom('.race-clock') + 16, layoutBottom('.hud-extra') + 16),
         bottom: Math.max(HUD_BOTTOM, aim ? wrap.clientHeight - aim.offsetTop + 16 : 0),
       };
       const cur = hudInsetsRef.current;
@@ -245,7 +247,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       setSizeTick((t) => t + 1);
     });
     ro.observe(wrap);
-    wrap.querySelectorAll('.hud, .race-clock, .aim-bar').forEach((el) => ro.observe(el));
+    wrap.querySelectorAll('.hud, .race-clock, .hud-extra, .aim-bar').forEach((el) => ro.observe(el));
     return () => ro.disconnect();
   }, [timerFrom]);
 
@@ -828,13 +830,19 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
               })}
             </div>
             {scorecardExtra}
-            <button className="primary" onClick={share}>
-              {shared ? 'Shared!' : 'Share score'}
-            </button>
-            {!onExit && <button onClick={() => goToCourse('random', holes.length)}>New course, same length</button>}
-            {!onExit && courseSeed !== dailySeed() && getBest(dailySeed()) === null && <button onClick={() => goToCourse('daily')}>Daily course</button>}
-            {!noRetry && <button onClick={restartCourse}>Play again</button>}
-            {onExit ? <button onClick={onExit}>{exitLabel ?? 'Back'}</button> : <button onClick={() => goToCourse('title')}>Title screen</button>}
+            {renderScorecardButtons ? (
+              renderScorecardButtons({ share, shared })
+            ) : (
+              <>
+                <button className="primary" onClick={share}>
+                  {shared ? 'Shared!' : 'Share score'}
+                </button>
+                {!onExit && <button onClick={() => goToCourse('random', holes.length)}>New course, same length</button>}
+                {!onExit && courseSeed !== dailySeed() && getBest(dailySeed()) === null && <button onClick={() => goToCourse('daily')}>Daily course</button>}
+                {!noRetry && <button onClick={restartCourse}>Play again</button>}
+                {onExit ? <button onClick={onExit}>{exitLabel ?? 'Back'}</button> : <button onClick={() => goToCourse('title')}>Title screen</button>}
+              </>
+            )}
           </div>
         </div>
       )}

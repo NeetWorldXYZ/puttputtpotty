@@ -28,12 +28,23 @@ interface Props {
 }
 
 type Phase = 'lobby' | 'waiting' | 'loading' | 'playing' | 'result';
+/** Broadcast after each hole: the hole just finished (1-based), its strokes, the running total. */
 interface Progress {
   hole: number;
   strokes: number;
   total: number;
   done: boolean;
 }
+
+/** What we know of the opponent's round so far. */
+interface OppState {
+  /** Strokes on each finished hole. */
+  holes: number[];
+  total: number;
+  finished: boolean;
+}
+
+const relPar = (d: number) => (d === 0 ? 'E' : d > 0 ? `+${d}` : `${d}`);
 
 const POLL_MS = 2000;
 /** What the search says while it looks, one line every few seconds. */
@@ -54,7 +65,8 @@ export function MatchScreen({ code, matchId }: Props) {
   const [codeInput, setCodeInput] = useState('');
   const [askName, setAskName] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [opp, setOpp] = useState<Progress | null>(null);
+  const [opp, setOpp] = useState<OppState | null>(null);
+  const [myProg, setMyProg] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [oppOnline, setOppOnline] = useState(false);
   const [mine, setMine] = useState<{ score: number; holes: number[]; elapsed: number } | null>(null);
   const [shared, setShared] = useState(false);
@@ -72,6 +84,7 @@ export function MatchScreen({ code, matchId }: Props) {
   const totalRef = useRef(0);
   /** The bot opponent's clock and hole scores, when the opponent is a bot. Its "live" progress is derived from these. */
   const botRef = useRef<{ times: number[]; scores: (number | null)[] } | null>(null);
+  const matchIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void ensureSession()
@@ -103,7 +116,18 @@ export function MatchScreen({ code, matchId }: Props) {
   }, [me, matchId, code]);
 
   const enter = (m: MatchRow) => {
-    // The server may have seated a bot itself (after 15 s of waiting): pick up its clock so we plan its round and show it moving.
+    if (m.id !== matchIdRef.current) {
+      // A fresh match: nothing carries over from the last one.
+      matchIdRef.current = m.id;
+      botRef.current = null;
+      strokesRef.current = [];
+      totalRef.current = 0;
+      setMyProg({ done: 0, total: 0 });
+      setOpp(null);
+      setOppOnline(false);
+      setMine(null);
+    }
+    // The server may have seated a bot itself (after ten seconds of waiting): pick up its clock so we plan its round and show it moving.
     if (m.p2_bot && !botRef.current) botRef.current = { times: m.bot_times ?? [], scores: [] };
     setMatch(m);
     setError(null);
@@ -215,9 +239,9 @@ export function MatchScreen({ code, matchId }: Props) {
     const startedAt = match.started_at ? new Date(match.started_at).getTime() : Date.now();
     const tick = () => {
       const elapsed = Date.now() - startedAt;
-      const k = bot.times.filter((t) => t <= elapsed).length;
-      const total = bot.scores.slice(0, k).reduce<number>((a, b) => a + (b ?? 0), 0);
-      setOpp({ hole: Math.min(k + 1, n), strokes: k > 0 ? (bot.scores[k - 1] ?? 0) : 0, total, done: k >= n });
+      const k = Math.min(n, bot.times.filter((t) => t <= elapsed).length);
+      const done = bot.scores.slice(0, k).map((x) => x ?? 0);
+      setOpp({ holes: done, total: done.reduce((a, b) => a + b, 0), finished: k >= n });
       setOppOnline(true);
     };
     tick();
@@ -235,7 +259,12 @@ export function MatchScreen({ code, matchId }: Props) {
     const ch = supabase.channel(`match:${match.id}`, { config: { broadcast: { self: false }, presence: { key: me } } });
     ch.on('broadcast', { event: 'progress' }, ({ payload }) => {
       const p = payload as Progress & { from: string };
-      if (p.from !== me) setOpp({ hole: p.hole, strokes: p.strokes, total: p.total, done: p.done });
+      if (p.from === me) return;
+      setOpp((prev) => {
+        const holes = prev ? [...prev.holes] : [];
+        holes[p.hole - 1] = p.strokes;
+        return { holes: holes.map((x) => x ?? 0), total: p.total, finished: p.done };
+      });
     });
     ch.on('presence', { event: 'sync' }, () => {
       const others = Object.keys(ch.presenceState()).filter((k) => k !== me);
@@ -251,9 +280,10 @@ export function MatchScreen({ code, matchId }: Props) {
     };
   }, [match?.id, me, phase]);
 
-  // Result: poll until the match is done (opponent finishes, or forfeits after ten minutes).
+  // Finished: poll until the match is done (the opponent finishes, or forfeits after enough time).
+  const finished = phase === 'result' || (phase === 'playing' && mine !== null);
   useEffect(() => {
-    if (phase !== 'result' || !match || match.status === 'done') return;
+    if (!finished || !match || match.status === 'done') return;
     const id = setInterval(() => {
       api
         .matchState(match.id)
@@ -270,7 +300,7 @@ export function MatchScreen({ code, matchId }: Props) {
     }, POLL_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, match?.id, match?.status]);
+  }, [finished, match?.id, match?.status]);
 
   const broadcast = (p: Progress) => {
     void channelRef.current?.send({ type: 'broadcast', event: 'progress', payload: { ...p, from: me } });
@@ -282,6 +312,7 @@ export function MatchScreen({ code, matchId }: Props) {
     totalRef.current += info.score;
     const n = match.holes || 9;
     const last = info.holeIndex === n - 1;
+    setMyProg({ done: info.holeIndex + 1, total: totalRef.current });
     broadcast({ hole: info.holeIndex + 1, strokes: info.score, total: totalRef.current, done: last });
     if (!last) return;
     const lists = strokesRef.current.slice(0, n);
@@ -352,13 +383,29 @@ export function MatchScreen({ code, matchId }: Props) {
   const oppName = match ? (match[`${other}_name`] ?? 'Opponent') : 'Opponent';
 
   // ---------- screens
+  const leave = () => navigate('play');
+  const rematch = () => void start(() => api.findMatch());
+  const panel = match ? (
+    <MatchPanel match={match} me={me} side={side} opp={opp} oppOnline={oppOnline} mine={mine} holes={holes} error={error} onLeave={leave} onRematch={rematch} />
+  ) : null;
+
   if (phase === 'playing' && holes && match) {
-    const strip = (
-      <div className={`opp-strip${oppOnline ? ' online' : ''}`}>
-        <span className="opp-name">
-          <Avatar av={match[`${other}_avatar`]} size={22} className="opp-avatar" /> {oppName}
+    const pars = holes.map((h) => h.par);
+    const myRel = myProg.total - pars.slice(0, myProg.done).reduce((a, b) => a + b, 0);
+    const oppDone = opp?.holes.length ?? 0;
+    const oppRel = (opp?.total ?? 0) - pars.slice(0, oppDone).reduce((a, b) => a + b, 0);
+    const gap = oppRel - myRel;
+    const lead = myProg.done === 0 && oppDone === 0 ? 'square' : gap > 0 ? 'up' : gap < 0 ? 'down' : 'square';
+    const card = (
+      <div className={`duel-card hud-extra${oppOnline ? ' online' : ''}`} aria-live="polite">
+        <Avatar av={match[`${other}_avatar`]} size={26} className="duel-avatar" />
+        <span className="duel-who">
+          <span className="duel-name">{oppName}</span>
+          <span className="duel-thru">
+            {opp ? (opp.finished ? `finished · ${opp.total}` : oppDone ? `thru ${oppDone} · ${relPar(oppRel)}` : 'on hole 1') : oppOnline ? 'on hole 1' : 'connecting…'}
+          </span>
         </span>
-        <span className="opp-prog">{opp ? (opp.done ? `finished · ${opp.total}` : `hole ${opp.hole} done · ${opp.total} so far`) : oppOnline ? 'on hole 1' : 'connecting…'}</span>
+        <span className={`duel-lead ${lead}`}>{lead === 'square' ? 'ALL SQUARE' : lead === 'up' ? `${gap} UP` : `${-gap} DOWN`}</span>
       </div>
     );
     return (
@@ -366,13 +413,13 @@ export function MatchScreen({ code, matchId }: Props) {
         key={match.id}
         holes={holes}
         courseSeed={null}
-        onExit={() => navigate('play')}
+        onExit={leave}
         exitLabel="Quit"
         lockedParams={DEFAULT_PARAMS}
         noRetry
         timerFrom={match.started_at ? new Date(match.started_at).getTime() : null}
         onHoleDone={onHoleDone}
-        topExtra={strip}
+        topExtra={card}
         renderDoneCard={(info, actions) => (
           <>
             <div className="sub">
@@ -383,19 +430,17 @@ export function MatchScreen({ code, matchId }: Props) {
             </button>
           </>
         )}
-        scorecardExtra={
-          <div className="match-result">
-            {error && <div className="err" role="alert">{error}</div>}
-            {!mine && !error && <div className="sub">Submitting your round…</div>}
-            {mine && match.status !== 'done' && (
-              <div className="sub">
-                You: <strong>{mine.score}</strong> ({mine.holes.join('-')}) in {fmtElapsed(mine.elapsed)} · waiting for {oppName}
-                {opp ? ` · they're ${opp.done ? 'finished' : `on hole ${opp.hole + 1}`}` : ''}
-              </div>
-            )}
-            {match.status === 'done' && <Verdict match={match} me={me} side={side} />}
-            <button onClick={() => void start(() => api.findMatch())}>Rematch a stranger</button>
-          </div>
+        scorecardExtra={panel}
+        renderScorecardButtons={({ share, shared }) =>
+          match.status === 'done' ? (
+            <>
+              <button className="primary" onClick={rematch}>
+                Rematch a stranger
+              </button>
+              <button onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
+              <button onClick={leave}>Home</button>
+            </>
+          ) : null
         }
       />
     );
@@ -531,17 +576,16 @@ export function MatchScreen({ code, matchId }: Props) {
         )}
 
         {phase === 'result' && match && (
-          <div className="waiting">
-            {match.status === 'done' ? <Verdict match={match} me={me} side={side} /> : <div className="sub">You finished. Waiting for {oppName}…</div>}
-            {mine && (
-              <div className="sub">
-                You: <strong>{mine.score}</strong> ({mine.holes.join('-')}) in {fmtElapsed(mine.elapsed)}
-              </div>
+          <div className="waiting match-done">
+            {panel}
+            {match.status === 'done' && (
+              <>
+                <button className="primary" onClick={rematch}>
+                  Rematch a stranger
+                </button>
+                <button onClick={leave}>Home</button>
+              </>
             )}
-            <button className="primary" onClick={() => void start(() => api.findMatch())}>
-              Play again
-            </button>
-            <button onClick={() => navigate('play')}>Home</button>
           </div>
         )}
       </div>
@@ -558,6 +602,95 @@ export function MatchScreen({ code, matchId }: Props) {
     </div>
   );
 }
+
+/** Head to head once you have finished: their live progress until the result lands, then the verdict. */
+function MatchPanel({
+  match,
+  me,
+  side,
+  opp,
+  oppOnline,
+  mine,
+  holes,
+  error,
+  onLeave,
+}: {
+  match: MatchRow;
+  me: string | null;
+  side: 'p1' | 'p2';
+  opp: OppState | null;
+  oppOnline: boolean;
+  mine: { score: number; holes: number[]; elapsed: number } | null;
+  holes: Hole[] | null;
+  error: string | null;
+  onLeave: () => void;
+  onRematch: () => void;
+}) {
+  const other = side === 'p1' ? 'p2' : 'p1';
+  const oppName = match[`${other}_name`] ?? 'Opponent';
+  const n = match.holes || 9;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (match.status === 'done') return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [match.status]);
+  if (match.status === 'done') return <Verdict match={match} me={me} side={side} />;
+  const done = opp?.holes.length ?? 0;
+  const pars = holes?.map((h) => h.par) ?? [];
+  const oppRel = pars.length ? (opp?.total ?? 0) - pars.slice(0, done).reduce((a, b) => a + b, 0) : null;
+  // The server calls a forfeit when the other side has had twice your time (eight minutes at least).
+  const started = match.started_at ? new Date(match.started_at).getTime() : now;
+  const deadline = started + Math.max(480_000, (mine?.elapsed ?? 0) * 2);
+  const left = Math.max(0, deadline - now);
+  return (
+    <div className="duel-wait">
+      {error && <div className="err" role="alert">{error}</div>}
+      {!mine && !error && <div className="sub">Submitting your round…</div>}
+      <div className="duel-rows">
+        <div className="duel-row me">
+          <Avatar av={match[`${side}_avatar`]} size={30} />
+          <span className="duel-row-name">You</span>
+          <span className="duel-row-sub">{mine ? `finished · ${fmtElapsed(mine.elapsed)}` : 'sending…'}</span>
+          <b>{mine?.score ?? '–'}</b>
+        </div>
+        <div className={`duel-row them${oppOnline ? ' online' : ''}`}>
+          <Avatar av={match[`${other}_avatar`]} size={30} />
+          <span className="duel-row-name">{oppName}</span>
+          <span className="duel-row-sub">
+            {opp?.finished ? 'finished · tallying' : done ? `thru ${done}${oppRel !== null ? ` · ${relPar(oppRel)}` : ''}` : oppOnline ? 'on hole 1' : 'not here yet'}
+          </span>
+          <b>{opp ? opp.total : '–'}</b>
+        </div>
+      </div>
+      <div className="duel-holes" aria-label={`${oppName}'s holes`}>
+        {Array.from({ length: n }, (_, i) => {
+          const sc = opp?.holes[i];
+          const par = pars[i];
+          const cls = sc === undefined ? (i === done && !opp?.finished ? 'now' : '') : sc === 1 ? 'ace' : par !== undefined && sc < par ? 'under' : par !== undefined && sc > par ? 'over' : 'par';
+          return (
+            <span key={i} className={`duel-hole ${cls}`}>
+              {sc ?? ''}
+            </span>
+          );
+        })}
+      </div>
+      <div className="duel-status">
+        <span className="duel-spin" aria-hidden="true" />
+        {opp?.finished ? `${oppName} is done, the result lands any second` : done >= n ? `${oppName} is finishing up` : `${oppName} is on hole ${done + 1}`}
+        {!opp?.finished && left > 0 && <small> · forfeit in {fmtClock(left)}</small>}
+      </div>
+      <button className="quiet duel-leave" onClick={onLeave}>
+        Leave · the result still counts
+      </button>
+    </div>
+  );
+}
+
+const fmtClock = (ms: number) => {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side: 'p1' | 'p2' }) {
   const other = side === 'p1' ? 'p2' : 'p1';

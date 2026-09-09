@@ -534,14 +534,26 @@ async function courseHole(seed: string, index: number): Promise<Hole | null> {
 }
 
 /** Above average, beatable: usually a solid competent line, sometimes the best one, never the worst. */
-function pickBotLine(report: { bestRun: { solution: Stroke[]; strokes: number | null } | null; runs: { solution: Stroke[]; strokes: number | null }[] }, seed: number): Stroke[] | null {
-  const ok = report.runs.filter((r) => r.strokes !== null && r.solution.length > 0).sort((a, b) => (a.strokes ?? 99) - (b.strokes ?? 99));
-  const r = ((seed * 1103515245 + 12345) >>> 0) / 4294967296;
-  if (report.bestRun && report.bestRun.solution.length > 0 && r < 0.3) return report.bestRun.solution;
+function pickBotLine(report: { bestRun: { solution: Stroke[]; strokes: number | null } | null; runs: { solution: Stroke[]; strokes: number | null }[] }, seed: number, par: number): Stroke[] | null {
+  const ok = report.runs.filter((r) => r.strokes !== null && r.solution.length > 0);
+  if (report.bestRun && report.bestRun.solution.length > 0) ok.push(report.bestRun);
   if (!ok.length) return report.bestRun?.solution ?? null;
-  // Somewhere in the better half of the competent runs.
-  const i = Math.min(ok.length - 1, Math.floor(r * Math.max(1, ok.length / 2)));
-  return ok[i].solution;
+  const roll = (x: number) => ((x * 1103515245 + 12345) >>> 0) / 4294967296;
+  const r1 = roll(seed);
+  const r2 = roll((seed ^ 0x9e3779b9) >>> 0);
+  // A decent-not-deadly golfer: mostly par, a birdie now and then, a bogey or a double about as often.
+  const target = par + (r1 < 0.1 ? -1 : r1 < 0.55 ? 0 : r1 < 0.85 ? 1 : 2);
+  // The known line closest to that score; among equals, any of them.
+  let closest: typeof ok = [];
+  let gap = Infinity;
+  for (const r of ok) {
+    const g = Math.abs((r.strokes ?? 99) - target);
+    if (g < gap) {
+      gap = g;
+      closest = [r];
+    } else if (g === gap) closest.push(r);
+  }
+  return closest[Math.min(closest.length - 1, Math.floor(r2 * closest.length))].solution;
 }
 
 Deno.serve(async (req: Request) => {
@@ -977,7 +989,7 @@ Deno.serve(async (req: Request) => {
       let seed = 0;
       for (const ch of `${matchId}:${index}`) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
       const report = solveHole(hole, DEFAULT_PARAMS, { ...BOT_SOLVE, seed: seed || 1 });
-      const line = pickBotLine(report, seed);
+      const line = pickBotLine(report, seed, hole.par);
       let strokes: Stroke[] = line ?? [{ angle: Math.atan2(hole.cup.y - hole.tee.y, hole.cup.x - hole.tee.x), power: 0.7 }];
       let st = replay(hole, 0, strokes, DEFAULT_PARAMS).state;
       if (!st.done && line) {
