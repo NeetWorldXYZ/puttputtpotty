@@ -297,7 +297,8 @@ export const api = {
   /** Today's and this week's challenges with your progress, plus royal points and streak. */
   async challenges(): Promise<ChallengeBoard | null> {
     await ensureSession();
-    return await readRpc<ChallengeBoard | null>('challenge_board', {});
+    const b = await readRpc<ChallengeBoard | null>('challenge_board', {});
+    return b && Array.isArray(b.daily?.items) && Array.isArray(b.weekly?.items) ? b : null;
   },
   /** Collects the points for a finished challenge. The server re-checks progress. */
   async claimChallenge(period: string, key: string): Promise<number> {
