@@ -335,6 +335,7 @@ async function bathrooms(lat: number, lng: number, radius: number): Promise<{ pl
 }
 
 type Stroke = { angle: number; power: number; t?: number };
+type Hole = { id: string; name?: string; theme?: string; par: number; tee: { x: number; y: number }; cup: { x: number; y: number } } & Record<string, unknown>;
 
 function validStrokes(v: unknown): v is Stroke[] {
   if (!Array.isArray(v) || v.length === 0 || v.length > STROKE_CAP + 2) return false;
@@ -497,15 +498,39 @@ function dedupePlaces(places: OsmPlace[]): OsmPlace[] {
   return kept;
 }
 
-async function courseHole(seed: string, index: number) {
+/**
+ * A hole of a seeded course. Daily holes are generated in full (the phone
+ * generates the same hole itself, so the two must match exactly). Match holes
+ * come from the server only, so they are built like a bathroom's: two
+ * attempts per request under the edge CPU budget, retried under a new seed
+ * suffix next request, the undecorated fallback accepted after GEN_MAX_TRIES.
+ * Returns null while a match hole is still being built.
+ */
+async function courseHole(seed: string, index: number): Promise<Hole | null> {
   const { data: cached } = await admin.from('course_holes').select('hole, par').eq('seed', seed).eq('hole_index', index).maybeSingle();
-  if (cached) return cached.hole;
+  if (cached) return cached.hole as Hole;
   // The first N slots of a plan are the same for any count, so one 18-hole plan serves 3, 9 and 18.
-  const slot = courseSlots(seed, 18)[index];
+  const slot = courseSlots(seed, 18)[index] as { seed: string; archetype: string; difficulty: 'easy' | 'medium' | 'hard'; theme: string; index: number } | undefined;
   if (!slot) throw new Error('bad hole index');
-  const g = generateSlot(seed, slot);
-  await admin.from('course_holes').upsert({ seed, hole_index: index, hole: g.hole, par: g.hole.par });
-  return g.hole;
+  if (!seed.startsWith('m-')) {
+    const g = generateSlot(seed, slot);
+    await admin.from('course_holes').upsert({ seed, hole_index: index, hole: g.hole, par: g.hole.par });
+    return g.hole as Hole;
+  }
+  const { data: prog } = await admin.from('course_gen').select('tries').eq('seed', seed).eq('hole_index', index).maybeSingle();
+  const k = prog?.tries ?? 0;
+  const trySeed = k === 0 ? slot.seed : `${slot.seed}:try${k}`;
+  const g = generateHole({ seed: trySeed, archetype: slot.archetype, difficulty: slot.difficulty, maxAttempts: GEN_ATTEMPTS_PER_REQUEST, solve: GEN_SOLVE });
+  g.hole.id = `${seed}-${index + 1}`;
+  g.hole.theme = slot.theme;
+  if (!g.fallback || k + 1 >= GEN_MAX_TRIES) {
+    // Two players load the same course at once: the first one in wins, the other reads it back.
+    await admin.from('course_holes').upsert({ seed, hole_index: index, hole: g.hole, par: g.hole.par }, { onConflict: 'seed,hole_index', ignoreDuplicates: true });
+    const { data: row } = await admin.from('course_holes').select('hole').eq('seed', seed).eq('hole_index', index).maybeSingle();
+    return (row?.hole ?? g.hole) as Hole;
+  }
+  await admin.from('course_gen').upsert({ seed, hole_index: index, tries: k + 1, updated_at: new Date().toISOString() });
+  return null;
 }
 
 /** Above average, beatable: usually a solid competent line, sometimes the best one, never the worst. */
@@ -644,7 +669,8 @@ Deno.serve(async (req: Request) => {
     if (action === 'course-hole') {
       const { seed, index } = body;
       if (typeof seed !== 'string' || !/^(\d{4}-\d{2}-\d{2}(-am|-pm)?|m-[a-f0-9]{8})$/.test(seed) || typeof index !== 'number' || index < 0 || index > 17) return json({ error: 'bad course' }, 400);
-      return json({ hole: await courseHole(seed, index) });
+      const hole = await courseHole(seed, index);
+      return json(hole ? { hole } : { building: true });
     }
 
     if (action === 'submit') {
@@ -665,7 +691,11 @@ Deno.serve(async (req: Request) => {
         if (m.status !== 'playing') return json({ error: m.status === 'waiting' ? 'opponent has not joined yet' : 'match is over' }, 400);
         if (m[`${side}_score`] !== null) return json({ error: 'already submitted' }, 409);
         const mh: unknown[] = [];
-        for (let i = 0; i < n; i++) mh.push(await courseHole(m.seed, i));
+        for (let i = 0; i < n; i++) {
+          const h = await courseHole(m.seed, i);
+          if (!h) return json({ error: `hole ${i + 1} is still being built` }, 409);
+          mh.push(h);
+        }
         const scores: number[] = [];
         for (let i = 0; i < mh.length; i++) {
           const st = replay(mh[i], 0, (strokes as Stroke[][])[i], DEFAULT_PARAMS).state;
@@ -728,6 +758,7 @@ Deno.serve(async (req: Request) => {
         if (!validStrokes(strokes)) return json({ error: 'bad strokes' }, 400);
         strokeLists = [strokes];
         const hole = await courseHole(courseSeed, holeIndex);
+        if (!hole) return json({ error: 'that hole is still being built' }, 409);
         holes = [hole];
         par = hole.par;
         const { data: dup } = await admin.from('runs').select('id').eq('user_id', user.id).eq('course_seed', courseSeed).eq('hole_index', holeIndex).maybeSingle();
@@ -942,6 +973,7 @@ Deno.serve(async (req: Request) => {
       const scores = (Array.isArray(plan.scores) ? plan.scores : []) as (number | null)[];
       if (strokesAll[index]) return json({ ok: true, index, score: scores[index] ?? null, planned: plan.planned });
       const hole = await courseHole(m.seed, index);
+      if (!hole) return json({ error: 'hole not built yet' }, 409);
       let seed = 0;
       for (const ch of `${matchId}:${index}`) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
       const report = solveHole(hole, DEFAULT_PARAMS, { ...BOT_SOLVE, seed: seed || 1 });

@@ -156,16 +156,24 @@ export function MatchScreen({ code, matchId }: Props) {
         const n = match.holes || 9;
         for (let i = 0; i < n; i++) {
           setBuilding(i + 1);
+          // The server builds a match hole a couple of attempts per request; keep asking until it is laid out.
           let hole: Hole | null = null;
-          for (let attempt = 0; attempt < 4 && !hole; attempt++) {
+          let failures = 0;
+          for (let attempt = 0; attempt < 30 && !hole; attempt++) {
+            if (cancelled) return;
             try {
-              hole = (await api.courseHole(match.seed, i)).hole;
+              const r = await api.courseHole(match.seed, i);
+              failures = 0;
+              if (r.hole) hole = r.hole;
+              else await new Promise((res) => setTimeout(res, 250));
             } catch (e) {
-              if (attempt === 3) throw e;
-              await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+              failures++;
+              if (failures >= 4) throw e;
+              await new Promise((res) => setTimeout(res, 600 * failures));
             }
           }
-          hs.push(hole!);
+          if (!hole) throw new Error(`hole ${i + 1} is taking too long to build, try again`);
+          hs.push(hole);
         }
         if (cancelled) return;
         setHoles(hs);
