@@ -30,7 +30,17 @@
 .clubhouse-secondary button > span { flex:1;min-width:0; }
 .clubhouse-secondary strong { display:block;font:900 clamp(14px,4vw,20px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic; }
 .clubhouse-secondary small { display:block;margin-top:4px;font:600 10px/1.2 system-ui,sans-serif;color:#b8cdd3; }
-.clubhouse-secondary b { font-size:25px; }
+.clubhouse-secondary > button > b { font-size:25px; }
+/* Your standing, big: score, to par, rank (or the all-time match record). */
+.clubhouse-secondary .sec-stat { display:flex;align-items:baseline;flex-wrap:wrap;gap:0 5px;margin-top:2px; }
+.clubhouse-secondary .sec-num { font:900 22px/1 Impact,'Arial Narrow',sans-serif;font-style:italic;color:#ffe188;letter-spacing:.3px; }
+.clubhouse-secondary .sec-num.lost { color:#ffb3c6; }
+.clubhouse-secondary .sec-stat i { font:800 12px/1 var(--game-font);font-style:normal;color:#fff7df;padding:2px 5px;border-radius:999px;background:#1b3456;border:1px solid #45658b; }
+.clubhouse-secondary .sec-stat i.under { background:#1f9d5a;border-color:#4be69a;color:#fff; }
+.clubhouse-secondary .sec-stat i.over { background:#a4561f;border-color:#d3782f;color:#fff; }
+.clubhouse-secondary .sec-stat i.dash { background:none;border:0;padding:0;color:#b8cdd3;font-size:18px;font-weight:900; }
+.clubhouse-secondary .sec-stat em { flex-basis:100%;font:700 10px/1.3 system-ui,sans-serif;font-style:normal;color:#b8cdd3;letter-spacing:.04em;text-transform:uppercase; }
+.clubhouse-secondary .sec-stat em.top { color:#ffd044; }
 .clubhouse-home .clubhouse-custom { flex:0 0 26px;align-self:center;min-height:26px;padding:2px 8px;border:0;background:none;color:#fff7df;font:700 11px/1.2 var(--game-font);text-shadow:0 2px 3px #08263c; }
 .clubhouse-invitation:active,.clubhouse-kingdom:active,.clubhouse-secondary button:active { transform:translateY(2px); }
 .clubhouse-gold-marker { animation:clubhouse-glimmer 3s ease-in-out infinite; }
@@ -41,6 +51,8 @@
   .clubhouse-home .clubhouse-map-cta { flex-basis:46px; }
   .clubhouse-secondary button { min-height:54px; }
   .clubhouse-secondary small { display:none; }
+  .clubhouse-secondary .sec-stat em { display:none; }
+  .clubhouse-secondary .sec-num { font-size:19px; }
   .clubhouse-home .clubhouse-kingdom { flex-basis:40px; }
 }
 @media(max-height:530px) {

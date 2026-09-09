@@ -320,6 +320,14 @@ export const api = {
   async profile(userId: string): Promise<PlayerProfile | null> {
     return await readRpc<PlayerProfile | null>('player_profile', { in_user: userId });
   },
+  /** Your rank on a daily course among everyone who finished it, or null if you have not. */
+  async dailyStanding(seed: string): Promise<{ rank: number; of: number; total: number; par: number } | null> {
+    await ensureSession();
+    const { data, error } = await supabase.rpc('daily_standing', { in_seed: seed });
+    if (error) throw new Error(error.message);
+    const row = (Array.isArray(data) ? data[0] : data) as { rank: number; of_players: number; total: number; par: number } | undefined;
+    return row ? { rank: Number(row.rank), of: Number(row.of_players), total: row.total, par: row.par } : null;
+  },
   async leaderboard(seed: string): Promise<DailyRow[]> {
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);
