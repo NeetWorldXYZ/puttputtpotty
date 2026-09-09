@@ -516,6 +516,49 @@ export function MapScreen() {
   const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
   const searchedRef = useRef(false);
+  const clubhousesRef = useRef<() => void>(() => {});
+
+  /**
+   * Buildings come from OpenStreetMap volunteers, so a small-town bar is often
+   * a dot on bare ground. Every pin in view with nothing traced under it gets a
+   * little tan clubhouse so a throne always sits on something.
+   */
+  const refreshClubhouses = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !loadedRef.current || !map.getSource('clubhouses')) return;
+    const src = map.getSource('clubhouses') as maplibregl.GeoJSONSource;
+    if (map.getZoom() < 14) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    const bounds = map.getBounds();
+    const features: GeoJSON.Feature[] = [];
+    for (const p of placesRef.current.values()) {
+      if (!bounds.contains([p.lng, p.lat])) continue;
+      const under = map.queryRenderedFeatures(map.project([p.lng, p.lat]), { layers: ['building'] });
+      if (under.length) continue;
+      // A footprint of its own, about the size of a corner bar (16 to 26 m wide), decided by the id so it never jitters.
+      let h = 0;
+      for (let i = 0; i < p.id.length; i++) h = (h * 31 + p.id.charCodeAt(i)) >>> 0;
+      const w = 16 + (h % 11);
+      const d = 12 + ((h >>> 4) % 9);
+      const dLat = d / 2 / 111320;
+      const dLng = w / 2 / (111320 * Math.cos((p.lat * Math.PI) / 180));
+      features.push({
+        type: 'Feature',
+        properties: { id: p.id },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[[p.lng - dLng, p.lat - dLat], [p.lng + dLng, p.lat - dLat], [p.lng + dLng, p.lat + dLat], [p.lng - dLng, p.lat + dLat], [p.lng - dLng, p.lat - dLat]]],
+        },
+      });
+    }
+    src.setData({ type: 'FeatureCollection', features });
+  }, []);
+  clubhousesRef.current = refreshClubhouses;
+  useEffect(() => {
+    refreshClubhouses();
+  }, [places, zoomStep, mapLoaded, refreshClubhouses]);
 
   // --- map
   useEffect(() => {
@@ -548,9 +591,15 @@ export function MapScreen() {
       map.addLayer({ id: 'accuracy-line', type: 'line', source: 'accuracy', paint: { 'line-color': '#1f2a44', 'line-width': 1, 'line-dasharray': [2, 2] } });
       map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: { 'line-cap': 'round' }, paint: { 'line-color': '#1f2a44', 'line-width': 3, 'line-dasharray': [1.5, 2], 'line-opacity': 0.85 } });
+      // Little clubhouses under pins that sit on bare ground (nobody traced the building in OpenStreetMap).
+      map.addSource('clubhouses', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'clubhouse', type: 'fill', source: 'clubhouses', minzoom: 14, paint: { 'fill-color': '#dec99d' } }, 'water-name');
+      map.addLayer({ id: 'clubhouse-outline', type: 'line', source: 'clubhouses', minzoom: 14, paint: { 'line-color': '#233e46', 'line-width': 1.2 } }, 'water-name');
       loadedRef.current = true;
       setMapLoaded(true);
     });
+    // Once tiles are in, look under every pin in view for a building.
+    map.on('idle', () => clubhousesRef.current());
     map.on('error', (e) => {
       // Tile and font hiccups are non-fatal; keep them out of the user's face.
       console.warn('map', (e as { error?: Error }).error?.message ?? e);
