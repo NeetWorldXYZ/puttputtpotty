@@ -405,6 +405,10 @@ async function isAdmin(userId: string): Promise<boolean> {
 function nameKey(s: string): string {
   return s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
 }
+/** The same name written differently ("Hampton Inn" / "hampton inn"), not a longer one ("Hampton" -> "Hampton Inn" is a real rename). */
+function sameSpelling(a: string, b: string): boolean {
+  return nameKey(a) === nameKey(b);
+}
 function sameName(a: string, b: string): boolean {
   const x = nameKey(a);
   const y = nameKey(b);
@@ -875,13 +879,13 @@ Deno.serve(async (req: Request) => {
       if ((mine ?? 0) >= REPORTS_PER_DAY && !adminUser) return json({ error: 'enough reports for today' }, 429);
       const row = await ensureLocation({ id: place.id, name: String(place.name ?? 'Bathroom'), poiType: String(place.poiType ?? 'toilets'), lat: place.lat, lng: place.lng }, user.id);
       if (row.status === 'hidden') return json({ ok: true, applied: true, hidden: true });
-      if (reason === 'renamed' && sameName(row.name, details)) return json({ ok: true, applied: true, name: row.name });
+      if (reason === 'renamed' && sameSpelling(row.name, details)) return json({ ok: true, applied: true, name: row.name });
       const window = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
       // One open report per player per place; a new one replaces it.
       await admin.from('place_reports').delete().eq('reporter', user.id).eq('location_id', row.id);
       await admin.from('place_reports').insert({ reporter: user.id, location_id: row.id, reason, details: details || null });
       const { data: rows } = await admin.from('place_reports').select('reporter, reason, details').eq('location_id', row.id).gte('created_at', window);
-      const agree = (rows ?? []).filter((r) => r.reason === reason && (reason !== 'renamed' || sameName(String(r.details ?? ''), details)));
+      const agree = (rows ?? []).filter((r) => r.reason === reason && (reason !== 'renamed' || sameSpelling(String(r.details ?? ''), details)));
       const distinct = new Set(agree.map((r) => r.reporter)).size;
       const apply = adminUser || distinct >= PLACE_REPORTS_TO_APPLY;
       if (apply) {
@@ -904,7 +908,7 @@ Deno.serve(async (req: Request) => {
       const byPlace = new Map<string, { reason: string; details: string | null; reporters: Set<string>; latest: string }[]>();
       for (const r of reports ?? []) {
         const list = byPlace.get(r.location_id) ?? [];
-        let g = list.find((x) => x.reason === r.reason && (r.reason !== 'renamed' || sameName(String(x.details ?? ''), String(r.details ?? ''))));
+        let g = list.find((x) => x.reason === r.reason && (r.reason !== 'renamed' || sameSpelling(String(x.details ?? ''), String(r.details ?? ''))));
         if (!g) {
           g = { reason: r.reason, details: r.details, reporters: new Set(), latest: r.created_at };
           list.push(g);
