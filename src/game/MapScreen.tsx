@@ -9,7 +9,7 @@ import { HOLES_PER_COURSE, api, fmtElapsed, type King, type LocationRow, type Ne
 import { currentUserId, ensureSession, getSavedAvatar } from '../net/supabase';
 import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
-import { fmtDistance, haversine, watchPosition, type Fix } from '../net/geo';
+import { fmtDistance, geoHelp, haversine, watchPosition, type Fix, type GeoErrorCode } from '../net/geo';
 import { CLAIM_RADIUS_M } from '../net/config';
 import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
 import { getSavedName } from '../net/supabase';
@@ -247,6 +247,37 @@ function FoundSheet({
   );
 }
 
+/** The phone won't give a position: what happened and how to fix it on this phone. */
+function GeoHelpCard({ code, onRetry, onDismiss }: { code: GeoErrorCode; onRetry: () => void; onDismiss: () => void }) {
+  const h = geoHelp(code);
+  return (
+    <div className="geo-help" role="alert">
+      <div className="geo-help-head">
+        <span className="geo-help-icon" aria-hidden="true">📍</span>
+        <div>
+          <h3>{h.title}</h3>
+          <p>{h.why}</p>
+        </div>
+      </div>
+      {h.steps.length > 0 && (
+        <ol className="geo-help-steps">
+          {h.steps.map((st) => (
+            <li key={st}>{st}</li>
+          ))}
+        </ol>
+      )}
+      <div className="geo-help-actions">
+        {h.retry && (
+          <button className="primary" onClick={onRetry}>
+            Try again
+          </button>
+        )}
+        <button onClick={onDismiss}>Look around without it</button>
+      </div>
+    </div>
+  );
+}
+
 /** Something is wrong with a place: closed, a new name, or not a bathroom at all. */
 function PlaceReportSheet({ place, isAdmin, onClose }: { place: OsmPlace; isAdmin: boolean; onClose: (r: { hidden?: boolean; name?: string; msg: string } | null) => void }) {
   const [reason, setReason] = useState<PlaceReason>('closed');
@@ -472,6 +503,9 @@ export function MapScreen() {
 
   const [fix, setFix] = useState<Fix | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoCode, setGeoCode] = useState<GeoErrorCode>(1);
+  /** The player chose to look around without a position; the card stays away until they ask for location again. */
+  const [geoDismissed, setGeoDismissed] = useState(false);
   const [places, setPlaces] = useState<OsmPlace[]>([]);
   const [kings, setKings] = useState<Record<string, NearbyLocation>>({});
   const kingsRef = useRef<Record<string, NearbyLocation>>({});
@@ -621,7 +655,10 @@ export function MapScreen() {
         setGeoError(null);
         rememberFix(f.lat, f.lng);
       },
-      (msg) => setGeoError(msg),
+      (msg, code) => {
+        setGeoError(msg);
+        setGeoCode(code);
+      },
     );
   }, []);
 
@@ -1112,6 +1149,11 @@ export function MapScreen() {
       <div className="map-tools">
         {moved && fix && osmLoading && <div className="map-tool quiet">searching…</div>}
         {thronesDown === 'stale' && <div className="map-tool quiet">reconnecting…</div>}
+        {geoError && geoDismissed && (
+          <button className="map-tool geo-again" onClick={() => setGeoDismissed(false)}>
+            📍 Use my location
+          </button>
+        )}
         <button className="map-tool" onClick={closest} title="Closest bathroom">
           🚽 Closest
         </button>
@@ -1249,29 +1291,29 @@ export function MapScreen() {
           {fix && <button onClick={() => void loadThrones(fix.lat, fix.lng)}>Retry</button>}
         </div>
       )}
-      {(geoError || netError) && !selected && (
+      {netError && !geoError && !selected && (
         <div className="map-notice">
-          {geoError ?? netError}
-          {!geoError && netError && fix && (
-            <button onClick={() => void search(fix.lat, fix.lng)}>Retry</button>
-          )}
-          {geoError && (
-            <button
-              onClick={() => {
-                setGeoError(null);
-                navigator.geolocation?.getCurrentPosition(
-                  (p) => setFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, at: Date.now() }),
-                  (e) => setGeoError(e.message),
-                  { enableHighAccuracy: true },
-                );
-              }}
-            >
-              Retry
-            </button>
-          )}
+          {netError}
+          {fix && <button onClick={() => void search(fix.lat, fix.lng)}>Retry</button>}
         </div>
       )}
-
+      {geoError && !selected && !placing && !geoDismissed && (
+        <GeoHelpCard
+          code={geoCode}
+          onRetry={() => {
+            setGeoError(null);
+            navigator.geolocation?.getCurrentPosition(
+              (p) => setFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, at: Date.now() }),
+              (e) => {
+                setGeoError(geoHelp(e.code as GeoErrorCode).title);
+                setGeoCode(e.code as GeoErrorCode);
+              },
+              { enableHighAccuracy: true, timeout: 15000 },
+            );
+          }}
+          onDismiss={() => setGeoDismissed(true)}
+        />
+      )}
       {selected && (
         <div className="map-sheet pop ts">
           <button className="sheet-close" onClick={() => setSelected(null)} aria-label="Close">
