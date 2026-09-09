@@ -92,6 +92,8 @@ export interface FriendRow {
   invite_id: string | null;
   invite_code: string | null;
   invite_holes: number | null;
+  /** The house account's tag ("Head Janitor"): everybody's first friend. */
+  house_tag?: string | null;
 }
 export interface FriendLookupRow {
   user_id: string;

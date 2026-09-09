@@ -226,7 +226,10 @@ export function FriendsPanel({ initialQuery }: { initialQuery?: string | null })
                   <i className="fr-dot" aria-hidden="true" />
                 </span>
                 <span className="fr-who">
-                  <strong>{f.display_name}</strong>
+                  <strong>
+                    {f.display_name}
+                    {f.house_tag && <em className="fr-tag">{f.house_tag}</em>}
+                  </strong>
                   <small>
                     {f.invite_code ? `wants to play · ${f.invite_holes ?? 9} holes` : lastSeen(f.last_seen_at, on)}
                     {!f.invite_code && f.thrones > 0 ? ` · ${f.thrones} ${f.thrones === 1 ? 'throne' : 'thrones'}` : ''}
