@@ -259,6 +259,10 @@ export const api = {
     if (error) throw new Error(error.message.replace(/^.*?: /, ''));
     return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },
+  /** Nobody joined: seat a computer opponent (it looks like any other player). */
+  botJoin: (matchId: string) => call<{ ok: true; status: string; holeTimes?: number[] }>({ action: 'bot-join', matchId }),
+  /** Plans one hole of the bot's round; returns that hole's score. */
+  botPlan: (matchId: string, index: number) => call<{ ok: true; index: number; score: number | null; planned: number }>({ action: 'bot-plan', matchId, index }),
   async cancelMatch(id: string): Promise<void> {
     await supabase.rpc('cancel_match', { in_id: id });
   },
