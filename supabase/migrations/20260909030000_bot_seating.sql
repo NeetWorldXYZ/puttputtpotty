@@ -32,6 +32,9 @@ begin
     select x into nm from unnest(names) x where not exists (select 1 from public.profiles where display_name = x) order by random() limit 1;
     if nm is null then nm := 'Golfer ' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 4)); end if;
     bot := gen_random_uuid();
+    -- profiles.id references auth.users: a bot needs an auth row (never logs in: no password, no session).
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change, is_anonymous)
+      values ('00000000-0000-0000-0000-000000000000', bot, 'authenticated', 'authenticated', 'bot-' || bot || '@bots.puttputtpotty.invalid', '', now(), '{"provider":"bot","providers":["bot"]}'::jsonb, '{"bot":true}'::jsonb, now(), now(), '', '', '', '', false);
     insert into public.profiles (id, display_name, is_bot, avatar) values (bot, nm, true, jsonb_build_object(
       'porcelain', porcelain[1 + floor(random() * array_length(porcelain, 1))::int],
       'seat', seats[1 + floor(random() * array_length(seats, 1))::int],
@@ -50,6 +53,7 @@ begin
 end;
 $$;
 revoke all on function public.seat_bot(uuid) from public, anon, authenticated;
+grant execute on function public.seat_bot(uuid) to service_role;
 
 drop function if exists public.match_state(uuid);
 create function public.match_state(in_id uuid)
