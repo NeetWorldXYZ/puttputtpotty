@@ -74,6 +74,7 @@ export interface MatchRow {
   finished_at: string | null;
   p1_avatar: Avatar | null;
   p2_avatar: Avatar | null;
+  created_at?: string;
   /** Set when the opponent is a bot; the bot's cumulative hole clock (ms) is only sent to the player who faces it. */
   p2_bot?: boolean;
   bot_times?: number[] | null;
@@ -228,7 +229,8 @@ export const api = {
     call<{ ok: true; distance: number }>({ action: 'checkin', locationId, lat, lng, accuracy }),
   /** Bathrooms near a point, fetched from OpenStreetMap by the server and cached there. */
   bathrooms: (lat: number, lng: number, radius: number) => call<{ places: { id: string; name: string; poiType: string; lat: number; lng: number }[]; cached: boolean }>({ action: 'bathrooms', lat, lng, radius }),
-  courseHole: (seed: string, index: number) => call<{ hole: Hole }>({ action: 'course-hole', seed, index }),
+  /** A hole of a seeded course; a match hole answers `building` while the server is still laying it out. */
+  courseHole: (seed: string, index: number) => call<{ hole?: Hole; building?: boolean }>({ action: 'course-hole', seed, index }),
   /** Starts the server-side round clock for a throne run (needs a check-in). */
   start: (locationId: string) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId }),
   /** One stroke list per hole, in order. The server replays all three. */
@@ -269,8 +271,9 @@ export const api = {
   async cancelMatch(id: string): Promise<void> {
     await supabase.rpc('cancel_match', { in_id: id });
   },
-  async matchState(id: string): Promise<MatchRow> {
-    const { data, error } = await supabase.rpc('match_state', { in_id: id });
+  /** The match as the server sees it. `quick` seats a bot after two seconds instead of ten (testing alone). */
+  async matchState(id: string, quick = false): Promise<MatchRow> {
+    const { data, error } = await supabase.rpc('match_state', quick ? { in_id: id, in_quick: true } : { in_id: id });
     if (error) throw new Error(error.message);
     return (Array.isArray(data) ? data[0] : data) as MatchRow;
   },

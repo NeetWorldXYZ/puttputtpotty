@@ -36,8 +36,8 @@ interface Progress {
 }
 
 const POLL_MS = 2000;
-/** Random matchmaking waits this long for a person before a bot is seated (shorter with ?bot=1 for testing). */
-const BOT_WAIT_MS = 12000 + Math.random() * 8000;
+/** What the search says while it looks, one line every few seconds. */
+const SEARCH_LINES = ['Looking for players near you…', 'Checking who’s on the course…', 'Paging the clubhouse…', 'Rolling the greens…', 'Almost paired up…'];
 
 /**
  * Quick match: two players, the same three server-generated holes, live
@@ -113,34 +113,25 @@ export function MatchScreen({ code, matchId }: Props) {
     navigate('match', null, null, { match: m.id, replace: true });
   };
 
-  // Waiting: if nobody comes, seat a bot (random matchmaking only, never invites).
+  // Waiting: poll until an opponent joins (the server seats a bot after ten seconds; ?bot=1 makes it two).
+  const quickBot = typeof location !== 'undefined' && new URLSearchParams(location.search).get('bot') === '1';
+  const [waitSec, setWaitSec] = useState(0);
+  const waitStartRef = useRef(0);
   useEffect(() => {
-    if (phase !== 'waiting' || !match || match.code) return;
-    const quick = new URLSearchParams(location.search).get('bot') === '1';
-    const id = setTimeout(() => {
-      api
-        .botJoin(match.id)
-        .then((r) => {
-          if (r.status !== 'playing') return;
-          botRef.current = { times: r.holeTimes ?? [], scores: [] };
-          return api.matchState(match.id).then((m) => {
-            sfx.pop();
-            buzz(20);
-            enter(m);
-          });
-        })
-        .catch(() => {});
-    }, quick ? 1500 : BOT_WAIT_MS);
-    return () => clearTimeout(id);
+    if (phase !== 'waiting' || !match) return;
+    // match_state rows carry no created_at; the clock starts from the row that opened the match and is not reset by polls.
+    waitStartRef.current = match.created_at ? new Date(match.created_at).getTime() : Date.now();
+    const tick = () => setWaitSec(Math.max(0, Math.floor((Date.now() - waitStartRef.current) / 1000)));
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, match?.id]);
-
-  // Waiting: poll until an opponent joins.
   useEffect(() => {
     if (phase !== 'waiting' || !match) return;
     const id = setInterval(() => {
       api
-        .matchState(match.id)
+        .matchState(match.id, quickBot && !match.code)
         .then((m) => {
           if (m.status === 'playing') {
             sfx.pop();
@@ -165,16 +156,24 @@ export function MatchScreen({ code, matchId }: Props) {
         const n = match.holes || 9;
         for (let i = 0; i < n; i++) {
           setBuilding(i + 1);
+          // The server builds a match hole a couple of attempts per request; keep asking until it is laid out.
           let hole: Hole | null = null;
-          for (let attempt = 0; attempt < 4 && !hole; attempt++) {
+          let failures = 0;
+          for (let attempt = 0; attempt < 30 && !hole; attempt++) {
+            if (cancelled) return;
             try {
-              hole = (await api.courseHole(match.seed, i)).hole;
+              const r = await api.courseHole(match.seed, i);
+              failures = 0;
+              if (r.hole) hole = r.hole;
+              else await new Promise((res) => setTimeout(res, 250));
             } catch (e) {
-              if (attempt === 3) throw e;
-              await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+              failures++;
+              if (failures >= 4) throw e;
+              await new Promise((res) => setTimeout(res, 600 * failures));
             }
           }
-          hs.push(hole!);
+          if (!hole) throw new Error(`hole ${i + 1} is taking too long to build, try again`);
+          hs.push(hole);
         }
         if (cancelled) return;
         setHoles(hs);
@@ -499,7 +498,24 @@ export function MatchScreen({ code, matchId }: Props) {
                 <div className="sub">{match.holes} holes · waiting for your friend to join…</div>
               </>
             ) : (
-              <div className="sub" role="status">Waiting for another player to join.<br />Your round starts when you’re paired.</div>
+              <div className="search-live" role="status" aria-live="polite">
+                <div className="search-line" key={Math.floor(waitSec / 3) % SEARCH_LINES.length}>
+                  {SEARCH_LINES[Math.floor(waitSec / 3) % SEARCH_LINES.length]}
+                </div>
+                <div className="search-meta">
+                  <span className="search-dots" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span>
+                    Searching · {Math.floor(waitSec / 60)}:{String(waitSec % 60).padStart(2, '0')}
+                  </span>
+                </div>
+                <div className="search-bar" aria-hidden="true">
+                  <span style={{ width: `${Math.min(96, 8 + waitSec * 9)}%` }} />
+                </div>
+              </div>
             )}
             <button onClick={() => void cancel()}>Cancel</button>
           </div>
