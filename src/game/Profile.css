@@ -6,6 +6,8 @@
 .pf-crown .game-icon { width:26px; height:26px; color:#14213d; filter:none; }
 .pf-name { margin:6px 0 0; font:900 clamp(24px,7vw,34px)/1.05 Impact,'Arial Narrow',sans-serif; font-style:italic; letter-spacing:.5px; color:#fff8dc; text-transform:uppercase; paint-order:stroke fill; -webkit-text-stroke:4px #08263c; text-shadow:0 3px 0 #08263c; word-break:break-word; }
 .pf-slogan { font:italic 600 13px/1.3 var(--game-font); color:#c5d8ee; max-width:300px; }
+.pf-titles { display:inline-flex; flex-wrap:wrap; justify-content:center; gap:6px; }
+.pf-title-house { background:linear-gradient(135deg,#ffed95,#ffd12b 65%); border-color:#ffe9a0; color:#14213d; box-shadow:inset 0 -2px 0 #eaa519; }
 .pf-title { display:inline-flex; align-items:center; gap:6px; margin-top:6px; padding:4px 12px; border-radius:999px; background:#0f2440; border:1px solid #3f6390; color:#ffe17d; font:800 11px/1.2 var(--game-font); letter-spacing:.12em; text-transform:uppercase; }
 .pf-since { font:600 11px/1.2 var(--game-font); color:#8fb0d1; }
 .pf-hero-actions { display:flex; gap:8px; margin-top:8px; }

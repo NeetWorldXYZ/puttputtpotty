@@ -104,7 +104,14 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
             </div>
             <h1 className="pf-name">{p.name}</h1>
             {p.slogan && <div className="pf-slogan">&ldquo;{p.slogan}&rdquo;</div>}
-            <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
+            {p.house_tag ? (
+              <span className="pf-titles">
+                <span className="pf-title pf-title-house">🧹 {p.house_tag}</span>
+                <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
+              </span>
+            ) : (
+              <span className="pf-title">♛ {royalTitle(p.thrones)}</span>
+            )}
             <span className="pf-since">Playing since {memberSince(p.since)}</span>
             {(p.points ?? 0) > 0 || (p.streak ?? 0) > 0 ? (
               <span className="pf-points">
