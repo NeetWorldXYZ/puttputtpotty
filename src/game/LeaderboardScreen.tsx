@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, fmtElapsed, type KingRow, type DailyRow } from '../net/api';
-import { currentUserId, getSavedAvatar } from '../net/supabase';
+import { currentUserId } from '../net/supabase';
 import { recallFix } from '../net/places';
 import { dailySeed, dailyEdition, secondsUntilNextDaily } from './courses';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
-import { normalizeAvatar } from './avatarParts';
 import { ProfileStatIcon } from './ProfileStatIcon';
 import { AccountSheet } from './AccountSheet';
 import { MenuVolume } from './MenuControls';
@@ -66,13 +65,9 @@ export function LeaderboardScreen() {
     <main className="rk-content">
       <header className="rk-hero">
         <div className="rk-tools"><MenuVolume/><button onClick={()=>tab==='friends'?setFriendsOpen(true):tab==='nearby'?navigate('map'):tab==='daily'?play():findMe()}>{tab==='friends'?'Invite friends':tab==='nearby'?'Open map':tab==='daily'?'Play daily':'My rank'} →</button></div>
-        <div className="rk-scene" aria-hidden="true">
-          {tab==='world'&&<svg className="rk-globe" viewBox="0 0 360 150"><ellipse cx="180" cy="157" rx="170" ry="137" fill="#137ec0" stroke="#6fd5e8" strokeWidth="4"/><path d="M40 71l35-23 37 4 7 20-27 18 2 25-24 8-5-30Zm118-38 47 8 23 26-18 19-30-10-18 24-25-12 16-21Zm80 55 38-28 39 32-5 28-30-10-10 25-34-16Z" fill="#7bc659"/><g fill="none" stroke="#a9e4ea" opacity=".25"><ellipse cx="180" cy="157" rx="95" ry="137"/><path d="M24 103h311M61 61h239M180 20v130"/></g></svg>}
-          {tab==='friends'?<div className="rk-crew"><Avatar av={{...normalizeAvatar(getSavedAvatar()),hat:'cap',seat:'mint',face:'happy'}} size={85}/><Avatar av={getSavedAvatar()} size={120}/><Avatar av={{...normalizeAvatar(getSavedAvatar()),hat:'cap',seat:'pink',face:'wink'}} size={85}/></div>:<ProfileStatIcon kind="throne"/>}
-          {tab==='nearby'&&<span className="rk-sign">LOCAL<br/>LEGENDS<br/>ONLY</span>}
-          {tab==='daily'&&<span className="rk-sign">TODAY’S<br/>COURSE</span>}
-        </div>
-        <h1>CHASE <em>THE CROWN</em></h1>
+        <img className="rk-header-art" src={'/art/ranks-'+tab+'.webp'} alt="" />
+        <div className="rk-art-space" aria-hidden="true"/>
+        <h1>CHASE <em>THE</em> CROWN</h1>
         <strong className="rk-subtitle">{tab==='daily'?'RANKED BY TODAY’S SCORE':'RANKED BY THRONES HELD'}</strong>
         <p>{captions[tab]}</p>
       </header>

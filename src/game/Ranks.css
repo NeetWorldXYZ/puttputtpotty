@@ -53,3 +53,31 @@
 @media(max-height:730px){.rk-scene{height:100px}.rk-scene>.pf-stat-icon{width:100px;height:108px}.rk-crew{transform:scale(.78);transform-origin:bottom}.rk-sign{font-size:12px;padding:6px}.rk-hero h1{font-size:31px}.rk-hero{padding-bottom:9px}}
 @media(min-width:500px){.rk-scene{height:175px}.rk-hero h1{font-size:46px}.rk-board li{min-height:56px}.rk-player{font-size:14px}}
 @media(prefers-reduced-motion:reduce){.rk-content{scroll-behavior:auto}}
+
+/* Dedicated illustrated header compositions, replacing the home-screen backdrop. */
+.leaders.ranks-screen{background:linear-gradient(#04304d,#005344 65%,#023448)}
+.rk-content{padding-left:10px;padding-right:10px}
+.rk-hero{padding-bottom:9px;background:none}
+.rk-hero:before{display:none}
+.rk-header-art{position:absolute;left:-10px;top:0;width:calc(100% + 20px);height:calc(100% - 39px);object-fit:cover;object-position:center 42%;z-index:-1;mask-image:linear-gradient(#000 87%,transparent)}
+.rk-tools{height:39px;padding-top:6px}
+.rk-tools>button:last-child{min-height:32px;padding:5px 10px;border-radius:12px;background:#03283fd9}
+.rk-art-space{height:clamp(130px,40vw,190px)}
+.rk-hero h1{font-size:clamp(30px,9.2vw,49px);letter-spacing:-.9px;transform:rotate(-2deg);margin:-8px -1px 6px;white-space:nowrap;-webkit-text-stroke:8px #031f34}
+.rk-hero h1 em{color:#ffe16b}
+.rk-subtitle{font:900 12px/1.35 Impact,'Arial Narrow',sans-serif;letter-spacing:.3px}
+.rk-hero p{font-size:10px;margin:4px 0 0}
+.rk-tabs{border-radius:10px;margin-bottom:6px;padding:2px}
+.rk-tabs button{min-height:35px;border-radius:8px;font-size:11px}
+.rk-strip{padding:5px 8px;border-radius:8px;margin-bottom:5px;font-size:10px}
+.rk-strip select,.rk-strip button{padding:4px 7px;font-size:10px}
+.rk-board{border-radius:10px;background:#02283fec}
+.rk-board li{min-height:43px;padding:1px 7px;gap:6px}
+.rk-player{font-size:11px;padding:6px 0}
+.rk-tally{flex-basis:60px}.rk-tally strong{font-size:17px}
+.rk-number{font-size:16px;flex-basis:25px}
+.rk-footer{padding:8px;margin-top:6px;border-radius:10px}
+.rk-empty{min-height:0;padding:16px 12px;gap:7px;font-size:12px}
+.rk-empty>.pf-stat-icon{display:none}
+.rk-footer button,.rk-empty button{min-height:34px;padding:6px 10px}
+@media(max-height:730px){.rk-art-space{height:115px}.rk-hero h1{font-size:clamp(28px,8.9vw,40px)}}
