@@ -131,3 +131,15 @@ ${faceSvg(av.face)}
 ${hatSvg(av.hat)}
 ${ballSvg(ballLook(av), 132, 146, 13, id)}`;
 }
+
+/** A random look, from a 0..1 source: bots and previews. */
+export function randomAvatar(r: () => number): Avatar {
+  const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
+  return {
+    porcelain: pick(Object.keys(PORCELAIN)),
+    seat: pick(Object.keys(SEATS)),
+    hat: pick(Object.keys(HATS)),
+    face: pick(Object.keys(FACES)),
+    ball: pick(Object.keys(BALLS)),
+  };
+}
