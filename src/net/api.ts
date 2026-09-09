@@ -126,6 +126,8 @@ export interface PlayerProfile {
   id: string;
   name: string;
   slogan: string | null;
+  /** The house account's tag ("Head Janitor"), shown instead of the royal rank. */
+  house_tag?: string | null;
   avatar: Avatar | null;
   since: string;
   thrones: number;
