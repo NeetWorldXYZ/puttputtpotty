@@ -661,46 +661,145 @@ input[type='checkbox'] {
   margin: 12px 0 14px;
 }
 .chip {
-  width: 44px;
-  height: 52px;
+  position: relative;
+  width: 46px;
+  height: 56px;
   border-radius: 12px;
   border: 2px solid #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   background: #2b3a67;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: chip-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes chip-pop {
+  from {
+    transform: scale(0.4) rotate(-8deg);
+    opacity: 0;
+  }
 }
 .chip-n {
   font-size: 10px;
   color: #c9d8ff;
   font-weight: 700;
+  line-height: 1;
 }
 .chip-s {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 800;
   color: #ffffff;
   line-height: 1;
 }
+.chip-tag {
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  color: #fff;
+  opacity: 0.9;
+}
+/* Par: the plain navy tile. */
+.chip.par {
+  background: linear-gradient(#34457a, #24325a);
+}
+/* Birdie: emerald with a soft glow. */
+.chip.under {
+  background: linear-gradient(160deg, #4be69a, #1f9d5a);
+  border-color: #dffbe9;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 10px rgba(75, 230, 154, 0.55);
+}
+.chip.under .chip-n {
+  color: #e8fff2;
+}
+/* Eagle: royal purple, glowing. */
+.chip.eagle {
+  background: linear-gradient(160deg, #a78bfa, #5b21b6);
+  border-color: #efe7ff;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 12px rgba(167, 139, 250, 0.7);
+  animation: chip-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards, eagle-glow 2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 60ms), 0s;
+}
+.chip.eagle .chip-n {
+  color: #f1e9ff;
+}
+@keyframes eagle-glow {
+  0%,
+  100% {
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 8px rgba(167, 139, 250, 0.5);
+  }
+  50% {
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 18px rgba(196, 181, 253, 0.95);
+  }
+}
+/* Ace: gold, pulsing glow and a shine that sweeps across. */
 .chip.ace {
-  background: #ffd166;
+  background: linear-gradient(160deg, #fff3b0, #ffc633 60%, #f2a51a);
+  border-color: #fff8dc;
+  animation: chip-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) backwards, ace-glow 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 60ms), 0s;
 }
 .chip.ace .chip-s,
-.chip.ace .chip-n {
-  color: var(--ink);
+.chip.ace .chip-n,
+.chip.ace .chip-tag {
+  color: #3a2a05;
 }
-.chip.under {
-  background: #2ea86f;
+.chip.ace .chip-s {
+  text-shadow: 0 1px 0 #fff6cc;
 }
-.chip.par {
-  background: #2b3a67;
+.chip.ace::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 40%;
+  height: 140%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-20deg);
+  animation: ace-shine 2.4s ease-in-out infinite;
 }
+@keyframes ace-glow {
+  0%,
+  100% {
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 8px rgba(255, 209, 74, 0.55);
+  }
+  50% {
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 22px rgba(255, 224, 120, 1), 0 0 36px rgba(255, 200, 60, 0.6);
+  }
+}
+@keyframes ace-shine {
+  0%,
+  55% {
+    left: -60%;
+  }
+  85%,
+  100% {
+    left: 130%;
+  }
+}
+/* Bogey: warm orange. Double or worse: red, with a wince. */
 .chip.over {
-  background: #b8642a;
+  background: linear-gradient(160deg, #d3782f, #a4561f);
 }
 .chip.bad {
-  background: #b03a48;
+  background: linear-gradient(160deg, #cc4a5a, #8f2836);
+}
+.chip.bad .chip-tag {
+  color: #ffd6dc;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .chip.ace,
+  .chip.eagle {
+    animation: none;
+  }
+  .chip.ace::after {
+    display: none;
+  }
 }
 
 /* ---------- title screen ---------- */
@@ -2360,13 +2459,15 @@ input[type='checkbox'] {
   border-color: #fff;
 }
 .duel-hole.under {
-  background: #2ea86f;
-  border-color: #fff;
+  background: linear-gradient(160deg, #4be69a, #1f9d5a);
+  border-color: #dffbe9;
+  box-shadow: 0 0 8px rgba(75, 230, 154, 0.5);
 }
 .duel-hole.ace {
-  background: #ffd166;
-  border-color: #fff;
-  color: var(--ink);
+  background: linear-gradient(160deg, #fff3b0, #ffc633 60%, #f2a51a);
+  border-color: #fff8dc;
+  color: #3a2a05;
+  animation: ace-glow 1.6s ease-in-out infinite;
 }
 .duel-hole.over {
   background: #b8642a;
