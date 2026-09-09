@@ -3,7 +3,7 @@
  * context is created on the first user gesture (browser autoplay rules).
  */
 
-import { stinger, type StingerLevel } from './music';
+import { primeTheme, stinger, type StingerLevel } from './music';
 
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
@@ -136,6 +136,8 @@ export function unlockAudio(): void {
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
     loadCheerSamples();
+    // Render the theme loop now, during the tap, so it starts without a pause and never depends on timers.
+    primeTheme(ctx.sampleRate);
     // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
     syncAudioVisibility();
   } catch {

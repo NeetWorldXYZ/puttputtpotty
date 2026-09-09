@@ -378,13 +378,42 @@ export function stinger(v: Voice, level: StingerLevel, t: number): number {
   return 0.9;
 }
 
-// ---- Live player: look-ahead scheduler on the page's audio context.
+// ---- Live player.
+//
+// The loop is rendered once, offline, and played back as a looping buffer on
+// the audio thread. Nothing about playback depends on JavaScript timers, so a
+// busy main thread (the map, GPS, a Bluetooth route change in the car) cannot
+// make it skip. The look-ahead scheduler below stays as the fallback for a
+// browser that cannot render offline.
 let timer = 0;
 let playing = false;
 let nextBar = 0;
 let nextTime = 0;
 let musicGain: GainNode | null = null;
 let liveCtx: AudioContext | null = null;
+let source: AudioBufferSourceNode | null = null;
+let loopBuf: Promise<AudioBuffer> | null = null;
+let loopRate = 0;
+
+/**
+ * Two passes of the tune, so the second pass starts with the first pass's
+ * tails (the flush that carries the loop around) and loops seamlessly.
+ */
+function themeLoop(sampleRate: number): Promise<AudioBuffer> {
+  if (!loopBuf || loopRate !== sampleRate) {
+    loopRate = sampleRate;
+    loopBuf = renderTheme(BARS * 2, sampleRate).catch((e) => {
+      loopBuf = null;
+      throw e;
+    });
+  }
+  return loopBuf;
+}
+
+/** Renders the loop ahead of time (e.g. on the first tap) so the theme starts without a pause. */
+export function primeTheme(sampleRate = 44100): void {
+  void themeLoop(sampleRate).catch(() => {});
+}
 
 export function isThemePlaying(): boolean {
   return playing;
@@ -401,16 +430,47 @@ export function startTheme(ctx: AudioContext, master: AudioNode, volume = 0.5): 
   if (playing && liveCtx === ctx) return;
   stopTheme();
   liveCtx = ctx;
+  source = null;
   musicGain = ctx.createGain();
   musicGain.gain.setValueAtTime(0.0001, ctx.currentTime);
   musicGain.gain.exponentialRampToValueAtTime(volume, ctx.currentTime + 0.8);
   musicGain.connect(master);
-  const v: Voice = { ctx, out: musicGain };
   playing = true;
+  const gain = musicGain;
+  // The timer scheduler starts the tune at once; the rendered loop takes over at the
+  // next bar boundary as soon as it is ready (instantly when it was primed on the first tap).
+  startScheduled(ctx, gain);
+  themeLoop(ctx.sampleRate).then(
+    (buf) => {
+      if (!playing || liveCtx !== ctx || musicGain !== gain) return;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = 0.05 + BARS * BAR;
+      src.loopEnd = 0.05 + 2 * BARS * BAR;
+      src.connect(gain);
+      window.clearTimeout(timer);
+      if (nextTime > ctx.currentTime) {
+        // Every bar before nextTime is already laid down: pick up from that bar's pattern, exactly on the beat.
+        src.start(nextTime, src.loopStart + (nextBar % BARS) * BAR);
+      } else {
+        src.start(ctx.currentTime + 0.05, src.loopStart);
+      }
+      source = src;
+    },
+    () => {
+      /* No offline rendering here: the timer scheduler keeps playing. */
+    },
+  );
+}
+
+/** Lays bars down a little ahead of the clock from a timer. */
+function startScheduled(ctx: AudioContext, out: GainNode): void {
+  const v: Voice = { ctx, out };
   nextBar = 0;
   nextTime = -1; // unset: (re)synced to the clock when the context is running
   const tick = () => {
-    if (!playing) return;
+    if (!playing || source) return;
     if (ctx.state !== 'running' || document.hidden) {
       nextTime = -1;
       timer = window.setTimeout(tick, 100);
@@ -440,11 +500,21 @@ export function stopTheme(fadeSeconds = 0.35): void {
   window.clearTimeout(timer);
   const g = musicGain;
   const c = liveCtx;
+  const src = source;
   if (g && c) {
     g.gain.cancelScheduledValues(c.currentTime);
     g.gain.setTargetAtTime(0.0001, c.currentTime, fadeSeconds / 3);
-    setTimeout(() => g.disconnect(), fadeSeconds * 1000 + 100);
+    try {
+      src?.stop(c.currentTime + fadeSeconds + 0.1);
+    } catch {
+      /* already stopped */
+    }
+    setTimeout(() => {
+      g.disconnect();
+      src?.disconnect();
+    }, fadeSeconds * 1000 + 200);
   }
+  source = null;
   musicGain = null;
 }
 
