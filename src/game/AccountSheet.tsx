@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './AccountSheet.css';
 import { FriendsPanel } from './FriendsSheet';
 import { api } from '../net/api';
@@ -6,20 +6,8 @@ import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOu
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
 import { getSavedAvatar, saveAvatar } from '../net/supabase';
 import { Avatar } from './Avatar';
-import { BALLS, DEFAULT_AVATAR, FACES, HATS, HEADS, SEATS, headTones, type Avatar as AvatarSpec } from './avatarParts';
-
-type LookOption = readonly [string, string, string | null];
-/** The editor's categories. The colour row follows the head: skin for the classic golfer, paper, browns, greens or coat for the others. */
-function lookGroups(av: AvatarSpec): readonly (readonly [string, keyof AvatarSpec, LookOption[]])[] {
-  return [
-    ['Head', 'head', Object.entries(HEADS).map(([id, v]) => [id, v.label, null] as const)],
-    [av.head === 'classic' ? 'Skin' : 'Colour', 'porcelain', Object.entries(headTones(av.head)).map(([id, v]) => [id, v.label, v.bottom] as const)],
-    ['Shirt', 'seat', Object.entries(SEATS).map(([id, v]) => [id, v.label, v.color] as const)],
-    ['Hat', 'hat', Object.entries(HATS).map(([id, label]) => [id, label, null] as const)],
-    ['Face', 'face', Object.entries(FACES).map(([id, label]) => [id, label, null] as const)],
-    ['Ball', 'ball', Object.entries(BALLS).map(([id, v]) => [id, v.label, v.pattern === 'plain' ? v.color : v.accent] as const)],
-  ];
-}
+import { DEFAULT_AVATAR, type Avatar as AvatarSpec } from './avatarParts';
+import { AvatarCustomizer } from './AvatarCustomizer';
 
 interface Props {
   onClose: (name: string | null) => void;
@@ -39,7 +27,7 @@ type Mode = 'name' | 'friends' | 'save' | 'signin' | 'code' | 'claim' | 'look' |
 export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: Props) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const lookOnly = initialMode === 'look';
-  const [category, setCategory] = useState<keyof AvatarSpec>('head');
+  const lookEdited = useRef(false);
   const [name, setName] = useState(getSavedName() ?? '');
   const [email, setEmail] = useState('');
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
@@ -54,17 +42,19 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const [claim, setClaim] = useState('');
 
   useEffect(() => {
+    let active = true;
     void loadProfile().then((p) => {
-      if (!p) return;
+      if (!p || !active) return;
       setCurrent({ name: p.name, email: p.email, anonymous: p.anonymous });
       if (p.name) setName(p.name);
       setSlogan(p.slogan ?? '');
       setSavedSlogan(p.slogan ?? '');
-      if (p.avatar) {
+      if (p.avatar && !lookEdited.current) {
         setAvatar(p.avatar);
         setSavedAvatar(p.avatar);
       }
-    });
+    }).catch(() => { /* The cached profile remains available while offline. */ });
+    return () => { active = false; };
   }, []);
 
   const trimmed = name.trim().slice(0, 24);
@@ -109,9 +99,12 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const avatarDirty = JSON.stringify(avatar) !== JSON.stringify(savedAvatar);
   const saveLook = () =>
     run(async () => {
-      await api.setProfile(undefined, undefined, avatar);
-      saveAvatar(avatar);
-      setSavedAvatar(avatar);
+      lookEdited.current = true;
+      if (avatarDirty) {
+        await api.setProfile(undefined, undefined, avatar);
+        saveAvatar(avatar);
+        setSavedAvatar(avatar);
+      }
       setNote('Looking good.');
       if (lookOnly) onClose(current?.name ?? getSavedName());
       else setMode('name');
@@ -135,6 +128,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const close = () => onClose(current?.name ?? getSavedName());
   const tabs = (['name', 'friends', 'account'] as const).map((id) => [id, id === 'name' ? 'Identity' : id === 'friends' ? 'Friends' : 'Account'] as const);
   const inTabs = mode === 'name' || mode === 'friends' || mode === 'account';
+  if (mode === 'look') return <AvatarCustomizer avatar={avatar} busy={busy} error={error} onChange={(next) => { lookEdited.current = true; setAvatar(next); setError(null); }} onSave={() => void saveLook()} onClose={close} />;
   return (
     <div className="overlay locker-overlay" onClick={close}>
       <div className={`card pop account locker${lookOnly ? ' locker-look' : ''}`} role="dialog" aria-modal="true" aria-label={lookOnly ? 'Your look' : 'Player locker'} onClick={(e) => e.stopPropagation()}>
@@ -202,36 +196,6 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
                   </button>
                 )}
               </div>
-            </>
-          )}
-
-          {mode === 'look' && (
-            <>
-              <div className="look-preview">
-                <Avatar av={avatar} size={120} />
-              </div>
-              <div className="locker-categories" aria-label="Appearance categories">
-                {lookGroups(avatar).map(([title, key]) => <button key={key} aria-pressed={category === key} onClick={() => setCategory(key)}>{title}</button>)}
-              </div>
-              {lookGroups(avatar).filter(([, key]) => key === category).map(([title, key, options]) => (
-                <div key={key} className="look-group">
-                  <div className="field-label">{title}</div>
-                  <div className="look-chips">
-                    {options.map(([id, label, swatch]) => (
-                      <button key={id} className={`chip${avatar[key] === id ? ' active' : ''}`} aria-pressed={avatar[key] === id} onClick={() => setAvatar({ ...avatar, [key]: id })}>
-                        <Avatar av={{ ...avatar, [key]: id }} size={48} />
-                        {swatch && <span className="swatch" style={{ background: swatch }} />}
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {error && <div className="err">{error}</div>}
-              <button className="primary" disabled={busy || !avatarDirty} onClick={() => void saveLook()}>
-                {busy ? 'Saving…' : 'Save my look'}
-              </button>
-              <button onClick={close}>{avatarDirty ? 'Cancel' : 'Done'}</button>
             </>
           )}
 

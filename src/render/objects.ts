@@ -953,6 +953,7 @@ export interface BallStyle {
   color: string;
   pattern: 'plain' | 'stripe' | 'dots';
   accent: string;
+  motif?: 'eight' | 'fire' | 'gold';
 }
 
 export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null): void {
@@ -993,6 +994,30 @@ export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r:
         ctx.arc(x + dx * r, y + dy * r, r * 0.17, 0, Math.PI * 2);
         ctx.fill();
       }
+    ctx.restore();
+  }
+  // Cosmetic emblems stay inside the same circular ball; its radius is unchanged.
+  if (style?.motif === 'eight' || style?.motif === 'fire') {
+    ctx.save();
+    circle(ctx, x, y, r * 0.88);
+    ctx.clip();
+    if (style.motif === 'eight') {
+      circle(ctx, x, y + r * 0.12, r * 0.51);
+      ctx.fillStyle = '#fff7e4';
+      ctx.fill();
+      ctx.fillStyle = '#071f32';
+      ctx.font = `900 ${r * 0.82}px Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText('8', x, y + r * 0.4);
+    } else {
+      ctx.translate(x - r, y - r);
+      ctx.scale(r / 50, r / 50);
+      ctx.fillStyle = '#ffd145';
+      ctx.fill(new Path2D('M49 10c4 23-25 27-14 47-2-9-8-15-15-16-13 34 9 50 30 50 31 0 42-30 25-48 0 14-6 14-9 18 8-25-7-37-17-51Z'));
+      ctx.fillStyle = '#fff3a1';
+      ctx.fill(new Path2D('M51 43c2 13-14 17-11 29-3-4-6-7-9-7 0 17 13 23 23 20 15-5 16-17 8-29 0 10-5 10-5 10 2-10-2-17-6-23Z'));
+    }
     ctx.restore();
   }
   highlight(ctx, x - r * 0.32, y - r * 0.32, r * 0.28, r * 0.2, 0.95);
