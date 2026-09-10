@@ -7,15 +7,25 @@ import { ProfileStatIcon } from './ProfileStatIcon';
 
 export function ProfileStage() {
   return <svg className="pf-stage" viewBox="0 0 220 210" aria-hidden="true">
-    <path d="M17 168Q110 139 203 168L195 191Q110 221 25 191Z" fill="#9b7546" stroke="#08283d" strokeWidth="5"/>
-    <path d="M46 180v18m35-11v16m46-16v16m39-23v17" stroke="#65492e" strokeWidth="5"/>
-    <ellipse cx="110" cy="168" rx="96" ry="27" fill="#6dbd58" stroke="#08283d" strokeWidth="5"/>
-    <ellipse cx="110" cy="166" rx="70" ry="17" fill="#a0d65c"/>
-    <path d="M181 156V36" stroke="#08283d" strokeWidth="8" strokeLinecap="round"/><path d="M181 38l34 16-34 18Z" fill="#ff674f" stroke="#08283d" strokeWidth="4"/>
-    <path d="M29 164l-9-9 4-9 15-4 10 12Z" fill="#9bb8bb" stroke="#08283d" strokeWidth="3"/>
-    <path d="M166 161v-32q12-9 26 0v32q-13 8-26 0Z" fill="#fff6df" stroke="#08283d" strokeWidth="4"/>
-    <ellipse cx="179" cy="128" rx="13" ry="5" fill="#d3ddd5" stroke="#08283d" strokeWidth="3"/>
-    <ellipse cx="179" cy="128" rx="4" ry="2" fill="#08283d"/>
+    {/* An open patch of course turf: no raised rim or wooden pedestal. */}
+    <path d="M15 188q8-18 36-20l99-9q43-3 61 18l-5 17q-23 14-76 13l-71-1q-34-2-44-18Z" fill="#032f32" opacity=".2"/>
+    <path d="m12 181 8-10-2-10 12 5q13-13 36-10l31 6 36-10q28-7 51 7l10-8 1 14 13 8-4 13 6 7-17 1q-25 14-60 10l-31-4-25 5q-29-1-43-11l-17 1 4-8Z" fill="#27874d" stroke="#08283d" strokeWidth="3" strokeLinejoin="round"/>
+    <path d="M30 179q8-17 34-14l34 6 32-11q27-8 48 4 18 11 11 20-9 10-36 11l-51-4-28 7q-37-1-44-19Z" fill="#80c94d"/>
+    <path d="m46 168 14-3 57 26-15 0-7 2Zm38 0 14 3 12-4 53 26-15 1Zm43-7 10-3 48 22q-1 5-6 7Z" fill="#a9dd69" opacity=".65"/>
+    <path d="m27 183-6-6m6 6 1-10m24 23-4-7m4 7 5-7m122 8 3-7m-3 7 9-3m13-16 3-8" fill="none" stroke="#b0df72" strokeWidth="2.5" strokeLinecap="round"/>
+    <ellipse cx="108" cy="180" rx="48" ry="9" fill="#164b38" opacity=".22"/>
+    {/* A visible cup and red flag make the setting unmistakably golf. */}
+    <ellipse cx="180" cy="173" rx="14" ry="7" fill="#e1f5a3"/>
+    <ellipse cx="180" cy="172" rx="10" ry="4.5" fill="#08283d"/>
+    <path d="M180 171V45" stroke="#08283d" strokeWidth="7" strokeLinecap="round"/>
+    <path d="M180 169V47" stroke="#fff2d2" strokeWidth="2.5" strokeLinecap="round"/>
+    <path d="M181 48q14-3 30 10l-30 17Z" fill="#ff674f" stroke="#08283d" strokeWidth="3.5" strokeLinejoin="round"/>
+    <path d="m185 53 15 5-15 8Z" fill="#ff9e72"/>
+    {/* A small roll keeps the bathroom theme, tucked into the rough. */}
+    <path d="M25 174v-21q10-7 20 0v21q-10 7-20 0Z" fill="#fff6df" stroke="#08283d" strokeWidth="3"/>
+    <path d="M39 158v16q8 8 18 3l-4 9q-17 4-19-10v-18" fill="#fff6df" stroke="#08283d" strokeWidth="3" strokeLinejoin="round"/>
+    <ellipse cx="35" cy="153" rx="10" ry="4" fill="#e8e7d4" stroke="#08283d" strokeWidth="3"/>
+    <ellipse cx="35" cy="153" rx="3.5" ry="1.5" fill="#08283d"/>
   </svg>;
 }
 export function ProfileCareer({p}:{p:PlayerProfile}) {
