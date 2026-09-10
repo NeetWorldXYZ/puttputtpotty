@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { getSavedAvatar, getSavedName, loadProfile } from '../net/supabase';
 import type { RankedRecord } from '../net/rankedRecord';
 import { Avatar } from './Avatar';
-import { ProfileStatIcon } from './ProfileStatIcon';
+import './MatchClean.css';
 import { MatchDailyCard } from './MatchDailyCard';
+import { MatchModeIcon } from './MatchModeIcon';
 import { goToCourse, setPreferredLength } from './courses';
 
 const LENGTHS = [3, 9, 18] as const;
@@ -24,17 +25,14 @@ interface Props {
   onCancel: () => void;
 }
 
-function Crown() {
-  return <svg viewBox="0 0 120 90" aria-hidden="true"><defs><linearGradient id="ma-crown-gold" x2=".3" y2="1"><stop stopColor="#fff3ab"/><stop offset=".5" stopColor="#ffdc41"/><stop offset="1" stopColor="#f3a31b"/></linearGradient></defs><g stroke="#031e33" strokeWidth="7" strokeLinejoin="round"><path d="m15 28 23 19 22-33 22 33 23-19-13 47H28Z" fill="url(#ma-crown-gold)"/><path d="M29 73q31-8 62 0v8H29Z" fill="#ffbd29"/><circle cx="15" cy="25" r="8" fill="#ffe887"/><circle cx="60" cy="13" r="8" fill="#ffe887"/><circle cx="105" cy="25" r="8" fill="#ffe887"/></g><path d="m27 42 9 23m24-38v31" stroke="#fff6bd" strokeWidth="4" strokeLinecap="round"/></svg>;
+function CourseBackdrop() {
+  return <img className="mc-landscape" src="/art/match-greens-v2.webp" width="1200" height="800" alt="" aria-hidden="true" decoding="async"/>;
 }
 
 function MysteryOpponent() {
   return <svg viewBox="0 0 160 170" aria-hidden="true" className="ma-mystery"><path d="m39 55-7-30 26 17 22-34 22 34 26-17-7 30Z" fill="#031c2e"/><g fill="#031c2e"><circle cx="32" cy="24" r="7"/><circle cx="80" cy="9" r="7"/><circle cx="128" cy="24" r="7"/><circle cx="80" cy="81" r="46"/><path d="M12 169q2-58 68-58t68 58Z"/></g><text x="80" y="105" textAnchor="middle" fill="#fffdf2" fontFamily="Arial,sans-serif" fontSize="68" fontWeight="900">?</text></svg>;
 }
 
-function Ticket() {
-  return <svg viewBox="0 0 100 68" aria-hidden="true"><path d="M8 10h84v13q-12 7 0 14v20H8V37q12-7 0-14Z" fill="#ff6586" stroke="#031e33" strokeWidth="5" strokeLinejoin="round"/><path d="M18 16h64v36H18Z" fill="none" stroke="#b82758" strokeWidth="2" strokeDasharray="3 3"/><text x="50" y="32" textAnchor="middle" fontFamily="Arial,sans-serif" fontSize="12" fontWeight="900" fill="#052338">ADMIT</text><text x="50" y="46" textAnchor="middle" fontFamily="Arial,sans-serif" fontSize="12" fontWeight="900" fill="#052338">ONE</text></svg>;
-}
 
 /** Keyboard focus stays in the sheet, then returns to the card that opened it. */
 function MatchSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -76,31 +74,30 @@ export function MatchLobby({ busy, error, record, recordError, onRetryRecord, on
   useEffect(() => { if (searching) setSheet(null); }, [searching]);
   const chooseLength = <fieldset className="ma-lengths"><legend>How many holes?</legend>{LENGTHS.map(n => <button key={n} type="button" aria-pressed={holes === n} onClick={() => setHoles(n)} disabled={busy}>{n}<small>holes</small></button>)}</fieldset>;
   const open = (next: Sheet) => { if (!busy && !searching) setSheet(next); };
-  return <main className={`ma-scroll${searching ? ' ma-searching' : ''}`}>
+  return <main className={`ma-scroll mc-clean${searching ? ' ma-searching' : ''}`}>
     {error && !sheet && <div className="ma-error" role="alert">{error}</div>}
     <section className="ma-arena" aria-labelledby="ma-title">
-      <div className="ma-scene">
-        <div className="ma-title-crown"><Crown/></div>
-        <header className="ma-heading"><h1 id="ma-title">RANKED <span>MATCH</span></h1><p>Same 9 holes. Head to head. Fewest strokes wins.</p></header>
+      <header className="ma-heading"><h1 id="ma-title">RANKED <span>MATCH</span></h1><p>Same 9 holes. Head to head.<br/>Fewest strokes wins.</p></header>
+      <div className="mc-match-scene">
+        <CourseBackdrop/>
         <div className="ma-duel">
           <div className="ma-player ma-player-you"><div className="ma-portrait"><Avatar av={avatar} size={160}/></div><div className="ma-player-name" title={name}>{name}</div></div>
           <strong className="ma-versus" aria-label="versus">VS</strong>
-          <div className="ma-player ma-player-opponent"><div className="ma-portrait"><MysteryOpponent/></div><div className="ma-player-name">{searching ? 'Finding opponent…' : 'Your next opponent'}</div></div>
+          <div className="ma-player ma-player-opponent"><div className="ma-portrait"><MysteryOpponent/></div><div className="ma-player-name">{searching ? 'Finding opponent…' : 'Find Opponent'}</div></div>
+        </div>
+      <div className="ma-ranked-record" role="group" aria-label="Your ranked record">
+        <div className="ma-record-content">
+          {recordError ? <button className="ma-record-retry" onClick={onRetryRecord}>Record unavailable · Retry</button> : !record ? <p className="ma-record-loading" role="status">Loading your record…</p> : <div className="ma-record-numbers"><span className="ma-wins"><b>{record.wins}W</b><small>wins</small></span><span className="ma-losses"><b>{record.losses}L</b><small>losses</small></span><span className="ma-rate"><b>{record.played ? `${record.winRate}%` : '—'}</b><small>win rate</small></span>{record.draws > 0 && <small className="ma-draws">{record.draws} {record.draws === 1 ? 'draw' : 'draws'}</small>}</div>}
         </div>
       </div>
-      <div className="ma-ranked-record">
-        <ProfileStatIcon kind="win"/>
-        <div className="ma-record-content"><div className="ma-record-heading"><h2>RANKED RECORD</h2><button className="ma-info" aria-label="How your ranked record works" onClick={() => setSheet('record')}>i</button></div>
-          {recordError ? <button className="ma-record-retry" onClick={onRetryRecord}>Record unavailable · Retry</button> : !record ? <p className="ma-record-loading" role="status">Loading your record…</p> : <div className="ma-record-numbers"><span className="ma-wins"><b>{record.wins}</b> W</span><i>•</i><span className="ma-losses"><b>{record.losses}</b> L</span><i>•</i><span className="ma-rate"><b>{record.played ? `${record.winRate}%` : '—'}</b><small>win rate</small></span>{record.draws > 0 && <small className="ma-draws">{record.draws} {record.draws === 1 ? 'draw' : 'draws'}</small>}</div>}
-        </div>
       </div>
       {searching ? <div className="ma-search-status"><p role="status">{searchLine}</p><button className="ma-primary ma-cancel" onClick={onCancel}>Cancel search <span>{Math.floor(waitSeconds / 60)}:{String(waitSeconds % 60).padStart(2, '0')}</span></button></div> : <button className="ma-primary" disabled={busy} onClick={onFind}>{busy ? 'CONNECTING…' : 'FIND RANKED OPPONENT'}<span aria-hidden="true">→</span></button>}
     </section>
     <MatchDailyCard disabled={busy || searching}/>
-    <h2 className="ma-divider"><span>OTHER WAYS TO PLAY</span></h2>
-    <div className="ma-other-modes">
-      <article className="ma-mode-card ma-friend"><img src="/art/match-friends.webp" alt=""/><div className="ma-mode-body"><h2>PLAY A FRIEND</h2><p>Pick the holes, share the invite.<br/>No impact on your ranked record.</p><div className="ma-friend-actions"><button className="ma-ticket" aria-label="Have an invite code? Join a friend's match" disabled={busy || searching} onClick={() => open('join')}><Ticket/></button><button className="ma-secondary" disabled={busy || searching} onClick={() => open('friend')}>Get Invite Link <span aria-hidden="true">›</span></button></div></div></article>
-      <article className="ma-mode-card ma-custom"><img src="/art/match-custom.webp" alt=""/><div className="ma-mode-body"><h2>CUSTOM MATCH</h2><p>Choose your own course settings.<br/>No impact on your ranked record.</p><button className="ma-secondary" disabled={busy || searching} onClick={() => open('custom')}>Create Match <span aria-hidden="true">›</span></button></div></article>
+    <h2 className="mc-social-divider" id="mc-social-title"><span>Social Play <small>· Unranked</small></span></h2>
+    <div className="ma-other-modes" role="group" aria-labelledby="mc-social-title">
+      <button className="ma-mode-card ma-friend" disabled={busy || searching} onClick={() => open('friend')}><MatchModeIcon kind="friend"/><h2>PLAY A FRIEND</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
+      <button className="ma-mode-card ma-custom" disabled={busy || searching} onClick={() => open('custom')}><MatchModeIcon kind="custom"/><h2>CUSTOM MATCH</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
     </div>
     {sheet && <MatchSheet title={sheet === 'record' ? 'YOUR RANKED RECORD' : sheet === 'friend' ? 'PLAY A FRIEND' : sheet === 'join' ? 'YOU’RE INVITED' : 'MAKE IT YOUR MATCH'} onClose={() => { if (!busy) setSheet(null); }}>
       {error && <div className="ma-error" role="alert">{error}</div>}
