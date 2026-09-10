@@ -9,7 +9,7 @@
 .rk2-hero:after{content:"";position:absolute;inset:auto 0 0;height:24%;background:linear-gradient(transparent,#003b54d9);pointer-events:none}
 .rk2-hero .menu-volume{position:absolute;z-index:5;left:20px;top:18px;width:45px;height:45px;min-height:45px;padding:8px;border:2px solid #b4eef2;background:#042c42e8;box-shadow:0 4px 0 #001b2e}
 .rk2-logo{position:absolute;z-index:3;top:13px;left:50%;width:min(47%,270px);height:auto;transform:translateX(-50%);filter:drop-shadow(0 4px 0 #061d35)}
-.rk2-tagline{position:absolute;z-index:4;top:25cqw;left:50%;transform:translateX(-50%) rotate(-3deg);white-space:nowrap;color:#071f32;font:italic 400 clamp(17px,5.2cqw,29px)/1 'Ranks Anton','Arial Narrow',sans-serif;letter-spacing:.5px;text-shadow:0 1px 0 #fff8e6}
+.rk2-tagline{position:absolute;z-index:4;top:calc(25cqw + 8px);left:50%;transform:translateX(-50%) rotate(-3deg);white-space:nowrap;color:#071f32;font:italic 400 clamp(17px,5.2cqw,29px)/1 'Ranks Anton','Arial Narrow',sans-serif;letter-spacing:.5px;text-shadow:0 1px 0 #fff8e6}
 .rk2-hero .rk2-sign{position:absolute;z-index:4;display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-align:center;color:#102a3b;font:400 3.1cqw/1.08 'Ranks Anton','Arial Narrow',sans-serif;text-shadow:0 1px 0 #ffe8b3;transform:rotate(-4deg);margin:0;padding:0}
 .rk2-hero .rk2-sign-left{left:3%;top:44%;bottom:auto;width:17.5%;height:25%}.rk2-hero .rk2-sign-right{right:3%;top:47%;bottom:auto;width:16%;height:23%;font-size:2.2cqw;line-height:1.15;transform:rotate(-5deg)}
 
