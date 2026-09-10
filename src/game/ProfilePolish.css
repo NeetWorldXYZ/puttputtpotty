@@ -2,7 +2,10 @@
 .profile-polished .pf-stat-icon{display:block;width:58px;height:58px;flex:none;overflow:visible;filter:drop-shadow(0 2px 0 #001b2c66)}
 .profile-polished .pf-career-grid .pf-stat-icon{width:48px;height:48px;max-width:100%}
 .profile-polished .profile-body{max-width:620px;width:100%;gap:12px;padding:8px 14px 22px}
-.profile-polished .pf-hero{position:relative;display:grid;grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);align-items:center;gap:0;padding:18px 8px 8px;border:0;border-radius:24px;background:linear-gradient(180deg,#0876a830,#0a374630);box-shadow:none;isolation:isolate;min-height:245px}
+/* Scroll the profile instead of squeezing cards below the height of their contents. */
+.profile-polished .profile-body>*{flex-shrink:0}
+/* The stage extends beyond its avatar column. Leave room for that artwork and the CTA shadow. */
+.profile-polished .pf-hero{position:relative;display:grid;grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);align-items:center;column-gap:clamp(26px,8vw,40px);padding:18px 8px 16px;border:0;border-radius:24px;background:linear-gradient(180deg,#0876a830,#0a374630);box-shadow:none;isolation:isolate;min-height:245px}
 .profile-polished .pf-hero:before{content:"";position:absolute;inset:0;z-index:-1;border-radius:24px;background:radial-gradient(ellipse at 27% 40%,#79d7f044,transparent 65%)}
 .profile-polished .pf-avatar{align-self:end;width:100%;height:230px;display:flex;align-items:center;justify-content:center;margin:0}
 .profile-polished .pf-avatar>.avatar{position:relative;width:100%;max-width:185px;height:auto;transform:translateY(-12px);filter:drop-shadow(0 5px 0 #08283d30)}
@@ -15,8 +18,8 @@
 .profile-polished .pf-since{color:#cee7e9;font-size:10px;text-shadow:0 1px 2px #08283d}
 .profile-polished .pf-slogan{font-size:11px;color:#e6f3e4}
 .profile-polished .pf-level{width:100%;margin:3px 0;padding:9px;box-sizing:border-box;background:#042940eb;border:1px solid #3484a0;border-radius:13px;gap:6px}
-.profile-polished .pf-level-bar{height:12px;border-color:#2d728f}.profile-polished .pf-level small{font-size:10px}.profile-polished .pf-level-badge{align-self:flex-start;background:none;color:#fff4d6;box-shadow:none;padding:0;font-size:12px}
-.profile-polished .pf-hero-actions{margin:0;width:100%}.profile-polished .pf-hero-actions button{width:100%;min-height:45px;font-size:12px;padding:9px}
+.profile-polished .pf-level-bar{height:12px;border-color:#2d728f}.profile-polished .pf-level small{max-width:100%;font-size:10px;line-height:1.4;overflow-wrap:anywhere}.profile-polished .pf-level-badge{align-self:flex-start;background:none;color:#fff4d6;box-shadow:none;padding:0;font-size:12px}
+.profile-polished .pf-hero-actions{margin:0;width:100%}.profile-polished .pf-hero-actions button{width:100%;min-height:45px;font-size:12px;line-height:1.25;padding:9px}
 .profile-polished .pf-panel,.profile-polished .pf-kingdom,.profile-polished .pf-challenges{box-sizing:border-box;border:2px solid #348eb3;border-radius:19px;background:linear-gradient(135deg,#07364eF5,#03233bf5);box-shadow:inset 0 0 0 3px #092d43,0 4px 0 #08233399;color:#fff6db;padding:13px}
 .profile-polished .pf-panel h2,.profile-polished .pf-kingdom-title{display:flex;align-items:center;gap:8px;margin:0 0 10px;font:italic 900 20px/1.15 Impact,'Arial Narrow',sans-serif;letter-spacing:.1px;text-transform:uppercase;color:#fff8df}
 .profile-polished .pf-panel h2>span{margin-left:auto;color:#ffdb63}.profile-polished .pf-panel h2 .game-icon{width:25px;height:25px;color:#ffd34a}
