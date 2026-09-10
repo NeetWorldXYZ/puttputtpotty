@@ -3,6 +3,7 @@ import { getSavedAvatar, getSavedName, loadProfile } from '../net/supabase';
 import type { RankedRecord } from '../net/rankedRecord';
 import { Avatar } from './Avatar';
 import { ProfileStatIcon } from './ProfileStatIcon';
+import { MatchDailyCard } from './MatchDailyCard';
 import { goToCourse, setPreferredLength } from './courses';
 
 const LENGTHS = [3, 9, 18] as const;
@@ -95,6 +96,7 @@ export function MatchLobby({ busy, error, record, recordError, onRetryRecord, on
       </div>
       {searching ? <div className="ma-search-status"><p role="status">{searchLine}</p><button className="ma-primary ma-cancel" onClick={onCancel}>Cancel search <span>{Math.floor(waitSeconds / 60)}:{String(waitSeconds % 60).padStart(2, '0')}</span></button></div> : <button className="ma-primary" disabled={busy} onClick={onFind}>{busy ? 'CONNECTING…' : 'FIND RANKED OPPONENT'}<span aria-hidden="true">→</span></button>}
     </section>
+    <MatchDailyCard disabled={busy || searching}/>
     <h2 className="ma-divider"><span>OTHER WAYS TO PLAY</span></h2>
     <div className="ma-other-modes">
       <article className="ma-mode-card ma-friend"><img src="/art/match-friends.webp" alt=""/><div className="ma-mode-body"><h2>PLAY A FRIEND</h2><p>Pick the holes, share the invite.<br/>No impact on your ranked record.</p><div className="ma-friend-actions"><button className="ma-ticket" aria-label="Have an invite code? Join a friend's match" disabled={busy || searching} onClick={() => open('join')}><Ticket/></button><button className="ma-secondary" disabled={busy || searching} onClick={() => open('friend')}>Get Invite Link <span aria-hidden="true">›</span></button></div></div></article>
