@@ -18,7 +18,7 @@ type RankRow = {user_id:string;display_name:string;avatar:KingRow['avatar'];thro
 const captions = {nearby:'Beat a bathroom’s course record to claim it.',friends:'Your friends. Same game. Bigger bragging rights.',world:'Claim your place among the world’s throne holders.',daily:'Same nine holes. A new shot at glory.'};
 
 export function LeaderboardScreen() {
-  const [tab,setTab]=useState<Tab>(()=>recallFix()?'nearby':'world');
+  const [tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get('seed')===dailySeed()?'daily':recallFix()?'nearby':'world');
   const [rows,setRows]=useState<RankRow[]|null>(null);
   const [error,setError]=useState('');
   const [me,setMe]=useState<string|null>(null);
