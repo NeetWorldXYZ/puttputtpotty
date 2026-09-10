@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtElapsed, type DailyRow, type KingRow, type PlayerProfile } from '../net/api';
 import { currentUserId } from '../net/supabase';
+import { loadRankedLeaderboard } from '../net/rankedLeaderboard';
 import { dailySeed } from './courses';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
@@ -78,6 +79,10 @@ export function LeaderboardScreen() {
         friendIds = new Set([me, ...friends.map((friend) => friend.user_id)]);
       }
 
+      if (board === 'wins') {
+        return loadRankedLeaderboard(friendIds ? [...friendIds] : null);
+      }
+
       if (board === 'daily') {
         const daily = await api.leaderboard(seed);
         const visible = friendIds ? daily.filter((row) => friendIds!.has(row.user_id)) : daily;
@@ -93,21 +98,10 @@ export function LeaderboardScreen() {
       if (friendIds) {
         const profiles = await loadProfiles([...friendIds]);
         return profiles.map(profileRow).sort((a, b) =>
-          board === 'wins'
-            ? (b.wins ?? 0) - (a.wins ?? 0) || (b.thrones ?? 0) - (a.thrones ?? 0)
-            : (b.thrones ?? 0) - (a.thrones ?? 0) || (b.wins ?? 0) - (a.wins ?? 0),
-        );
+          (b.thrones ?? 0) - (a.thrones ?? 0) || (b.wins ?? 0) - (a.wins ?? 0));
       }
 
-      const kings = await api.kings({ limit: 50 });
-      if (board === 'thrones') return kings;
-
-      // Ranked wins are already part of public profiles. Hydrate known competitors and
-      // sort those real values without changing the server or its deployed schema.
-      const profiles = await loadProfiles([...kings.map((king) => king.user_id), ...(me ? [me] : [])]);
-      return profiles.map(profileRow).sort((a, b) =>
-        (b.wins ?? 0) - (a.wins ?? 0) || (b.thrones ?? 0) - (a.thrones ?? 0) || a.display_name.localeCompare(b.display_name),
-      );
+      return api.kings({ limit: 50 });
     }
 
     void fetchBoard()
