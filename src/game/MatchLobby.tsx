@@ -26,7 +26,7 @@ interface Props {
 }
 
 function CourseBackdrop() {
-  return <svg className="mc-landscape" viewBox="0 0 600 280" preserveAspectRatio="none" aria-hidden="true"><path d="M0 100Q40 55 80 100T170 105T270 95T370 100T470 80T600 100V280H0Z" fill="#0a617b"/><path d="M0 150Q70 100 130 151T280 145T430 152T600 135V280H0Z" fill="#11655a"/><path d="M0 220Q170 120 350 183T600 177V280H0Z" fill="#168b55"/><path d="M0 259Q175 161 360 206T600 215V280H0Z" fill="#26ac5a"/><path d="M0 280Q210 199 420 230T600 260V280Z" fill="#3bc268"/><ellipse cx="300" cy="250" rx="27" ry="7" fill="#031c31"/><path d="M300 250V171l37 17-37 17" fill="#ff4867" stroke="#032239" strokeWidth="5" strokeLinejoin="round"/><path d="M299 174v73" stroke="#fff8d9" strokeWidth="3"/></svg>;
+  return <img className="mc-landscape" src="/art/match-greens-v2.webp" width="1200" height="800" alt="" aria-hidden="true" decoding="async"/>;
 }
 
 function MysteryOpponent() {
@@ -77,19 +77,19 @@ export function MatchLobby({ busy, error, record, recordError, onRetryRecord, on
   return <main className={`ma-scroll mc-clean${searching ? ' ma-searching' : ''}`}>
     {error && !sheet && <div className="ma-error" role="alert">{error}</div>}
     <section className="ma-arena" aria-labelledby="ma-title">
-      <div className="ma-scene">
+      <header className="ma-heading"><h1 id="ma-title">RANKED <span>MATCH</span></h1><p>Same 9 holes. Head to head.<br/>Fewest strokes wins.</p></header>
+      <div className="mc-match-scene">
         <CourseBackdrop/>
-        <header className="ma-heading"><h1 id="ma-title">RANKED <span>MATCH</span></h1><p>Same 9 holes. Head to head.<br/>Fewest strokes wins.</p></header>
         <div className="ma-duel">
           <div className="ma-player ma-player-you"><div className="ma-portrait"><Avatar av={avatar} size={160}/></div><div className="ma-player-name" title={name}>{name}</div></div>
           <strong className="ma-versus" aria-label="versus">VS</strong>
           <div className="ma-player ma-player-opponent"><div className="ma-portrait"><MysteryOpponent/></div><div className="ma-player-name">{searching ? 'Finding opponent…' : 'Find Opponent'}</div></div>
         </div>
-      </div>
       <div className="ma-ranked-record" role="group" aria-label="Your ranked record">
         <div className="ma-record-content">
           {recordError ? <button className="ma-record-retry" onClick={onRetryRecord}>Record unavailable · Retry</button> : !record ? <p className="ma-record-loading" role="status">Loading your record…</p> : <div className="ma-record-numbers"><span className="ma-wins"><b>{record.wins}W</b><small>wins</small></span><span className="ma-losses"><b>{record.losses}L</b><small>losses</small></span><span className="ma-rate"><b>{record.played ? `${record.winRate}%` : '—'}</b><small>win rate</small></span>{record.draws > 0 && <small className="ma-draws">{record.draws} {record.draws === 1 ? 'draw' : 'draws'}</small>}</div>}
         </div>
+      </div>
       </div>
       {searching ? <div className="ma-search-status"><p role="status">{searchLine}</p><button className="ma-primary ma-cancel" onClick={onCancel}>Cancel search <span>{Math.floor(waitSeconds / 60)}:{String(waitSeconds % 60).padStart(2, '0')}</span></button></div> : <button className="ma-primary" disabled={busy} onClick={onFind}>{busy ? 'CONNECTING…' : 'FIND RANKED OPPONENT'}<span aria-hidden="true">→</span></button>}
     </section>

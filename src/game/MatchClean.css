@@ -1,14 +1,15 @@
 /* Simplified match lobby. All rules stay scoped away from gameplay and the dock. */
 .ma-scroll.mc-clean{padding:2px 14px 16px;box-sizing:border-box;container-type:inline-size}
 .mc-clean .ma-arena{border:0;background:none;box-shadow:none;padding:0;border-radius:0}
-.mc-clean .ma-scene{height:auto;margin:0;display:flex;flex-direction:column;background:none;border-radius:0;overflow:visible}
-.mc-clean .ma-scene:after{display:none}
-.mc-landscape{position:absolute;inset:auto -14px -45px;width:calc(100% + 28px);height:72%;z-index:-1;pointer-events:none}
+/* Auto-sized rows keep the portraits and record separate at every viewport height.
+   This scene deliberately does not inherit the legacy arena's fixed-height class. */
+.mc-match-scene{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:4px 0 10px;margin:0}
+.mc-landscape{position:absolute;inset:-30px -14px 0;width:calc(100% + 28px);height:calc(100% + 30px);object-fit:cover;object-position:center 65%;z-index:-1;pointer-events:none;mask-image:linear-gradient(transparent,#000 18%,#000 86%,transparent);-webkit-mask-image:linear-gradient(transparent,#000 18%,#000 86%,transparent)}
 .mc-clean .ma-heading{padding-top:4px}
 .mc-clean .ma-heading h1{font-size:clamp(30px,8.6cqw,54px);line-height:1.14;transform:skewX(-7deg);-webkit-text-stroke:5px #03182c;text-shadow:0 4px 0 #03182c;letter-spacing:0}
 .mc-clean .ma-heading h1 span{color:#fffaf0}
 .mc-clean .ma-heading p{display:block;background:none;box-shadow:none;padding:0;margin:7px auto 12px;color:#b6dfed;font:600 clamp(13px,3.7cqw,21px)/1.25 var(--game-font)}
-.mc-clean .ma-duel{position:relative;inset:auto;display:grid;grid-template-columns:minmax(0,1fr) 20% minmax(0,1fr);gap:0;padding:0 8px 24px;align-items:stretch}
+.ma-scroll.mc-clean .ma-duel{position:relative;inset:auto;display:grid;grid-template-columns:minmax(0,1fr) 20% minmax(0,1fr);gap:0;padding:0 8px;align-items:stretch}
 .mc-clean .ma-player{width:auto;min-width:0;height:clamp(132px,36cqw,225px);border:3px solid #38efff;border-radius:20px;background:linear-gradient(135deg,#047cbd,#033758);box-shadow:0 0 6px #2ae5ff,0 0 17px #12cfff70;overflow:hidden;padding:9px 3px 0}
 .mc-clean .ma-player-opponent{border-color:#c27cff;background:linear-gradient(135deg,#6530d6,#302472);box-shadow:0 0 6px #bc77ff,0 0 17px #ae5bff70}
 .mc-clean .ma-portrait{overflow:hidden}
@@ -16,8 +17,8 @@
 .mc-clean .ma-player .avatar,.mc-clean .ma-player .ma-mystery{width:100%;height:100%;max-height:none;filter:none}
 .mc-clean .ma-player-name{margin:0 -3px;min-height:30px;max-height:none;padding:5px 3px;border:0;border-radius:0;background:linear-gradient(transparent,#021b31e6);box-shadow:none;font:800 clamp(10px,3.1cqw,18px)/1.1 var(--game-font);overflow-wrap:anywhere}
 .mc-clean .ma-player-opponent .ma-player-name{font-size:clamp(9px,2.8cqw,17px)}
-.mc-clean .ma-versus{position:relative;inset:auto;align-self:center;text-align:center;transform:skewX(-7deg);font-size:clamp(39px,11cqw,67px);-webkit-text-stroke:5px #03192b;filter:none;margin-top:-20px}
-.mc-clean .ma-ranked-record{border:1px solid #277483;border-radius:17px;background:#022c3beF;box-shadow:none;width:86%;margin:0 auto 9px;padding:9px 5px;min-height:0}
+.mc-clean .ma-versus{position:relative;inset:auto;align-self:start;text-align:center;transform:skewX(-7deg);font-size:clamp(39px,11cqw,67px);-webkit-text-stroke:5px #03192b;filter:none;margin-top:28px}
+.ma-scroll.mc-clean .ma-ranked-record{position:relative;inset:auto;z-index:1;display:block;box-sizing:border-box;border:1px solid #3d8c95;border-radius:17px;background:linear-gradient(120deg,#022d3bf7,#031f33f7);box-shadow:inset 0 1px 0 #b3f2ec20,0 3px 8px #011c3544;width:86%;margin:0 auto;padding:10px 5px;min-height:58px}
 .mc-clean .ma-record-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:0;text-align:center}
 .mc-clean .ma-record-numbers>span{display:flex;flex-direction:column;align-items:center;gap:3px;white-space:normal;font-size:18px}
 .mc-clean .ma-record-numbers>span+span{border-left:1px solid #337282}
