@@ -1,5 +1,5 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
-import { renderAvatarArt, renderAvatarPart } from './avatarArt';
+import { renderAvatarArt, renderAvatarPart, renderResultAvatarArt } from './avatarArt';
 
 export interface Avatar {
   /** Skin tone for the classic golfer; for the other heads, that head's colour. */
@@ -135,6 +135,11 @@ export const AVATAR_VIEWBOX = '0 0 160 170';
 export function avatarSvg(input: Avatar | null | undefined, id = 'av'): string {
   const av = normalizeAvatar(input);
   return renderAvatarArt(av, headTones(av.head)[av.porcelain], SEATS[av.seat].color, ballLook(av), id);
+}
+
+export function resultAvatarSvg(input: Avatar | null | undefined, mood:'win'|'loss'|'draw', id:string):string {
+  const av=normalizeAvatar(input);
+  return renderResultAvatarArt(av,headTones(av.head)[av.porcelain],SEATS[av.seat].color,id,mood);
 }
 
 export function avatarPartSvg(input: Avatar, part: keyof Avatar, id: string): {markup:string;viewBox:string} {

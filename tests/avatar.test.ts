@@ -1,10 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { BALLS, DEFAULT_AVATAR, FACES, HEADS, avatarPartSvg, avatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
+import { BALLS, DEFAULT_AVATAR, FACES, HEADS, avatarPartSvg, avatarSvg, resultAvatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
 import { LOOK_CATEGORIES, lookOptions } from '../src/game/AvatarCustomizer';
 // @ts-expect-error The checked-in production engine is prebuilt JavaScript.
 import { normalizeAvatar as serverNormalizeAvatar } from '../server/potty/engine.js';
 
 describe('avatars', () => {
+  it('renders result emotions for every head without changing saved cosmetics', () => {
+    for (const head of Object.keys(HEADS)) {
+      const av={...DEFAULT_AVATAR,head,hat:'crown',seat:'ink',face:'cool'};
+      const saved=JSON.stringify(av),normal=avatarSvg(av,'normal');
+      for(const mood of ['win','loss','draw'] as const){
+        const markup=resultAvatarSvg(av,mood,`result-${head}-${mood}`);
+        expect(markup).toContain(`data-emotion="${mood}"`);
+        expect(markup).toContain(`data-head="${head}"`);
+        expect(markup).toContain('data-hat="crown"');
+        expect(markup).not.toMatch(/NaN|undefined/);
+      }
+      expect(JSON.stringify(av)).toBe(saved);
+      expect(avatarSvg(av,'normal')).toBe(normal);
+    }
+  });
   it('polishes every existing head without changing saved selections', () => {
     for (const head of Object.keys(HEADS)) {
       const av = {...DEFAULT_AVATAR,head,hat:'crown'};

@@ -15,6 +15,7 @@ import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
 import { stopTheme } from './music';
 import { MatchLobby } from './MatchLobby';
+import { MatchResultModal } from './MatchResultModal';
 import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
 import './MatchLobby.css';
 
@@ -388,6 +389,12 @@ export function MatchScreen({ code, matchId }: Props) {
   const panel = match ? (
     <MatchPanel match={match} me={me} side={side} opp={opp} oppOnline={oppOnline} mine={mine} holes={holes} error={error} onLeave={leave} onRematch={rematch} />
   ) : null;
+  const resultModal = match?.status === 'done' && me && holes ? <MatchResultModal
+    key={match.id} match={match} me={me} holes={holes} onLeave={leave} onEnter={enter}
+    friendAction={!match.p2_bot && match[other] ? <AddFriend userId={match[other] as string} name={oppName}/> : null}
+  /> : null;
+
+  if (phase === 'result' && resultModal) return resultModal;
 
   if (phase === 'playing' && holes && match) {
     const pars = holes.map((h) => h.par);
@@ -430,18 +437,7 @@ export function MatchScreen({ code, matchId }: Props) {
             </button>
           </>
         )}
-        scorecardExtra={panel}
-        renderScorecardButtons={({ share, shared }) =>
-          match.status === 'done' ? (
-            <>
-              <button className="primary" onClick={rematch}>
-                Rematch a stranger
-              </button>
-              <button onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
-              <button onClick={leave}>Home</button>
-            </>
-          ) : null
-        }
+        renderScorecard={() => resultModal ?? <div className="overlay"><div className="card pop scorecard">{panel}</div></div>}
       />
     );
   }

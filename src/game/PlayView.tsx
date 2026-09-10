@@ -36,6 +36,8 @@ interface Props {
   renderDoneCard?: (info: HoleDoneInfo, actions: { next: () => void; retry: () => void }) => ReactNode;
   /** Extra content under the scorecard chips (leaderboards etc). */
   scorecardExtra?: ReactNode;
+  /** Full replacement for a completed course overlay (head-to-head results). */
+  renderScorecard?: () => ReactNode;
   /** Replaces the scorecard's own buttons (share, play again, back) with the caller's. */
   renderScorecardButtons?: (share: { share: () => void; shared: boolean }) => ReactNode;
   /** Hides the retry button on ranked holes. */
@@ -101,7 +103,7 @@ function fmtClock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
+export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
@@ -803,7 +805,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         </div>
       )}
 
-      {courseDone && (
+      {courseDone && (renderScorecard ? renderScorecard() : (
         <div className="overlay">
           <div className="card pop scorecard">
             <h2>{totalScore - totalPar < 0 ? 'Under par!' : totalScore - totalPar === 0 ? 'Even par' : 'Course complete'}</h2>
@@ -847,7 +849,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {devOpen && !lockedParams && (
         <DevPanel

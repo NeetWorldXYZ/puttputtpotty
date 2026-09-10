@@ -80,6 +80,21 @@ export function renderAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:BallLook,r
   return defs(id,tone,shirt)+shirtSvg(av.seat,id)+headSvg(av.head,tone,id)+faceSvg(av.face,av.head)+hatSvg(av.hat,id)+ballSvg(ball,133,147,14,id);
 }
 
+/** Result-only poses. Saved cosmetics and the normal portrait renderer are untouched. */
+export function renderResultAvatarArt(av:Avatar,tone:Tone,shirt:string,rawId:string,mood:'win'|'loss'|'draw'):string {
+  const id=cleanId(rawId),won=mood==='win',lost=mood==='loss';
+  const mouthY=av.head==='dawg'?94:87;
+  const face=lost
+    ? `<g data-part="face" data-emotion="sad"><path d="m59 62 13-5m16 0 13 5" fill="none" ${stroke} stroke-width="3"/><path d="M60 70q6 7 12 0m16 0q6 7 12 0" fill="none" ${stroke} stroke-width="4"/><path d="M68 ${mouthY+5}q12-15 24 0" fill="none" ${stroke} stroke-width="4"/></g>`
+    : won ? faceSvg(av.face,av.head).replace(/<path data-feature="mouth"[^>]*\/>/,`<path data-feature="mouth" d="M66 ${mouthY-3}q14 5 28 0q-1 20-14 17T66 ${mouthY-3}Z" fill="${INK}"/><path d="M72 ${mouthY+7}q8-6 16 0" stroke="#ff8792" stroke-width="5" stroke-linecap="round"/>`)
+    : faceSvg(av.face,av.head);
+  const putter=`<g transform="rotate(${won?10:-8} 148 126)"><path d="M148 70v106" stroke="${INK}" stroke-width="10"/><path d="M148 75v95" stroke="#b8dbea" stroke-width="5"/><path d="M142 63h12v27h-12Z" fill="#284a5f" ${stroke} stroke-width="4"/><path d="M145 173h23q8 0 6 10h-30Z" fill="#d7ecf2" ${stroke} stroke-width="5"/><path d="M150 178h18" stroke="#fff" stroke-width="2"/></g>`;
+  const arms=won
+    ? `<path d="M51 113Q30 112 19 89l-15 12q11 38 43 40m62-28q18-7 29-29l16 12q-8 37-38 44" fill="url(#${id}-shirt)" ${stroke} stroke-width="6"/><path d="m17 106 9 12m105-8 7-10" stroke="#fff" stroke-opacity=".25" stroke-width="3"/><circle cx="12" cy="87" r="13" fill="url(#${id}-skin)" ${stroke} stroke-width="5"/><path d="m8 82 5 2-2 6" fill="none" ${stroke} stroke-width="3"/><circle cx="147" cy="83" r="12" fill="url(#${id}-skin)" ${stroke} stroke-width="5"/>`
+    : `<path d="M53 114q-20 0-21 25l-3 14 16 8 17-34m43-13q22 0 26 37l-17 7-13-31" fill="url(#${id}-shirt)" ${stroke} stroke-width="6"/>${lost?`<path d="M33 144 39 95l17 5-7 47Z" fill="url(#${id}-shirt)" ${stroke} stroke-width="5"/><ellipse cx="46" cy="94" rx="11" ry="14" fill="url(#${id}-skin)" ${stroke} stroke-width="4"/>`:''}`;
+  return defs(id,tone,shirt)+`<ellipse cx="80" cy="175" rx="79" ry="10" fill="#092b30" opacity=".45"/>${putter}<g data-emotion="${mood}" transform="rotate(${won?-5:lost?7:0} 80 150)"><clipPath id="${id}-torso"><path d="M42 98h77v76H42Z"/></clipPath><g clip-path="url(#${id}-torso)">${shirtSvg(av.seat,id)}</g>${arms}<g transform="rotate(${lost?8:won?-7:0} 80 85)">${headSvg(av.head,tone,id)}${face}${hatSvg(av.hat,id)}</g></g>`;
+}
+
 /** Part cards isolate the choice. Head and colour cards always have a neutral face. */
 export function renderAvatarPart(av:Avatar,part:keyof Avatar,tone:Tone,shirt:string,ball:BallLook,rawId:string):{markup:string;viewBox:string} {
   const id=cleanId(rawId),base=defs(id,tone,shirt);
