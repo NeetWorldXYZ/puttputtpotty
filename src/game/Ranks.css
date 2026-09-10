@@ -1,6 +1,6 @@
 @font-face{font-family:'Ranks Anton';src:url('/art/ranks-anton.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
 
-.leaders.ranks-screen{background:linear-gradient(#073b58,#005143 54%,#033448);color:#f4f8ec;padding:0 0 calc(66px + env(safe-area-inset-bottom,0px));box-sizing:border-box}
+.leaders.ranks-screen{background:linear-gradient(#073b58,#005143 54%,#033448);color:#f4f8ec;padding:0 0 var(--dock-height);box-sizing:border-box}
 .rk-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;width:100%;max-width:460px;margin:0 auto;padding:env(safe-area-inset-top,0px) 9px 8px;box-sizing:border-box;scroll-padding-top:53px}
 .rk-content>header,.rk-content>nav,.rk-content>section,.rk-content>footer,.rk-content>.rk-strip,.rk-content>.rk-course{flex-shrink:0}
 

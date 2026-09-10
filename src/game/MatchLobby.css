@@ -1,9 +1,9 @@
 @font-face{font-family:'Match Anton';src:url('/art/ranks-anton.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
 
-.leaders.match-screen.ma{background:radial-gradient(ellipse at 50% 20%,#073c58,#03213b 65%,#021a30);color:#fff9e9}
+.leaders.match-screen.ma{padding-bottom:var(--dock-height);background:radial-gradient(ellipse at 50% 20%,#073c58,#03213b 65%,#021a30);color:#fff9e9}
 .leaders.ma .map-head.menu-controls-only{flex-shrink:0;max-width:640px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 3px;min-height:52px;z-index:2}
 .leaders.ma .menu-golfer{max-width:180px;min-height:38px}
-.ma-scroll{--ma-ink:#031b2e;--ma-blue:#1696c4;--ma-mint:#47bcae;flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;width:100%;padding:14px 11px calc(82px + env(safe-area-inset-bottom,0px));scrollbar-width:thin}
+.ma-scroll{--ma-ink:#031b2e;--ma-blue:#1696c4;--ma-mint:#47bcae;flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;width:100%;padding:14px 11px 16px;scrollbar-width:thin}
 .ma-scroll>*{max-width:600px;margin-left:auto;margin-right:auto;box-sizing:border-box}
 .ma-scroll button{font-family:var(--game-font);cursor:pointer;touch-action:manipulation}
 .ma-scroll button:focus-visible,.ma-scroll input:focus-visible{outline:3px solid #fff3af;outline-offset:3px}
