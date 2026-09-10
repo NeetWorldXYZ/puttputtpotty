@@ -6,7 +6,6 @@ import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
 import { api, fmtElapsed, type MatchRow } from '../net/api';
 
-const INVITE_LENGTHS = [3, 9, 18] as const;
 import { ensureSession, getSavedName, loadProfile, supabase } from '../net/supabase';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
@@ -15,9 +14,8 @@ import { NamePrompt } from './NamePrompt';
 import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
 import { stopTheme } from './music';
-import { GameIcon } from './GameIcon';
-import { MatchIcon } from './MatchIcon';
-import { MatchArt } from './MatchArt';
+import { MatchLobby } from './MatchLobby';
+import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
 import './MatchLobby.css';
 
 interface Props {
@@ -62,7 +60,6 @@ export function MatchScreen({ code, matchId }: Props) {
   const [holes, setHoles] = useState<Hole[] | null>(null);
   const [building, setBuilding] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [codeInput, setCodeInput] = useState('');
   const [askName, setAskName] = useState(false);
   const [busy, setBusy] = useState(false);
   const [opp, setOpp] = useState<OppState | null>(null);
@@ -70,15 +67,18 @@ export function MatchScreen({ code, matchId }: Props) {
   const [oppOnline, setOppOnline] = useState(false);
   const [mine, setMine] = useState<{ score: number; holes: number[]; elapsed: number } | null>(null);
   const [shared, setShared] = useState(false);
-  const [inviteLen, setInviteLen] = useState<number>(9);
-  const [record, setRecord] = useState<{ matches: number; matches_won: number } | null>(null);
+  const [record, setRecord] = useState<RankedRecord | null>(null);
+  const [recordError, setRecordError] = useState(false);
+  const [recordRevision, setRecordRevision] = useState(0);
   useEffect(() => {
-    if (phase !== 'lobby' || !me) return;
-    api
-      .profile(me)
-      .then((p) => setRecord(p && typeof p.matches === 'number' ? { matches: p.matches, matches_won: p.matches_won ?? 0 } : { matches: 0, matches_won: 0 }))
-      .catch(() => setRecord({ matches: 0, matches_won: 0 }));
-  }, [phase, me]);
+    if ((phase !== 'lobby' && phase !== 'waiting') || !me) return;
+    let live = true;
+    setRecordError(false);
+    void loadRankedRecord(me)
+      .then(value => { if (live) setRecord(value); })
+      .catch(() => { if (live) setRecordError(true); });
+    return () => { live = false; };
+  }, [phase, me, recordRevision]);
   const strokesRef = useRef<Stroke[][]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const totalRef = useRef(0);
@@ -446,73 +446,24 @@ export function MatchScreen({ code, matchId }: Props) {
     );
   }
 
-  if (phase === 'lobby') {
+  if (phase === 'lobby' || (phase === 'waiting' && match && !match.code)) {
     return (
-      <div className="leaders match-screen ml">
-        <div className="map-head menu-controls-only">
-          <MenuVolume />
-          <GolferChip />
-        </div>
-        <div className="ml-lobby">
-          {error && <div className="ml-err" role="alert">{error}</div>}
-          <div className="ml-heading">
-            <h1>PUTT UP.</h1>
-            <p>Same holes, head to head. Fewest strokes wins.</p>
-          </div>
-          <button className="ml-invitation" disabled={busy} aria-label="Find an opponent for a nine-hole match" onClick={() => void start(() => api.findMatch())}>
-            <MatchArt />
-            <span className="ml-cta">
-              {busy ? 'Connecting…' : 'Find an opponent'} <span aria-hidden="true">→</span>
-            </span>
-          </button>
-          <p className="ml-rule">Nine holes. Tied score? The faster round takes it.</p>
-          <button className="ml-record" onClick={() => navigate('profile')}>
-            <GameIcon kind="trophy" />
-            <strong>YOUR RECORD</strong>
-            <span>{record === null ? 'Loading…' : record.matches === 0 ? 'No matches yet' : `${record.matches_won} ${record.matches_won === 1 ? 'win' : 'wins'} · ${record.matches - record.matches_won} ${record.matches - record.matches_won === 1 ? 'loss' : 'losses'}`}</span>
-          </button>
-          <div className="ml-tile" aria-labelledby="friend-title">
-            <MatchIcon />
-            <span className="ml-tile-text">
-              <strong id="friend-title">Play a friend</strong>
-              <small>Pick the holes, share the invite</small>
-            </span>
-            <span className="ml-controls">
-              <span className="ml-chips" aria-label="Invite round length">
-                {INVITE_LENGTHS.map((n) => (
-                  <button key={n} aria-pressed={n === inviteLen} disabled={busy} className={n === inviteLen ? 'active' : ''} onClick={() => setInviteLen(n)}>
-                    {n}
-                    <small>holes</small>
-                  </button>
-                ))}
-              </span>
-              <button className="ml-go" disabled={busy} onClick={() => void start(() => api.createInvite(inviteLen))}>
-                Invite
-              </button>
-            </span>
-          </div>
-          <form
-            className="ml-tile"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (codeInput.trim().length === 6 && !busy) void start(() => api.joinInvite(codeInput.trim()));
-            }}
-          >
-            <span className="ml-emoji" aria-hidden="true">
-              🎟️
-            </span>
-            <label className="ml-tile-text" htmlFor="match-code">
-              <strong>Got a code?</strong>
-              <small>Join a friend's round</small>
-            </label>
-            <span className="ml-controls">
-              <input id="match-code" className="ml-code" maxLength={6} minLength={6} required autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder="6 characters" value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/\s/g, ''))} />
-              <button type="submit" className="ml-go" disabled={codeInput.trim().length !== 6 || busy}>
-                Join
-              </button>
-            </span>
-          </form>
-        </div>
+      <div className="leaders match-screen ma">
+        <div className="map-head menu-controls-only"><MenuVolume /><GolferChip /></div>
+        <MatchLobby
+          busy={busy}
+          error={error}
+          record={record}
+          recordError={recordError}
+          onRetryRecord={() => setRecordRevision(n => n + 1)}
+          onFind={() => void start(() => api.findMatch())}
+          onInvite={n => start(() => api.createInvite(n))}
+          onJoin={inviteCode => start(() => api.joinInvite(inviteCode))}
+          searching={phase === 'waiting'}
+          waitSeconds={waitSec}
+          searchLine={SEARCH_LINES[Math.floor(waitSec / 3) % SEARCH_LINES.length]}
+          onCancel={() => void cancel()}
+        />
         <TabBar active="match" />
         {askName && <NamePrompt title="Name for the match" sub="Your opponent will see it." onDone={() => setAskName(false)} onCancel={() => setAskName(false)} />}
       </div>
