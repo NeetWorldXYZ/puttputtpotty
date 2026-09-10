@@ -3363,7 +3363,7 @@ input[type='checkbox'] {
 }
 .leaders,
 .profile {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+  padding-bottom: calc(var(--dock-height) + 12px);
 }
 
 .title:has(.home2) .title-bg {
