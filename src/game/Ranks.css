@@ -4,20 +4,22 @@
 .rk2-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;width:100%;max-width:620px;margin:0 auto;padding:0 10px 10px;box-sizing:border-box}
 .rk2-content>*{flex-shrink:0}
 
-.rk2-hero{position:relative;isolation:isolate;width:calc(100% + 20px);height:clamp(225px,62vw,360px);margin:0 -10px;overflow:hidden;background:#169ddc}
+.rk2-hero{position:relative;isolation:isolate;container-type:inline-size;width:calc(100% + 20px);height:auto;aspect-ratio:3/2;margin:0 -10px;overflow:hidden;background:#169ddc}
 .rk2-scene{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 58%}
 .rk2-hero:after{content:"";position:absolute;inset:auto 0 0;height:24%;background:linear-gradient(transparent,#003b54d9);pointer-events:none}
 .rk2-hero .menu-volume{position:absolute;z-index:5;left:20px;top:calc(env(safe-area-inset-top,0px) + 18px);width:45px;height:45px;min-height:45px;padding:8px;border:2px solid #b4eef2;background:#042c42e8;box-shadow:0 4px 0 #001b2e}
 .rk2-logo{position:absolute;z-index:3;top:calc(env(safe-area-inset-top,0px) + 13px);left:50%;width:min(47%,270px);height:auto;transform:translateX(-50%);filter:drop-shadow(0 4px 0 #061d35)}
 .rk2-tagline{position:absolute;z-index:4;top:calc(env(safe-area-inset-top,0px) + clamp(91px,25vw,151px));left:50%;transform:translateX(-50%) rotate(-3deg);white-space:nowrap;color:#071f32;font:italic 400 clamp(17px,5.2vw,29px)/1 'Ranks Anton','Arial Narrow',sans-serif;letter-spacing:.5px;text-shadow:0 1px 0 #fff8e6}
-.rk2-sign{position:absolute;z-index:4;width:22%;text-align:center;color:#102a3b;font:400 clamp(10px,3vw,17px)/1.08 'Ranks Anton','Arial Narrow',sans-serif;text-shadow:0 1px 0 #ffe8b3;transform:rotate(-2deg)}
-.rk2-sign-left{left:4.5%;bottom:18%}.rk2-sign-right{right:4.2%;bottom:22%;font-size:clamp(8px,2.4vw,14px);line-height:1.1;transform:rotate(2deg)}
+.rk2-hero .rk2-sign{position:absolute;z-index:4;display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-align:center;color:#102a3b;font:400 3.1cqw/1.08 'Ranks Anton','Arial Narrow',sans-serif;text-shadow:0 1px 0 #ffe8b3;transform:rotate(-4deg);margin:0;padding:0}
+.rk2-hero .rk2-sign-left{left:3%;top:44%;bottom:auto;width:17.5%;height:25%}.rk2-hero .rk2-sign-right{right:3%;top:47%;bottom:auto;width:16%;height:23%;font-size:2.2cqw;line-height:1.15;transform:rotate(-5deg)}
 
-.rk2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:-7px 0 9px;position:relative;z-index:5;padding:0 4px}
+.rk2-tabs{container-type:inline-size;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:-7px 0 9px;position:relative;z-index:5;padding:0 4px}
 .rk2-tabs button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:105px;padding:8px 5px 10px;border:2px solid #2587b2;border-radius:14px;background:linear-gradient(145deg,#064064,#032c49);color:#fff7e8;box-shadow:0 5px 0 #01263b;font-family:var(--game-font);cursor:pointer}
 .rk2-tabs .pf-stat-icon{width:44px;height:44px;margin-bottom:0;filter:drop-shadow(0 2px 0 #001829)}
-.rk2-tabs button strong{font:italic 400 clamp(15px,4.2vw,24px)/.95 'Ranks Anton','Arial Narrow',sans-serif;text-transform:uppercase;white-space:nowrap}
-.rk2-tabs button small{display:block;margin-top:5px;color:#f3f5e8;font:600 clamp(8px,2vw,11px)/1.15 var(--game-font);white-space:nowrap}
+.ranks-city-screen .rk2-tabs button{min-width:0;box-sizing:border-box}
+.ranks-city-screen .rk2-tabs button strong{display:block;max-width:100%;margin:0;font:italic 400 clamp(10px,3.15cqw,18px)/1.2 'Ranks Anton','Arial Narrow',sans-serif;text-transform:uppercase;white-space:nowrap}
+.ranks-city-screen .rk2-tabs button small{display:block;max-width:100%;min-height:2.4em;margin:5px 0 0;color:#f3f5e8;font:600 clamp(8px,2.2cqw,12px)/1.2 var(--game-font);white-space:normal;text-align:center;text-wrap:balance}
+.ranks-city-screen .rk2-tabs button[aria-pressed=true] small{color:#17364a}
 .rk2-tabs button[aria-pressed=true]{border-color:#fff3b0;background:linear-gradient(145deg,#fff0a0,#ffd34f 70%);color:#08293d;box-shadow:inset 0 -5px 0 #e9aa27,0 5px 0 #8e681d}
 .rk2-tabs button[aria-pressed=true]:after{content:"";position:absolute;left:35%;right:35%;bottom:-12px;height:5px;border-radius:99px;background:#ffe25c;box-shadow:0 0 7px #ffe16c}
 
@@ -38,6 +40,6 @@
 .rk2-empty{min-height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:18px;text-align:center;color:#fff8e9;font:600 12px/1.4 var(--game-font)}.rk2-empty strong{font-size:16px}.rk2-empty small{color:#b9dce7}.rk2-empty button{margin-top:4px;border:1px solid #fff1aa;border-radius:10px;padding:9px 15px;background:linear-gradient(#ffe989,#ffca38);color:#08283c;font:800 11px var(--game-font);box-shadow:0 3px 0 #a87318}
 .ranks-city-screen button:focus-visible{outline:3px solid #fff1a3;outline-offset:3px}
 
-@media(max-width:360px){.rk2-hero{height:218px}.rk2-tabs{gap:4px}.rk2-tabs button{min-height:98px;padding-inline:2px}.rk2-tabs button strong{font-size:14px}.rk2-tabs button small{font-size:7.5px}.rk2-friends-toggle{padding-inline:9px}.rk2-board li{grid-template-columns:41px 39px minmax(0,1fr) 53px;padding-inline:5px}.rk2-player strong{font-size:12px}.rk2-value{font-size:22px}}
-@media(min-width:500px){.rk2-sign-left{bottom:20%}.rk2-sign-right{bottom:23%}.rk2-tabs button{min-height:120px}.rk2-friends-toggle strong{font-size:17px}.rk2-friends-toggle small{font-size:12px}.rk2-board li{min-height:64px}.rk2-player strong{font-size:15px}}
+@media(max-width:360px){.rk2-tabs{gap:4px}.rk2-tabs button{min-height:98px;padding-inline:2px}.rk2-friends-toggle{padding-inline:9px}.rk2-board li{grid-template-columns:41px 39px minmax(0,1fr) 53px;padding-inline:5px}.rk2-player strong{font-size:12px}.rk2-value{font-size:22px}}
+@media(min-width:500px){.rk2-tabs button{min-height:120px}.rk2-friends-toggle strong{font-size:17px}.rk2-friends-toggle small{font-size:12px}.rk2-board li{min-height:64px}.rk2-player strong{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.rk2-switch i{transition:none}}

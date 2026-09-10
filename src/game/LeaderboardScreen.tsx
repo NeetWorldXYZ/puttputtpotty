@@ -129,8 +129,8 @@ export function LeaderboardScreen() {
           <MenuVolume />
           <img className="rk2-logo" src="/art/arcade-logo.webp" alt="Putt Putt Potty" />
           <div className="rk2-tagline">CHASE THE CROWN</div>
-          <div className="rk2-sign rk2-sign-left">REAL<br />PLACES.<br />REAL<br />THRONES.</div>
-          <div className="rk2-sign rk2-sign-right">BARS<br />RESTAURANTS<br />REST AREAS<br />HOTELS<br />AND MORE...</div>
+          <div className="rk2-sign rk2-sign-left"><span>REAL<br />PLACES.<br />REAL<br />THRONES.</span></div>
+          <div className="rk2-sign rk2-sign-right"><span>BARS<br />RESTAURANTS<br />REST AREAS<br />HOTELS<br />AND MORE...</span></div>
         </header>
 
         <nav className="rk2-tabs" aria-label="Ranking categories">
