@@ -4,6 +4,7 @@ import type { RankedRecord } from '../net/rankedRecord';
 import { Avatar } from './Avatar';
 import './MatchClean.css';
 import { MatchDailyCard } from './MatchDailyCard';
+import { MatchModeIcon } from './MatchModeIcon';
 import { goToCourse, setPreferredLength } from './courses';
 
 const LENGTHS = [3, 9, 18] as const;
@@ -32,9 +33,6 @@ function MysteryOpponent() {
   return <svg viewBox="0 0 160 170" aria-hidden="true" className="ma-mystery"><path d="m39 55-7-30 26 17 22-34 22 34 26-17-7 30Z" fill="#031c2e"/><g fill="#031c2e"><circle cx="32" cy="24" r="7"/><circle cx="80" cy="9" r="7"/><circle cx="128" cy="24" r="7"/><circle cx="80" cy="81" r="46"/><path d="M12 169q2-58 68-58t68 58Z"/></g><text x="80" y="105" textAnchor="middle" fill="#fffdf2" fontFamily="Arial,sans-serif" fontSize="68" fontWeight="900">?</text></svg>;
 }
 
-function ModeIcon({ friend }: { friend?: boolean }) {
-  return friend ? <svg viewBox="0 0 180 90" aria-hidden="true"><g stroke="#021d33" strokeWidth="5" strokeLinejoin="round"><circle cx="46" cy="51" r="29" fill="#fff0cc"/><path d="M16 44Q12 6 46 8q23 0 28 20L24 51Z" fill="#13b9ff"/><path d="m24 40 51-17 8 8-56 15Z" fill="#0087cd"/><circle cx="136" cy="51" r="29" fill="#fff0cc"/><path d="M107 29q7-23 30-21 30 3 28 37l-12 6Z" fill="#ff416f"/><path d="m106 24-9 8 54 16 6-8Z" fill="#cc2858"/></g><g fill="#052039"><ellipse cx="37" cy="52" rx="3" ry="4"/><ellipse cx="56" cy="52" rx="3" ry="4"/><ellipse cx="127" cy="52" rx="3" ry="4"/><ellipse cx="146" cy="52" rx="3" ry="4"/></g><path d="M36 65q10 10 20 0m90 0q-10 10-20 0" fill="none" stroke="#052039" strokeWidth="4" strokeLinecap="round"/></svg> : <svg viewBox="0 0 100 100" aria-hidden="true"><path d="m42 8 16 0 3 12 9 4 11-6 11 12-7 11 3 9 12 4-3 16-12 1-7 8 2 12-16 6-7-10-10-1-9 9-14-9 4-12-5-9-13-3 1-16 12-4 5-8-4-12 14-8 9 8 9-1Z" transform="translate(1 0) scale(.94)" fill="#57d8ff" stroke="#021d33" strokeWidth="6" strokeLinejoin="round"/><circle cx="49" cy="49" r="17" fill="#036595" stroke="#021d33" strokeWidth="6"/></svg>;
-}
 
 /** Keyboard focus stays in the sheet, then returns to the card that opened it. */
 function MatchSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -96,9 +94,10 @@ export function MatchLobby({ busy, error, record, recordError, onRetryRecord, on
       {searching ? <div className="ma-search-status"><p role="status">{searchLine}</p><button className="ma-primary ma-cancel" onClick={onCancel}>Cancel search <span>{Math.floor(waitSeconds / 60)}:{String(waitSeconds % 60).padStart(2, '0')}</span></button></div> : <button className="ma-primary" disabled={busy} onClick={onFind}>{busy ? 'CONNECTING…' : 'FIND RANKED OPPONENT'}<span aria-hidden="true">→</span></button>}
     </section>
     <MatchDailyCard disabled={busy || searching}/>
-    <div className="ma-other-modes">
-      <button className="ma-mode-card ma-friend" disabled={busy || searching} onClick={() => open('friend')}><ModeIcon friend/><h2>PLAY A FRIEND</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
-      <button className="ma-mode-card ma-custom" disabled={busy || searching} onClick={() => open('custom')}><ModeIcon/><h2>CUSTOM MATCH</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
+    <h2 className="mc-social-divider" id="mc-social-title"><span>Social Play <small>· Unranked</small></span></h2>
+    <div className="ma-other-modes" role="group" aria-labelledby="mc-social-title">
+      <button className="ma-mode-card ma-friend" disabled={busy || searching} onClick={() => open('friend')}><MatchModeIcon kind="friend"/><h2>PLAY A FRIEND</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
+      <button className="ma-mode-card ma-custom" disabled={busy || searching} onClick={() => open('custom')}><MatchModeIcon kind="custom"/><h2>CUSTOM MATCH</h2><span className="mc-arrow" aria-hidden="true">→</span></button>
     </div>
     {sheet && <MatchSheet title={sheet === 'record' ? 'YOUR RANKED RECORD' : sheet === 'friend' ? 'PLAY A FRIEND' : sheet === 'join' ? 'YOU’RE INVITED' : 'MAKE IT YOUR MATCH'} onClose={() => { if (!busy) setSheet(null); }}>
       {error && <div className="ma-error" role="alert">{error}</div>}

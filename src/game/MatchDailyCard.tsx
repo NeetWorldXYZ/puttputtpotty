@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../net/api';
 import { dailySeed, getBest, goToCourse, secondsUntilNextDaily } from './courses';
 import './MatchDailyCard.css';
+import { MatchModeIcon } from './MatchModeIcon';
 
 type Standing = Awaited<ReturnType<typeof api.dailyStanding>>;
 
 function DailyEmblem() {
-  return <div className="md-emblem" aria-hidden="true"><svg viewBox="0 0 100 120"><rect x="12" y="20" width="76" height="90" rx="12" fill="#fff9e9" stroke="#031c31" strokeWidth="7"/><path d="M16 50V32q0-8 8-8h52q8 0 8 8v18Z" fill="#ff416d"/><path d="M31 12v25m38-25v25" stroke="#031c31" strokeWidth="8" strokeLinecap="round"/><g fill="#031c31"><circle cx="33" cy="70" r="4"/><circle cx="33" cy="92" r="4"/><circle cx="63" cy="92" r="4"/></g><path d="M51 81V62l18 7-18 7" fill="#ff416d" stroke="#ff416d" strokeWidth="3" strokeLinejoin="round"/></svg></div>;
+  return <div className="md-emblem"><MatchModeIcon kind="daily"/></div>;
 }
 
 export function MatchDailyCard({ disabled }: { disabled: boolean }) {
