@@ -7,8 +7,8 @@
 /* The stage extends beyond its avatar column. Leave room for that artwork and the CTA shadow. */
 .profile-polished .pf-hero{position:relative;display:grid;grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);align-items:center;column-gap:clamp(26px,8vw,40px);padding:18px 8px 16px;border:0;border-radius:24px;background:linear-gradient(180deg,#0876a830,#0a374630);box-shadow:none;isolation:isolate;min-height:245px}
 .profile-polished .pf-hero:before{content:"";position:absolute;inset:0;z-index:-1;border-radius:24px;background:radial-gradient(ellipse at 27% 40%,#79d7f044,transparent 65%)}
-.profile-polished .pf-avatar{align-self:end;width:100%;height:230px;display:flex;align-items:center;justify-content:center;margin:0}
-.profile-polished .pf-avatar>.avatar{position:relative;width:100%;max-width:185px;height:auto;transform:translateY(-12px);filter:drop-shadow(0 5px 0 #08283d30)}
+.profile-polished .pf-avatar{align-self:end;width:100%;height:230px;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;margin:0;padding-bottom:clamp(22px,7vw,35px)}
+.profile-polished .pf-avatar>.avatar{position:relative;width:100%;max-width:185px;height:auto;filter:drop-shadow(0 5px 0 #08283d30)}
 .profile-polished .pf-stage{position:absolute;bottom:0;width:145%;max-width:260px;height:auto;pointer-events:none}
 .profile-polished .pf-crown{right:6px;top:6px;width:28px;height:28px;border-width:1px}.profile-polished .pf-crown .game-icon{width:19px;height:19px}
 .profile-polished .pf-identity{display:flex;min-width:0;flex-direction:column;align-items:center;gap:7px;position:relative;padding:4px}
