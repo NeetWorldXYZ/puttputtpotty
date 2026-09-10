@@ -14,7 +14,7 @@ import './Ranks.css';
 
 type Tab = 'nearby' | 'friends' | 'world' | 'daily';
 const tabs: [Tab,string][] = [['nearby','Nearby'],['friends','Friends'],['world','Global'],['daily','Daily']];
-type RankRow = {user_id:string;display_name:string;avatar:KingRow['avatar'];thrones?:number;aces?:number;total?:number;elapsed_ms?:number};
+type RankRow = {user_id:string;display_name:string;avatar:KingRow['avatar'];thrones?:number;aces?:number;ranked_wins?:number;total?:number;elapsed_ms?:number};
 const captions = {nearby:'Beat a bathroom’s course record to claim it.',friends:'Your friends. Same game. Bigger bragging rights.',world:'Claim your place among the world’s throne holders.',daily:'Same nine holes. A new shot at glory.'};
 
 export function LeaderboardScreen() {
@@ -52,10 +52,10 @@ export function LeaderboardScreen() {
       await Promise.all(Array.from({length:Math.min(4,ids.length)},async()=>{
         while(next<ids.length&&!cancelled){
           const p=await api.profile(ids[next++]);
-          if(p)out.push({user_id:p.id,display_name:p.name,avatar:p.avatar,thrones:p.thrones,aces:p.aces});
+          if(p)out.push({user_id:p.id,display_name:p.name,avatar:p.avatar,thrones:p.thrones,aces:p.aces,ranked_wins:p.ranked_wins??0});
         }
       }));
-      return out.sort((a,b)=>(b.thrones??0)-(a.thrones??0)||(b.aces??0)-(a.aces??0)||a.display_name.localeCompare(b.display_name));
+      return out.sort((a,b)=>(b.thrones??0)-(a.thrones??0)||(b.aces??0)-(a.aces??0)||(b.ranked_wins??0)-(a.ranked_wins??0)||a.display_name.localeCompare(b.display_name));
     }
     void fetchBoard().then(r=>{if(!cancelled){setRows(r);setUpdated(new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));}}).catch(()=>{if(!cancelled)setError('Couldn’t load these rankings. Please try again.');});
     return()=>{cancelled=true;};
@@ -80,7 +80,7 @@ export function LeaderboardScreen() {
         {error?<div className="rk-empty" role="alert">{error}<button onClick={()=>setRetry(n=>n+1)}>Try again</button></div>:!rows?<div className="rk-empty" role="status">Getting the latest scores…</div>:rows.length===0?<div className="rk-empty"><ProfileStatIcon kind="throne"/><strong>{tab==='nearby'&&!fix?'Your local legends are waiting':tab==='friends'?'Build your golf crew':'The crown is up for grabs'}</strong><p>{tab==='nearby'&&!fix?'Open the map to set your location.':tab==='friends'?'Add friends to compare your kingdoms.':tab==='daily'?'Be the first to finish this daily course.':'No claimed thrones on this board yet.'}</p><button onClick={()=>tab==='daily'?play():tab==='friends'?setFriendsOpen(true):navigate('map')}>{tab==='daily'?'Play daily':tab==='friends'?'Find friends':'Open map'} →</button></div>:<ol>{rows.map((r,i)=><li key={r.user_id} id={r.user_id===me?'rk-you':undefined} className={(r.user_id===me?'rk-mine ':'')+'rk-place-'+(i+1)}>
           <span className="rk-number">{i+1}</span><Avatar av={r.avatar} size={32}/>
           <button className="rk-player" onClick={()=>navigate('profile',null,null,{user:r.user_id})}>{r.display_name}{r.user_id===me&&<small> · you</small>}</button>
-          {tab==='daily'?<><strong className="rk-score">{(r as DailyRow).total}</strong><span className="rk-time">{r.elapsed_ms!=null?fmtElapsed(r.elapsed_ms):'–'}</span></>:<span className="rk-tally"><strong><RankGlyph kind="crown"/>{r.thrones}</strong><small><RankGlyph kind="target"/>{r.aces??0} aces</small></span>}
+          {tab==='daily'?<><strong className="rk-score">{(r as DailyRow).total}</strong><span className="rk-time">{r.elapsed_ms!=null?fmtElapsed(r.elapsed_ms):'–'}</span></>:<span className="rk-tally"><strong><RankGlyph kind="crown"/>{r.thrones}</strong><small><RankGlyph kind="target"/>{r.aces??0} aces</small><small><RankGlyph kind="trophy"/>{r.ranked_wins??0} ranked {r.ranked_wins===1?'win':'wins'}</small></span>}
         </li>)}</ol>}
       </section>
       <footer className="rk-footer">

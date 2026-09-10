@@ -119,6 +119,8 @@ export interface KingRow {
   thrones: number;
   best_rel: number;
   aces: number;
+  /** Wins from the random-opponent queue (matches without an invite code). */
+  ranked_wins: number;
   last_win: string;
 }
 
@@ -136,6 +138,8 @@ export interface PlayerProfile {
   best_rel: number | null;
   matches_won: number;
   matches: number;
+  /** Wins from the random-opponent queue only; custom and friend matches are left out. */
+  ranked_wins?: number;
   /** Throne Points (TP) from challenges, matches, aces, throne runs and daily courses, and the current daily streak. */
   points?: number;
   streak?: number;
