@@ -21,7 +21,6 @@
 .ranks-city-screen .rk2-tabs button small{display:block;max-width:100%;min-height:2.4em;margin:5px 0 0;color:#f3f5e8;font:600 clamp(8px,2.2cqw,12px)/1.2 var(--game-font);white-space:normal;text-align:center;text-wrap:balance}
 .ranks-city-screen .rk2-tabs button[aria-pressed=true] small{color:#17364a}
 .rk2-tabs button[aria-pressed=true]{border-color:#fff3b0;background:linear-gradient(145deg,#fff0a0,#ffd34f 70%);color:#08293d;box-shadow:inset 0 -5px 0 #e9aa27,0 5px 0 #8e681d}
-.rk2-tabs button[aria-pressed=true]:after{content:"";position:absolute;left:35%;right:35%;bottom:-12px;height:5px;border-radius:99px;background:#ffe25c;box-shadow:0 0 7px #ffe16c}
 
 .rk2-friends-toggle{display:flex;align-items:center;gap:11px;width:calc(100% - 8px);margin:0 4px 9px;min-height:58px;padding:8px 12px;border:2px solid #2587b2;border-radius:14px;background:linear-gradient(145deg,#053b5d,#022b47);color:#fff;box-shadow:0 4px 0 #01253c;text-align:left;font-family:var(--game-font)}
 .rk2-friends-toggle>span:nth-child(2){flex:1;min-width:0}.rk2-friends-toggle strong,.rk2-friends-toggle small{display:block}.rk2-friends-toggle strong{font-size:15px}.rk2-friends-toggle small{margin-top:2px;color:#bbdceb;font-size:10px;line-height:1.2}
