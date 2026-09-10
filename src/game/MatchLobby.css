@@ -16,7 +16,7 @@
 .ma-heading h1{margin:0;color:#fffaf0;font:400 clamp(34px,9.5vw,58px)/1.08 'Match Anton',Impact,sans-serif;letter-spacing:.2px;transform:rotate(-2deg) skewX(-8deg);paint-order:stroke fill;-webkit-text-stroke:8px #03182c;text-shadow:0 5px 0 #03182c,2px 8px 0 #03182c}
 .ma-heading h1 span{color:#ffdf4b}
 .ma-heading p{display:table;position:relative;margin:8px auto 0;padding:4px 7px 5px;max-width:96%;border-radius:8px;background:#03223be8;font:800 clamp(10px,2.6vw,15px)/1.25 var(--game-font);box-shadow:0 3px 5px #001c3270}
-.ma-duel{position:absolute;top:37%;bottom:12%;left:15.5%;right:15.5%;display:flex;justify-content:space-between;align-items:stretch;gap:23%}
+.ma-duel{position:absolute;top:calc(37% + 18px);bottom:12%;left:15.5%;right:15.5%;display:flex;justify-content:space-between;align-items:stretch;gap:23%}
 .ma-player{position:relative;min-width:0;width:39%;display:flex;align-items:stretch;flex-direction:column;z-index:1}
 .ma-portrait{flex:1;min-height:0;position:relative;display:flex;align-items:flex-end;justify-content:center;isolation:isolate}
 .ma-portrait:before{content:'';position:absolute;inset:0 0 -2px;border:2px solid #6ef6ff;border-radius:12px;background:linear-gradient(145deg,#005aadcc,#05364bc9);box-shadow:0 0 7px #41dfff,0 0 21px #12bfff88,inset 0 0 12px #15cfff55;transform:rotate(-4deg);z-index:-1}
