@@ -80,6 +80,12 @@ export interface MatchRow {
   bot_times?: number[] | null;
 }
 
+export interface MatchReactionRow {
+  user_id: string;
+  key: string;
+  created_at: string;
+}
+
 export type FriendRelation = 'me' | 'none' | 'friend' | 'incoming' | 'outgoing' | 'blocked';
 export interface FriendRow {
   user_id: string;
@@ -402,6 +408,18 @@ export const api = {
     const { data, error } = await supabase.rpc('my_friend_code');
     if (error) throw new Error(error.message);
     return String(data);
+  },
+  /** Fire a canned after-match line at your opponent. */
+  async matchReact(matchId: string, key: string): Promise<void> {
+    await ensureSession();
+    const { error } = await supabase.rpc('match_react', { in_match: matchId, in_key: key });
+    if (error) throw new Error(error.message.replace(/^.*?: /, ''));
+  },
+  /** Everything said after one of your matches, oldest first. */
+  async matchReactions(matchId: string): Promise<MatchReactionRow[]> {
+    const { data, error } = await supabase.rpc('match_reactions', { in_match: matchId });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as MatchReactionRow[];
   },
   async heartbeat(): Promise<void> {
     await supabase.rpc('heartbeat');

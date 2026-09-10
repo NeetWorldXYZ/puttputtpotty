@@ -3986,3 +3986,197 @@ svg {
   flex-basis: 100%;
   margin: 0;
 }
+
+/* ---- After the match: the crowned winner, speech bubbles, canned reactions ---- */
+.verdict-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0 4px;
+  position: relative;
+}
+.verdict-crown {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: -14px;
+  z-index: 1;
+  filter: drop-shadow(0 2px 0 #08263c);
+  animation: verdict-crown-drop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes verdict-crown-drop {
+  from {
+    transform: translateY(-18px) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.verdict-hero-avatar {
+  filter: drop-shadow(0 0 10px #ffd12b) drop-shadow(0 4px 0 #08263c);
+  animation: verdict-hero-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes verdict-hero-pop {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.verdict-hero-name {
+  font: 800 13px var(--game-font);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffed95, #ffd12b 65%);
+  color: #14213d;
+  border: 1px solid #ffe9a0;
+  box-shadow: inset 0 -2px 0 #eaa519;
+}
+.verdict-rows > div {
+  grid-template-areas: 'av name score' 'av sub score' 'bub bub bub';
+}
+.verdict-bubble {
+  grid-area: bub;
+  position: relative;
+  justify-self: start;
+  margin: 4px 0 2px 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 2px solid #09273a;
+  background: linear-gradient(120deg, #fff6dc, #fbeac4);
+  color: #08263c;
+  font: 600 13px/1.25 var(--game-font);
+  font-style: normal;
+  max-width: calc(100% - 44px);
+  box-sizing: border-box;
+  animation: verdict-bubble-in 0.25s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.verdict-bubble::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 8px;
+  border: 6px solid transparent;
+  border-right-color: #09273a;
+  border-left: 0;
+}
+.verdict-bubble::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  border: 4px solid transparent;
+  border-right-color: #fff6dc;
+  border-left: 0;
+}
+.verdict-bubble.them {
+  background: linear-gradient(120deg, #e3f1ff, #cfe4fb);
+}
+.verdict-bubble.them::after {
+  border-right-color: #e3f1ff;
+}
+@keyframes verdict-bubble-in {
+  from {
+    transform: scale(0.8) translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.verdict-talk {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #45658b;
+}
+.waiting .verdict .verdict-talk {
+  border-top-color: #b9c6dd;
+}
+.verdict-talk-head {
+  font: 800 11px var(--game-font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+  margin-bottom: 6px;
+}
+.waiting .verdict .verdict-talk-head {
+  color: #4a5a80;
+}
+.verdict-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  margin: 0 -2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.verdict-chips::-webkit-scrollbar {
+  display: none;
+}
+.verdict .verdict-chip {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 34px;
+  margin: 0 2px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 2px solid #45658b;
+  background: linear-gradient(145deg, #1b3456, #12253f);
+  color: #fff6dc;
+  font: 800 13px var(--game-font);
+  box-shadow: 0 2px 0 #08263c;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.verdict .verdict-chip:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #08263c;
+}
+.verdict .verdict-chip:disabled {
+  opacity: 0.55;
+}
+.verdict .verdict-chip.trash {
+  border-color: #ff7a9c;
+}
+.verdict .verdict-chip.sad {
+  border-color: #6fb6ff;
+}
+.verdict .verdict-chip.nice {
+  border-color: #8fe3a3;
+}
+.verdict-log {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--dim);
+}
+.waiting .verdict .verdict-log {
+  color: #4a5a80;
+}
+.verdict-log li {
+  padding: 1px 0;
+}
+.verdict-log li b {
+  color: var(--text);
+}
+.waiting .verdict .verdict-log li b {
+  color: var(--ink);
+}
+.verdict-log li.me b {
+  color: #b8860b;
+}
+.waiting .verdict .verdict-friend.done {
+  border-color: #6b7fa3;
+  color: #4a5a80;
+}

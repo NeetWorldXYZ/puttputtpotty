@@ -16,6 +16,7 @@ import { buzz } from './haptics';
 import { stopTheme } from './music';
 import { MatchLobby } from './MatchLobby';
 import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
+import { botReply, reactionFor, reactionsFor } from './reactions';
 import './MatchLobby.css';
 
 interface Props {
@@ -40,6 +41,13 @@ interface OppState {
   holes: number[];
   total: number;
   finished: boolean;
+}
+
+/** One canned line said after the match, by whom and when. */
+interface Said {
+  from: string;
+  key: string;
+  at: number;
 }
 
 const relPar = (d: number) => (d === 0 ? 'E' : d > 0 ? `+${d}` : `${d}`);
@@ -67,6 +75,7 @@ export function MatchScreen({ code, matchId }: Props) {
   const [oppOnline, setOppOnline] = useState(false);
   const [mine, setMine] = useState<{ score: number; holes: number[]; elapsed: number } | null>(null);
   const [shared, setShared] = useState(false);
+  const [said, setSaid] = useState<Said[]>([]);
   const [record, setRecord] = useState<RankedRecord | null>(null);
   const [recordError, setRecordError] = useState(false);
   const [recordRevision, setRecordRevision] = useState(0);
@@ -126,6 +135,7 @@ export function MatchScreen({ code, matchId }: Props) {
       setOpp(null);
       setOppOnline(false);
       setMine(null);
+      setSaid([]);
     }
     // The server may have seated a bot itself (after ten seconds of waiting): pick up its clock so we plan its round and show it moving.
     if (m.p2_bot && !botRef.current) botRef.current = { times: m.bot_times ?? [], scores: [] };
@@ -266,6 +276,12 @@ export function MatchScreen({ code, matchId }: Props) {
         return { holes: holes.map((x) => x ?? 0), total: p.total, finished: p.done };
       });
     });
+    ch.on('broadcast', { event: 'react' }, ({ payload }) => {
+      const r = payload as { from: string; key: string };
+      if (r.from === me || !reactionFor(r.key)) return;
+      sfx.pop();
+      setSaid((prev) => [...prev.slice(-19), { from: r.from, key: r.key, at: Date.now() }]);
+    });
     ch.on('presence', { event: 'sync' }, () => {
       const others = Object.keys(ch.presenceState()).filter((k) => k !== me);
       setOppOnline(others.length > 0);
@@ -301,6 +317,44 @@ export function MatchScreen({ code, matchId }: Props) {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished, match?.id, match?.status]);
+
+  // The match is over: pick up anything already said (a reload, or they spoke before we landed here).
+  useEffect(() => {
+    if (!match || match.status !== 'done' || match.p2_bot) return;
+    const id = match.id;
+    api
+      .matchReactions(id)
+      .then((rows) => {
+        if (matchIdRef.current !== id) return;
+        setSaid((prev) => {
+          const seen = new Set(prev.map((x) => `${x.from}:${x.key}:${x.at}`));
+          const older = rows.map((r) => ({ from: r.user_id, key: r.key, at: new Date(r.created_at).getTime() })).filter((x) => !seen.has(`${x.from}:${x.key}:${x.at}`));
+          return [...older, ...prev].sort((a, b) => a.at - b.at).slice(-20);
+        });
+      })
+      .catch(() => {});
+  }, [match?.id, match?.status, match?.p2_bot]);
+
+  /** Fire a canned line: show it, tell the other side, keep it on the server. A bot opponent answers back. */
+  const react = (key: string) => {
+    if (!match || !me || !reactionFor(key)) return;
+    sfx.pop();
+    buzz(12);
+    setSaid((prev) => [...prev.slice(-19), { from: me, key, at: Date.now() }]);
+    void channelRef.current?.send({ type: 'broadcast', event: 'react', payload: { from: me, key } });
+    if (match.p2_bot) {
+      const id = match.id;
+      const outcome = match.winner === null ? 'tie' : match.winner === me ? 'won' : 'lost';
+      const reply = botReply(outcome);
+      setTimeout(() => {
+        if (matchIdRef.current !== id) return;
+        sfx.pop();
+        setSaid((prev) => [...prev.slice(-19), { from: match.p2 ?? 'bot', key: reply.key, at: Date.now() }]);
+      }, 1200 + Math.random() * 1800);
+      return;
+    }
+    api.matchReact(match.id, key).catch((e: Error) => setError(e.message));
+  };
 
   const broadcast = (p: Progress) => {
     void channelRef.current?.send({ type: 'broadcast', event: 'progress', payload: { ...p, from: me } });
@@ -386,7 +440,7 @@ export function MatchScreen({ code, matchId }: Props) {
   const leave = () => navigate('play');
   const rematch = () => void start(() => api.findMatch());
   const panel = match ? (
-    <MatchPanel match={match} me={me} side={side} opp={opp} oppOnline={oppOnline} mine={mine} holes={holes} error={error} onLeave={leave} onRematch={rematch} />
+    <MatchPanel match={match} me={me} side={side} opp={opp} oppOnline={oppOnline} mine={mine} holes={holes} error={error} onLeave={leave} onRematch={rematch} said={said} onReact={react} />
   ) : null;
 
   if (phase === 'playing' && holes && match) {
@@ -565,6 +619,8 @@ function MatchPanel({
   holes,
   error,
   onLeave,
+  said,
+  onReact,
 }: {
   match: MatchRow;
   me: string | null;
@@ -576,6 +632,8 @@ function MatchPanel({
   error: string | null;
   onLeave: () => void;
   onRematch: () => void;
+  said: Said[];
+  onReact: (key: string) => void;
 }) {
   const other = side === 'p1' ? 'p2' : 'p1';
   const oppName = match[`${other}_name`] ?? 'Opponent';
@@ -586,7 +644,7 @@ function MatchPanel({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [match.status]);
-  if (match.status === 'done') return <Verdict match={match} me={me} side={side} />;
+  if (match.status === 'done') return <Verdict match={match} me={me} side={side} said={said} onReact={onReact} />;
   const done = opp?.holes.length ?? 0;
   const pars = holes?.map((h) => h.par) ?? [];
   const oppRel = pars.length ? (opp?.total ?? 0) - pars.slice(0, done).reduce((a, b) => a + b, 0) : null;
@@ -683,14 +741,34 @@ function AddFriend({ userId, name }: { userId: string; name: string }) {
   );
 }
 
-function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side: 'p1' | 'p2' }) {
+function Verdict({ match, me, side, said, onReact }: { match: MatchRow; me: string | null; side: 'p1' | 'p2'; said: Said[]; onReact: (key: string) => void }) {
   const other = side === 'p1' ? 'p2' : 'p1';
   const mine = { score: match[`${side}_score`], holes: match[`${side}_holes`], t: match[`${side}_elapsed_ms`] };
   const theirs = { score: match[`${other}_score`], holes: match[`${other}_holes`], t: match[`${other}_elapsed_ms`], name: match[`${other}_name`] ?? 'Opponent' };
   const won = match.winner === me;
   const tie = match.winner === null;
+  const outcome = tie ? 'tie' : won ? 'won' : 'lost';
+  const winSide = tie ? null : won ? side : other;
+  // The latest line from each side sits in a bubble by their avatar; the last few make a little log.
+  const lastMine = [...said].reverse().find((x) => x.from === me);
+  const lastTheirs = [...said].reverse().find((x) => x.from !== me);
+  const chips = reactionsFor(outcome);
+  // A breath between taps, so nobody machine-guns the other side.
+  const [cooling, setCooling] = useState(false);
+  useEffect(() => {
+    if (!cooling) return;
+    const id = setTimeout(() => setCooling(false), 1500);
+    return () => clearTimeout(id);
+  }, [cooling]);
   return (
     <div className={`verdict ${tie ? 'tie' : won ? 'won' : 'lost'}`}>
+      {winSide && (
+        <div className="verdict-hero" aria-label={`Winner: ${winSide === side ? 'you' : theirs.name}`}>
+          <span className="verdict-crown" aria-hidden="true">👑</span>
+          <Avatar av={match[`${winSide}_avatar`]} size={92} className="verdict-hero-avatar" />
+          <span className="verdict-hero-name">{winSide === side ? 'You' : theirs.name}</span>
+        </div>
+      )}
       <div className="verdict-title">{tie ? 'Dead heat' : won ? (match.forfeit ? 'Win by forfeit' : 'You win!') : match.forfeit ? 'Lost by forfeit' : `${theirs.name} wins`}</div>
       <div className="verdict-rows">
         <div className={won ? 'lead' : ''}>
@@ -701,6 +779,11 @@ function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side
             {mine.holes?.join('-') ?? ''}
             {mine.t != null ? ` · ${fmtElapsed(mine.t)}` : ''}
           </small>
+          {lastMine && (
+            <em className="verdict-bubble me" key={lastMine.at}>
+              {reactionFor(lastMine.key)?.text}
+            </em>
+          )}
         </div>
         <div className={!won && !tie ? 'lead' : ''}>
           <Avatar av={match[`${other}_avatar`]} size={34} className="verdict-avatar" />
@@ -710,8 +793,44 @@ function Verdict({ match, me, side }: { match: MatchRow; me: string | null; side
             {theirs.holes?.join('-') ?? (match.forfeit ? 'did not finish' : '')}
             {theirs.t != null ? ` · ${fmtElapsed(theirs.t)}` : ''}
           </small>
+          {lastTheirs && (
+            <em className="verdict-bubble them" key={lastTheirs.at}>
+              {reactionFor(lastTheirs.key)?.text}
+            </em>
+          )}
         </div>
       </div>
+      {match[other] && (
+        <div className="verdict-talk">
+          <div className="verdict-talk-head">{won ? 'Talk some trash' : tie ? 'Say something' : 'Take it like a champ'}</div>
+          <div className="verdict-chips" role="group" aria-label="Send a reaction">
+            {chips.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={`verdict-chip ${r.mood}`}
+                disabled={cooling}
+                onClick={() => {
+                  setCooling(true);
+                  onReact(r.key);
+                }}
+                title={r.text}
+              >
+                {r.chip}
+              </button>
+            ))}
+          </div>
+          {said.length > 1 && (
+            <ul className="verdict-log" aria-live="polite">
+              {said.slice(-4).map((x) => (
+                <li key={`${x.from}:${x.at}`} className={x.from === me ? 'me' : 'them'}>
+                  <b>{x.from === me ? 'You' : theirs.name}</b> {reactionFor(x.key)?.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {!match.p2_bot && match[other] && <AddFriend userId={match[other] as string} name={theirs.name} />}
     </div>
   );
