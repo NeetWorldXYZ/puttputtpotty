@@ -7,6 +7,7 @@ import { AccountSheet } from './AccountSheet';
 import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
+import { ProfileName, ProfileSign } from './ProfileIdentity';
 import './Profile.css';
 import './ProfilePolish.css';
 import { ProfileGolfer, ProfileRecentCrowns, ProfileStage, ProfileStats, PublicProfileExtras } from './ProfileExtras';
@@ -64,10 +65,10 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
     {!error && p === null && <div className="lb-note">No such player.</div>}
     {p && <div className="profile-body">
       <section className="pf3-hero" aria-label={`${p.name}'s profile`}>
-        <div className="pf3-avatar"><ProfileStage/><ProfileGolfer av={p.avatar}/></div>
+        <div className="pf3-avatar"><ProfileSign slogan={p.slogan} onEdit={mine ? () => setAccount(true) : undefined}/><div className="pf3-golfer-group"><ProfileStage/><ProfileGolfer av={p.avatar}/></div></div>
         <div className="pf3-identity">
-          <div className="pf3-name-row"><h1>{p.name}</h1>{mine && <button aria-label="Edit profile" onClick={() => setAccount(true)}>✎</button>}{!mine && <span className="pf3-level-shield">♛<b>LVL</b><strong>{progress.level}</strong></span>}</div>
-          <span className="pf3-title">♛&nbsp; {p.house_tag ?? royalTitle(p.thrones)}</span>
+          <div className="pf3-name-row"><ProfileName name={p.name}/>{mine && <button aria-label="Edit profile" onClick={() => setAccount(true)}>✎</button>}</div>
+          <div className="pf3-rank-row"><span className="pf3-title">♛&nbsp; {p.house_tag ?? royalTitle(p.thrones)}</span>{!mine && <span className="pf3-level-chip">LVL <b>{progress.level}</b></span>}</div>
           <small>Playing since {memberSince(p.since)}</small>
           {mine && <div className="pf3-level-box"><div><b>LVL {progress.level}</b><span>{progress.into} / {progress.span} XP</span></div><i><em style={{ width: `${Math.round((100 * progress.into) / progress.span)}%` }}/></i><small><b>{progress.toNext} TP</b> to next level{(p.streak ?? 0) > 0 && <span>🔥 {p.streak} day streak</span>}</small></div>}
           {mine && <button className="pf3-customize" onClick={() => setEdit(true)}><span>👕</span>Customize My Look&nbsp; ›</button>}
