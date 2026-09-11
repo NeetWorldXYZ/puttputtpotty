@@ -52,6 +52,13 @@ export function getBest(seed: string): number | null {
   }
 }
 
+/** Clear a local score after the server confirms that its attempt was removed. */
+export function clearBest(seed: string): void {
+  const scores = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>;
+  delete scores[seed];
+  localStorage.setItem(BEST_KEY, JSON.stringify(scores));
+}
+
 /** Returns true if this is a new best. */
 export function recordBest(seed: string, total: number): boolean {
   try {

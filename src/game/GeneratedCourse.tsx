@@ -42,7 +42,9 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     setStatusError('');
     void api.dailyStanding(seed).then(standing => {
       if (!live) return;
-      if (standing) { setAlreadyPlayed(true); setSavedTotal(standing.total); }
+      // This is an entry check only. Submission updates must not replace PlayView's recap.
+      setAlreadyPlayed(standing !== null || getBest(seed) !== null);
+      setSavedTotal(standing?.total ?? getBest(seed));
       setChecked(true);
     }).catch(() => { if (live) setStatusError('Could not check your round. Please retry.'); });
     return () => { live = false; };
@@ -175,6 +177,11 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
         lockedParams={daily ? DEFAULT_PARAMS : undefined}
         onHoleDone={onHoleDone}
         noRetry={daily}
+        renderScorecardButtons={daily ? ({ share, shared }) => <>
+          <button className="primary" onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
+          <button onClick={() => navigate('leaders', seed)}>Daily leaderboard</button>
+          <button onClick={() => goToCourse('title')}>Home</button>
+        </> : undefined}
         scorecardExtra={daily ? <>{submissionFailed?<p role="status">Some holes have not synced. Your shots are saved on this device; return Home and open Daily Results to retry.</p>:<EarnedTP context={`daily:${seed}`} pending={submitted<9}/>}<DailyBoard seed={seed} refreshKey={submitted} /></> : undefined}
       />
       {askName && <NamePrompt title="Name for the leaderboard" sub="Today's course is ranked. Pick the name others will see." onDone={() => setAskName(false)} onCancel={() => setAskName(false)} />}
