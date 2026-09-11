@@ -1,5 +1,7 @@
 import type { Avatar, BallLook } from './avatarParts';
 import { earnedHeadArt, earnedFace } from './earnedHeadArt';
+import { ballMaterialSvg } from './ballMaterials';
+import { shirtMaterial, tailoredCollar } from './shirtMaterials';
 
 const INK = '#071f32';
 type Tone = {top:string;bottom:string};
@@ -7,9 +9,10 @@ const cleanId = (id:string) => 'look-'+id.replace(/[^a-zA-Z0-9_-]/g,'');
 const stroke = `stroke="${INK}" stroke-linejoin="round" stroke-linecap="round"`;
 
 function defs(id:string,tone:Tone,shirt:string):string {
+  const shade='#'+[1,3,5].map(offset=>Math.round(parseInt(shirt.slice(offset,offset+2),16)*.68).toString(16).padStart(2,'0')).join('');
   return `<defs>
     <linearGradient id="${id}-skin" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="${tone.top}"/><stop offset=".66" stop-color="${tone.top}"/><stop offset="1" stop-color="${tone.bottom}"/></linearGradient>
-    <linearGradient id="${id}-shirt" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="${shirt}"/><stop offset="1" stop-color="${shirt}"/></linearGradient>
+    <linearGradient id="${id}-shirt" x1="0" y1="0" x2=".65" y2="1"><stop stop-color="${shirt}"/><stop offset=".45" stop-color="${shirt}"/><stop offset="1" stop-color="${shade}"/></linearGradient>
     <linearGradient id="${id}-gold" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#fff09a"/><stop offset=".45" stop-color="#ffd643"/><stop offset="1" stop-color="#e59a21"/></linearGradient>
     <linearGradient id="${id}-red" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#ff6972"/><stop offset=".55" stop-color="#ff334f"/><stop offset="1" stop-color="#c8223c"/></linearGradient>
     <linearGradient id="${id}-hat" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#315269"/><stop offset=".5" stop-color="#163348"/><stop offset="1" stop-color="#071b2e"/></linearGradient>
@@ -19,13 +22,16 @@ function defs(id:string,tone:Tone,shirt:string):string {
 function shirtSvg(key:string,id:string):string {
   const outline='M52 107 Q80 98 108 107 L129 123 L142 144 L124 152 L115 136 L118 158 Q80 167 42 158 L45 136 L36 152 L18 144 L31 123 Z';
   const pizza=key==='wood';
-  return `<g data-part="shirt">
+  return `<g data-part="shirt" data-shirt="${key}">
     <clipPath id="${id}-garment"><path d="${outline}"/></clipPath>
     <path d="${outline}" fill="url(#${id}-shirt)" ${stroke} stroke-width="6"/>
     ${pizza?`<g clip-path="url(#${id}-garment)" fill="#ef4736" stroke="#d42b30" stroke-width="1.3">${[[36,121,7],[61,114,6],[91,112,7],[121,130,6],[54,144,7],[84,156,6],[110,148,7],[26,147,5],[80,130,5]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`:''}
+    ${shirtMaterial(key,id)}
+    <path d="${outline}" fill="none" ${stroke} stroke-width="6"/>
     <path d="M111 112l14 16 10 15-10 4-12-18 1 25q-34 8-68 0l-1 4q35 10 73 0l-3-22 9 16 18-8-13-21Z" fill="${INK}" opacity=".17"/>
     <path d="M49 118l-12 11-8 12" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="4" stroke-linecap="round"/>
-    ${pizza?`<path d="m60 108 20 9-11 12-14-19m45-2-20 9 11 12 14-19" fill="#ffe99c" ${stroke} stroke-width="3"/><path d="M80 118v24" stroke="#bf7930" stroke-width="2"/><circle cx="80" cy="131" r="1.6" fill="${INK}"/>`:`<path d="M53 112Q45 99 61 99h38q16 0 8 13l-27 8Z" fill="url(#${id}-shirt)" ${stroke} stroke-width="4"/><path d="m57 104 23 11 23-11" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="3"/><path d="m67 115-2 12m28-12 2 12" stroke="${INK}" stroke-width="2.5"/><path d="M66 147q14 6 28 0l2 9H64Z" fill="${INK}" opacity=".08"/>`}
+    ${tailoredCollar(key,id)??(pizza?`<path d="m60 108 20 9-11 12-14-19m45-2-20 9 11 12 14-19" fill="#ffe99c" ${stroke} stroke-width="3"/><path d="M80 118v24" stroke="#bf7930" stroke-width="2"/><circle cx="80" cy="131" r="1.6" fill="${INK}"/>`:`<path d="M53 112Q45 99 61 99h38q16 0 8 13l-27 8Z" fill="url(#${id}-shirt)" ${stroke} stroke-width="4"/><path d="m57 104 23 11 23-11" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="3"/><path d="m67 115-2 12m28-12 2 12" stroke="${INK}" stroke-width="2.5"/><path d="M66 147q14 6 28 0l2 9H64Z" fill="${INK}" opacity=".08"/>`)}
+    <path d="M45 136l-3 21q38 9 76 0l-3-21M23 142l14 7m87 0 13-7" fill="none" stroke="${INK}" stroke-opacity=".4" stroke-width="2"/>
     <path d="M88 134L86 121L93 126L98 118L103 126L110 121L108 134Z" fill="url(#${id}-gold)" ${stroke} stroke-width="2.5"/>
     <path d="M91 131h15" stroke="#fff6b9" stroke-width="1.5"/>
   </g>`;
@@ -75,6 +81,7 @@ function ballSvg(look:BallLook,cx:number,cy:number,r:number,id:string):string {
   if(look.pattern==='dots')detail+=dimplePositions.filter((_,i)=>i%3===0).map(([x,y])=>`<circle cx="${cx+x*r}" cy="${cy+y*r}" r="${r*.18}" fill="${look.accent}"/>`).join('');
   if(look.motif==='eight')detail=`<circle cx="${cx}" cy="${cy+r*.12}" r="${r*.51}" fill="#fff7e4"/><text x="${cx}" y="${cy+r*.4}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${r*.82}" font-weight="900" fill="${INK}">8</text>`;
   if(look.motif==='fire')detail=`<g transform="translate(${cx-r} ${cy-r}) scale(${r/50})"><path d="M49 10c4 23-25 27-14 47-2-9-8-15-15-16-13 34 9 50 30 50 31 0 42-30 25-48 0 14-6 14-9 18 8-25-7-37-17-51Z" fill="#ffd145"/><path d="M51 43c2 13-14 17-11 29-3-4-6-7-9-7 0 17 13 23 23 20 15-5 16-17 8-29 0 10-5 10-5 10 2-10-2-17-6-23Z" fill="#fff3a1"/></g>`;
+  if(look.material)detail=`<g data-ball-material="${look.material}" transform="translate(${cx-r} ${cy-r}) scale(${r/50})">${ballMaterialSvg(look.material)}</g>`;
   return `<g data-part="ball"><defs><clipPath id="${id}-clip"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath><radialGradient id="${id}-sphere" cx=".3" cy=".24" r=".8"><stop stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="${INK}" stop-opacity=".4"/></radialGradient></defs><circle data-ball-outline="true" cx="${cx}" cy="${cy}" r="${r}" fill="${look.color}" ${stroke} stroke-width="${r*.12+1.2}"/><g clip-path="url(#${id}-clip)">${detail}<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}-sphere)"/><ellipse cx="${cx-r*.36}" cy="${cy-r*.48}" rx="${r*.19}" ry="${r*.13}" transform="rotate(-30 ${cx-r*.36} ${cy-r*.48})" fill="#fff" opacity=".8"/></g></g>`;
 }
 

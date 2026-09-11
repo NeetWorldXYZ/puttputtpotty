@@ -7,6 +7,8 @@ import type { Hazard, Hole, MovingObstacle, Obstacle, Polygon, SlopeZone, Surfac
 import { compassVector } from '../sim/geometry';
 import { drawSprite } from './sprites';
 import { finishMaterial, type Material } from './materials';
+import { paintBallMaterial } from '../game/ballMaterials';
+import type { EarnedBall } from '../../server/potty/cosmeticCatalog';
 import { OUTLINE, type Theme } from './themes';
 import { bbox, chunky, circle, dropShadow, ellipse, highlight, makeRand, polygonCentroid, roundRectPath, roundedPolygonPath, hashString } from './shapes';
 
@@ -954,6 +956,7 @@ export interface BallStyle {
   pattern: 'plain' | 'stripe' | 'dots';
   accent: string;
   motif?: 'eight' | 'fire' | 'gold';
+  material?: EarnedBall;
 }
 
 export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, style?: BallStyle | null): void {
@@ -1019,6 +1022,13 @@ export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, r:
       ctx.fill(new Path2D('M51 43c2 13-14 17-11 29-3-4-6-7-9-7 0 17 13 23 23 20 15-5 16-17 8-29 0 10-5 10-5 10 2-10-2-17-6-23Z'));
     }
     ctx.restore();
+  }
+  if(style?.material){
+    ctx.save();circle(ctx,x,y,r*.88);ctx.clip();
+    paintBallMaterial(ctx,style.material,x,y,r);
+    const shade=ctx.createRadialGradient(x-r*.3,y-r*.35,0,x,y,r);
+    shade.addColorStop(0,'#ffffff38');shade.addColorStop(.5,'#ffffff00');shade.addColorStop(1,'#071f3266');
+    circle(ctx,x,y,r);ctx.fillStyle=shade;ctx.fill();ctx.restore();
   }
   highlight(ctx, x - r * 0.32, y - r * 0.32, r * 0.28, r * 0.2, 0.95);
 }

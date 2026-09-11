@@ -3,6 +3,10 @@ import { Avatar } from './Avatar';
 import { BALLS, FACES, HATS, HEADS, SEATS, avatarPartSvg, headTones, type Avatar as AvatarSpec } from './avatarParts';
 import './AvatarCustomizer.css';
 import { EARNABLE_HEADS, headUnlocked, isEarnableHead, type HeadProgress } from './earnedHeads';
+import { gearReward, gearUnlocked } from '../../server/potty/cosmeticCatalog';
+
+const rewardFor=(part:string,value:string)=>part==='head'&&isEarnableHead(value)?EARNABLE_HEADS[value]:gearReward(part,value);
+const progressUnit=(metric:string)=>({points:'TP',rankedWins:'wins',places:'places',dailyDays:'days',aces:'aces',thrones:'thrones'}[metric]??'');
 
 export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; featured: readonly string[] }[] = [
   { key: 'head', label: 'Head', featured: ['classic', 'roll', 'turd', 'alien', 'dawg'] },
@@ -45,6 +49,10 @@ interface Props {
 export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClose, headProgress, progressLoading }: Props) {
   const [category, setCategory] = useState<keyof AvatarSpec>('head');
   const [expanded, setExpanded] = useState<Partial<Record<keyof AvatarSpec, boolean>>>({});
+  const [inspected,setInspected]=useState<{part:keyof AvatarSpec;value:string}|null>(null);
+  const preview=inspected?{...avatar,[inspected.part]:inspected.value}:avatar;
+  const inspectedReward=inspected?rewardFor(inspected.part,inspected.value):null;
+  const inspectedCurrent=inspectedReward?headProgress?.stats[inspectedReward.metric]??0:0;
   const dialog = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -79,8 +87,8 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
             <div><h1 id={`${id}-title`}>YOUR <em>LOOK</em></h1><p>Same holes. Better style.</p></div>
             <button className="studio-circle" aria-label="Close customizer" disabled={busy} onClick={onClose}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
           </header>
-          <div className="studio-golfer" role="img" aria-label={`Your golfer: ${LOOK_CATEGORIES.map(({key}) => lookOptions(avatar, key).find(([value]) => value === avatar[key])?.[1]).join(', ')}`}>
-            <Avatar av={avatar} size={240} />
+          <div className="studio-golfer" role="img" aria-label={`${inspected?'Preview':'Your golfer'}: ${LOOK_CATEGORIES.map(({key}) => lookOptions(preview, key).find(([value]) => value === preview[key])?.[1]).join(', ')}`}>
+            <Avatar av={preview} size={240} />
           </div>
         </div>
         <div className="studio-wardrobe">
@@ -95,13 +103,17 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
             }}>{item.key === 'porcelain' && avatar.head !== 'classic' ? 'Colour' : item.label}</button>)}
           </div>
           <div className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
-            <div className="studio-options" aria-label={`Choose ${label.toLowerCase()}`}>
+            {inspectedReward&&<div className="studio-unlock-detail" aria-live="polite"><div><strong>{inspectedReward.label}</strong><button onClick={()=>setInspected(null)}>Back to my look ×</button></div><p>{inspectedReward.requirement}</p><progress value={Math.min(inspectedCurrent,inspectedReward.target)} max={inspectedReward.target}/><small>{progressLoading?'Checking progress…':`${inspectedCurrent.toLocaleString()} / ${inspectedReward.target.toLocaleString()} ${progressUnit(inspectedReward.metric)}`} · Permanent unlock · No TP spent</small></div>}
+            <div className="studio-options" data-expanded={showingAll||undefined} aria-label={`Choose ${label.toLowerCase()}`}>
               {visible.map(([value, title]) => {
-                const locked=category==='head' && !headUnlocked(value,headProgress);
-                const reward=isEarnableHead(value)?EARNABLE_HEADS[value]:null;
+                const locked=category==='head' ? !headUnlocked(value,headProgress) : !gearUnlocked(category,value,headProgress);
+                const reward=rewardFor(category,value);
                 const current=reward ? headProgress?.stats[reward.metric] ?? 0 : 0;
-                const unit=reward?.metric==='points'?'TP':reward?.metric==='rankedWins'?'wins':reward?.metric==='places'?'places':reward?.metric==='dailyDays'?'days':reward?.metric==='aces'?'aces':'thrones';
-                return <button key={`${category}-${value}`} className="studio-option" data-locked={locked||undefined} aria-pressed={avatar[category] === value} disabled={busy||locked} title={locked?reward?.requirement:undefined} onClick={() => { setExpanded((state) => ({ ...state, [category]: showingAll })); onChange({ ...avatar, [category]: value }); }}>
+                const unit=progressUnit(reward?.metric??'');
+                return <button key={`${category}-${value}`} className="studio-option" data-locked={locked||undefined} aria-pressed={preview[category] === value} disabled={busy} aria-label={locked?`${title}. Locked. ${reward?.requirement}. Tap to preview.`:title} onClick={() => {
+                  if(locked){setInspected({part:category,value});return;}
+                  setInspected(null);setExpanded((state) => ({ ...state, [category]: showingAll })); onChange({ ...avatar, [category]: value });
+                }}>
                   <Part avatar={{ ...avatar, [category]: value }} part={category} />
                   <span>{title}</span>
                   {locked&&reward&&<small className="studio-lock"><b aria-hidden="true">●</b>{progressLoading?'Checking…':`${Math.min(current,reward.target)} / ${reward.target} ${unit}`}</small>}
@@ -113,7 +125,7 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
         </div>
         <footer className="studio-footer">
           {error && <p className="studio-error" role="alert">{error}</p>}
-          <button className="studio-save" disabled={busy} onClick={onSave}>{busy ? 'Saving your look…' : 'Save my look'}</button>
+          <button className="studio-save" disabled={busy||!!inspected} onClick={onSave}>{busy ? 'Saving your look…' : inspected ? 'Locked · complete the milestone' : 'Save my look'}</button>
         </footer>
       </div>
     </div>

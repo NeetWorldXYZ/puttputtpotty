@@ -1,0 +1,8 @@
+.gg-preview{max-width:800px;margin:0 auto 36px;display:flex;align-items:center;justify-content:center;gap:20px;padding:24px;border:2px solid #387790;border-radius:24px;background:radial-gradient(ellipse at 20% 50%,#275d70,#092d45 70%)}
+.gg-preview>.avatar{width:clamp(120px,30vw,210px);height:auto;flex-shrink:0}
+.gg-preview h2{font:400 clamp(24px,5vw,42px)/1.1 'Locker Anton',Impact,sans-serif;margin:10px 0;color:#ffe578}
+.gg-preview p{font-size:11px;letter-spacing:1px;color:#79d9e9}.gg-preview span{font-size:12px;line-height:1.5;color:#b5d6e4}
+.gg-tabs{display:flex;gap:8px;margin-top:16px}.gg-tabs button{padding:10px 14px;border:1px solid #75bac9;border-radius:10px;background:#124d64;color:#fff2d3;font-weight:800;cursor:pointer}
+.gg-tabs button[aria-pressed=true]{background:#ffdf65;color:#06283c;border-color:#ffedac}
+.gg-card[aria-pressed=true]{border-color:#ffe17a;box-shadow:0 0 0 2px #ffda5455}.gg-card .hg-art svg{width:90%;height:155px;overflow:visible}.gg-card .hg-rule{min-height:52px}
+@media(max-width:500px){.gg-preview{padding:14px 8px;gap:8px}.gg-tabs button{padding:10px;font-size:11px}.gg-preview span{font-size:11px}.gg-card .hg-art svg{height:125px}}

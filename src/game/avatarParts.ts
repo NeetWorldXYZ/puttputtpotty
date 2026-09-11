@@ -1,6 +1,7 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
 import { renderAvatarArt, renderAvatarPart, renderResultAvatarArt } from './avatarArt';
 import { EARNABLE_HEADS, STARTER_HEADS, earnedHeadTones } from './earnedHeads';
+import { EARNABLE_BALLS, EARNABLE_SHIRTS, STARTER_BALLS, STARTER_SHIRTS, type EarnedBall } from '../../server/potty/cosmeticCatalog';
 
 export interface Avatar {
   /** Skin tone for the classic golfer; for the other heads, that head's colour. */
@@ -84,6 +85,7 @@ export const SEATS: Record<string, { color: string; label: string }> = {
   blue: { color: '#4db8ff', label: 'Blue' },
   wood: { color: '#ffc943', label: 'Pizza' },
   gold: { color: '#ffd447', label: 'Gold' },
+  ...EARNABLE_SHIRTS,
 };
 
 export const HATS: Record<string, string> = { none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo' };
@@ -96,6 +98,7 @@ export interface BallLook {
   accent: string;
   label: string;
   motif?: 'eight' | 'fire' | 'gold';
+  material?: EarnedBall;
 }
 export const BALLS: Record<string, BallLook> = {
   white: { color: '#ffffff', pattern: 'plain', accent: '#c4cfdb', label: 'Classic' },
@@ -109,6 +112,7 @@ export const BALLS: Record<string, BallLook> = {
   stripe: { color: '#ffffff', pattern: 'stripe', accent: '#ff5f7e', label: 'Racing stripe' },
   dots: { color: '#ffffff', pattern: 'dots', accent: '#4db8ff', label: 'Polka' },
   tiger: { color: '#ff9f1c', pattern: 'stripe', accent: '#1f2a44', label: 'Tiger' },
+  ...Object.fromEntries(Object.entries(EARNABLE_BALLS).map(([material,item]) => [material,{...item,pattern:'plain' as const,material:material as EarnedBall}])),
 };
 
 export const DEFAULT_AVATAR: Avatar = { porcelain: 'white', seat: 'white', hat: 'none', face: 'happy', ball: 'white', head: 'classic' };
@@ -158,7 +162,7 @@ export function starterAvatar(r: () => number): Avatar {
   return {
     head,
     porcelain: pick(Object.keys(headTones(head))),
-    seat: pick(Object.keys(SEATS)),
+    seat: pick([...STARTER_SHIRTS]),
     hat: head === 'turd' || head === 'alien' || head === 'dawg' ? 'crown' : 'none',
     face: 'happy',
     ball: 'white',
@@ -170,10 +174,10 @@ export function randomAvatar(r: () => number): Avatar {
   const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
   return {
     porcelain: pick(Object.keys(PORCELAIN)),
-    seat: pick(Object.keys(SEATS)),
+    seat: pick([...STARTER_SHIRTS]),
     hat: pick(Object.keys(HATS)),
     face: pick(Object.keys(FACES)),
-    ball: pick(Object.keys(BALLS)),
+    ball: pick([...STARTER_BALLS]),
     head: pick([...STARTER_HEADS]),
   };
 }

@@ -2,7 +2,7 @@
 // daily-course holes, and verifies submitted runs by re-simulating them.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { EARNED_HEAD_IDS, normalizeAvatarChoice } from './avatarUnlocks.ts';
+import { lockedAvatarPart, needsUnlockCheck, normalizeAvatarChoice } from './avatarUnlocks.ts';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
 import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, placeNameProblem, sloganProblem, normalizeAvatar, starterAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/26fcf4621098b49d7aa759981df2665deb16ea61/server/potty/engine.js';
@@ -572,8 +572,8 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'avatar-heads') {
       await ensureProfile(user.id);
-      const { data, error } = await admin.rpc('refresh_avatar_heads', { in_user: user.id });
-      if (error) throw new Error('Your head collection could not be loaded. Please try again.');
+      const { data, error } = await admin.rpc('refresh_avatar_collection', { in_user: user.id });
+      if (error) throw new Error('Your collection could not be loaded. Please try again.');
       return json(data);
     }
 
@@ -598,12 +598,11 @@ Deno.serve(async (req: Request) => {
       if (slogan !== undefined) await admin.from('profiles').update({ slogan: slogan || null }).eq('id', user.id);
       if (body.avatar && typeof body.avatar === 'object') {
         const avatar = normalizeAvatarChoice(body.avatar, normalizeAvatar);
-        if ((EARNED_HEAD_IDS as readonly string[]).includes(avatar.head)) {
-          const { data, error } = await admin.rpc('refresh_avatar_heads', { in_user: user.id });
-          if (error) throw new Error('Unable to verify this head. Please try again.');
-          if (!data?.unlocked?.includes(avatar.head)) {
-            return json({ error: 'That head is still locked. Complete its milestone first.' }, 403);
-          }
+        if (needsUnlockCheck(avatar)) {
+          const { data, error } = await admin.rpc('refresh_avatar_collection', { in_user: user.id });
+          if (error) throw new Error('Unable to verify this look. Please try again.');
+          const locked=lockedAvatarPart(avatar,data);
+          if (locked) return json({ error: `That ${locked} is still locked. Complete its milestone first.` }, 403);
         }
         const { error } = await admin.from('profiles').update({ avatar }).eq('id', user.id);
         if (error) throw new Error(error.message);
