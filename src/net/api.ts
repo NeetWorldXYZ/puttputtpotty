@@ -257,6 +257,7 @@ export const api = {
     await ensureSession();
     const {data,error}=await supabase.rpc('gameplay_reward',{in_context:context});
     if(error) throw new Error(error.message);
+    if(!data?.available) throw new Error('Round rewards are not available yet');
     return data;
   },
   setProfile: (displayName?: string, slogan?: string, avatar?: Avatar) => call<{ ok: true }>({ action: 'profile', displayName, slogan, avatar }),
