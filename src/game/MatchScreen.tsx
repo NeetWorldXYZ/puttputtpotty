@@ -15,8 +15,10 @@ import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
 import { stopTheme } from './music';
 import { MatchLobby } from './MatchLobby';
+import { MatchResultModal } from './MatchResultModal';
 import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
 import './MatchLobby.css';
+import './MatchWaiting.css';
 
 interface Props {
   /** Invite code from a shared link. */
@@ -388,6 +390,14 @@ export function MatchScreen({ code, matchId }: Props) {
   const panel = match ? (
     <MatchPanel match={match} me={me} side={side} opp={opp} oppOnline={oppOnline} mine={mine} holes={holes} error={error} onLeave={leave} onRematch={rematch} />
   ) : null;
+  const resultModal = match?.status === 'done' && me && holes ? <MatchResultModal
+    key={match.id} match={match} me={me} holes={holes} onLeave={leave} onEnter={enter}
+    friendAction={!match.p2_bot && match[other] ? <AddFriend userId={match[other] as string} name={oppName}/> : null}
+  /> : null;
+
+  if (phase === 'result' && resultModal) return resultModal;
+  const waitingModal = <div className="mr-overlay"><div className="mr-dialog mw-dialog" role="dialog" aria-modal="true" aria-label="Waiting for opponent">{panel}</div></div>;
+  if (phase === 'result' && match?.status !== 'done') return waitingModal;
 
   if (phase === 'playing' && holes && match) {
     const pars = holes.map((h) => h.par);
@@ -430,18 +440,7 @@ export function MatchScreen({ code, matchId }: Props) {
             </button>
           </>
         )}
-        scorecardExtra={panel}
-        renderScorecardButtons={({ share, shared }) =>
-          match.status === 'done' ? (
-            <>
-              <button className="primary" onClick={rematch}>
-                Rematch a stranger
-              </button>
-              <button onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
-              <button onClick={leave}>Home</button>
-            </>
-          ) : null
-        }
+        renderScorecard={() => resultModal ?? waitingModal}
       />
     );
   }
@@ -596,6 +595,12 @@ function MatchPanel({
   const left = Math.max(0, deadline - now);
   return (
     <div className="duel-wait">
+      <header className="mw-header">
+        <svg viewBox="0 0 64 58" aria-hidden="true"><path d="m8 13 14 11L32 5l10 19 14-11-6 34H14Z" fill="#ffdb4d" stroke="#09263d" strokeWidth="4" strokeLinejoin="round"/><path d="m13 17 9 11L32 11l10 17 9-11M16 44h32" fill="none" stroke="#fff2a2" strokeWidth="3"/><path d="M15 51h34" stroke="#dc9826" strokeWidth="5" strokeLinecap="round"/></svg>
+        <p>ROUND COMPLETE</p>
+        <h2>{!mine ? 'SAVING YOUR ROUND' : opp?.finished ? 'TALLYING THE SCORES' : 'WAITING ON THE GREEN'}</h2>
+        <span>{mine ? 'Your score is in. The crown is still in play.' : 'Hang tight while your score is recorded.'}</span>
+      </header>
       {error && <div className="err" role="alert">{error}</div>}
       {!mine && !error && <div className="sub">Submitting your round…</div>}
       <div className="duel-rows">
@@ -614,14 +619,16 @@ function MatchPanel({
           <b>{opp ? opp.total : '–'}</b>
         </div>
       </div>
+      <div className="mw-progress-heading"><span>OPPONENT’S ROUND</span><b>{Math.min(done,n)} / {n} holes</b></div>
+      <progress className="mw-progress" value={Math.min(done,n)} max={n} aria-label="Opponent completed holes"/>
       <div className="duel-holes" aria-label={`${oppName}'s holes`}>
         {Array.from({ length: n }, (_, i) => {
           const sc = opp?.holes[i];
           const par = pars[i];
           const cls = sc === undefined ? (i === done && !opp?.finished ? 'now' : '') : sc === 1 ? 'ace' : par !== undefined && sc < par ? 'under' : par !== undefined && sc > par ? 'over' : 'par';
           return (
-            <span key={i} className={`duel-hole ${cls}`}>
-              {sc ?? ''}
+            <span key={i} className={`duel-hole ${cls}`} aria-label={`Hole ${i+1}: ${sc ?? (i===done?'playing':'not played')}`}>
+              <small>{i+1}</small><b>{sc ?? (i===done&&!opp?.finished?'•':'—')}</b>
             </span>
           );
         })}
@@ -632,8 +639,9 @@ function MatchPanel({
         {!opp?.finished && left > 0 && <small> · forfeit in {fmtClock(left)}</small>}
       </div>
       <button className="quiet duel-leave" onClick={onLeave}>
-        Leave · the result still counts
+        Back to home <span aria-hidden="true">→</span>
       </button>
+      <p className="mw-leave-note">You can leave. Your result still counts.</p>
     </div>
   );
 }

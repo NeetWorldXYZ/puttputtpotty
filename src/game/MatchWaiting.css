@@ -1,0 +1,30 @@
+.mw-dialog{max-width:540px;padding:0 14px 16px}
+.mw-dialog .duel-wait{margin:0;gap:12px;font-family:var(--game-font)}
+.mw-header{position:relative;isolation:isolate;text-align:center;margin:0 -14px 2px;padding:17px 16px 24px;background:linear-gradient(#03243b55,#03243b 98%),url('/art/match-greens-v2.webp') center 62%/cover;border-radius:20px 20px 0 0}
+.mw-header>svg{width:51px;height:46px;filter:drop-shadow(0 2px 7px #ffdc6866)}
+.mw-header p{margin:2px 0 7px;font-size:10px;letter-spacing:2px;color:#ffe48c;font-weight:700}
+.mw-header h2{margin:0 0 8px;font:400 clamp(25px,6.9cqw,37px)/1.12 'Match Anton',Impact,sans-serif;color:#fff9e5;text-shadow:0 3px #00172b}
+.mw-header>span{display:block;font-size:12px;color:#b9dcec}
+.mw-dialog .duel-row{padding:10px;border:1.5px solid #329bc2;background:linear-gradient(120deg,#073d57,#04253e);box-shadow:inset 0 1px #a6eaff1a,0 3px #001827;column-gap:10px}
+.mw-dialog .duel-row.me{border-color:#ffe58d;background:linear-gradient(120deg,#ffefad,#ffcf44)}
+.mw-dialog .duel-row.me .duel-row-name,.mw-dialog .duel-row.me>b{color:#062b3e}
+.mw-dialog .duel-row.me .duel-row-sub{color:#38524b}
+.mw-dialog .duel-row .avatar{width:42px;height:45px}
+.mw-dialog .duel-row-name{font-size:16px}
+.mw-dialog .duel-row>b{font:400 34px/1 'Match Anton',Impact,sans-serif}
+.mw-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px;color:#abd4e7;font-size:10px;letter-spacing:.4px}
+.mw-progress-heading b{color:#ffe585;letter-spacing:0;font-size:11px}
+.mw-dialog .mw-progress{width:100%;height:7px;appearance:none;border:0;border-radius:6px;background:#001a2e;overflow:hidden;margin:-5px 0 0}
+.mw-progress::-webkit-progress-bar{background:#001a2e;border-radius:6px}.mw-progress::-webkit-progress-value{background:linear-gradient(90deg,#22c69e,#79f1c8);border-radius:6px}.mw-progress::-moz-progress-bar{background:#45dcad;border-radius:6px}
+.mw-dialog .duel-holes{justify-content:flex-start;overflow-x:auto;gap:4px;padding:2px 0 5px;scrollbar-width:thin}
+.mw-dialog .duel-hole{flex:1 0 25px;min-width:25px;max-width:none;height:47px;border-radius:6px;display:flex;flex-direction:column;gap:3px;justify-content:center;background:linear-gradient(#214a64,#103149);border:1px solid #547e9e;box-sizing:border-box}
+.mw-dialog .duel-hole small{font-size:9px;line-height:1;color:#b6d5e9}.mw-dialog .duel-hole b{font-size:15px;line-height:1.1}
+.mw-dialog .duel-hole.under{background:linear-gradient(#25ce8d,#079463);border-color:#73edb9}.mw-dialog .duel-hole.over{background:linear-gradient(#d96b81,#a83452);border-color:#f99cb3}
+.mw-dialog .duel-hole.ace{background:linear-gradient(#ffe898,#f3bd36);color:#082a3d;border-color:#fff2b7}.mw-dialog .duel-hole.ace small{color:#4d552b}
+.mw-dialog .duel-hole.now{border:2px solid #ffe575;background:#344839;color:#ffe575;animation:duel-pulse 1.8s ease-in-out infinite}
+.mw-dialog .duel-status{padding:12px 9px;border:1px solid #206782;border-radius:12px;background:#001d31;color:#f8f5df;font-size:12px;gap:6px}
+.mw-dialog .duel-status small{display:block;flex-basis:100%;color:#a5cddd;font-size:11px}
+.mw-dialog .duel-leave{display:flex;align-items:center;justify-content:center;gap:15px;align-self:stretch;margin:2px 0 0;padding:11px;border:2px solid #fff1a7;border-radius:13px;background:linear-gradient(#ffeb83,#ffce38);box-shadow:0 3px #bf8b26;color:#05263b;font:700 16px var(--game-font);text-decoration:none;min-height:46px}
+.mw-dialog .mw-leave-note{text-align:center;font-size:11px;color:#a9cbdc;margin:0}
+@media(max-width:360px){.mw-dialog{padding:0 10px 12px}.mw-header{margin-left:-10px;margin-right:-10px}.mw-dialog .duel-wait{gap:10px}.mw-header h2{font-size:25px}.mw-dialog .duel-row-name{font-size:14px}}
+@media(prefers-reduced-motion:reduce){.mw-dialog .duel-hole.now,.mw-dialog .duel-spin{animation:none}}
