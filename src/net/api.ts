@@ -1,3 +1,4 @@
+import { clearBest, getBest } from '../game/courses';
 import { queueDaily, pendingDaily, acknowledgeDaily, type PendingHole } from './dailyOutbox';
 import type { Hole, Stroke } from '../sim/types';
 import { FUNCTION_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
@@ -405,6 +406,14 @@ export const api = {
     const { data, error } = await supabase.rpc('daily_standing', { in_seed: seed });
     if (error) throw new Error(error.message);
     const row = (Array.isArray(data) ? data[0] : data) as { rank: number; of_players: number; total: number; par: number } | undefined;
+    if (!row && getBest(seed) !== null) {
+      const session = await ensureSession();
+      const queued = pendingDaily().some(h => h.user === session.user.id && h.seed === seed);
+      const { count, error: runError } = await supabase.from('runs').select('id', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('course_seed', seed);
+      // An incomplete or offline attempt must retain its score and queued shots.
+      // Only an empty, successfully checked server record clears a reset round.
+      if (!runError && count === 0 && !queued) clearBest(seed);
+    }
     return row ? { rank: Number(row.rank), of: Number(row.of_players), total: row.total, par: row.par } : null;
   },
   // ---- friends

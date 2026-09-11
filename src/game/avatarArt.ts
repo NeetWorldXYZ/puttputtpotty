@@ -107,6 +107,11 @@ export function renderProfileAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:Bal
       <path d="M85 179v13q22 5 35-1 0-9-13-13Z" fill="#315876"/>
       <path d="M38 190q16 5 32 0m18 1q16 3 28-1" fill="none" stroke="#c1dce8" stroke-width="3"/>
     </g>
+    <g data-part="free-left-hand" ${stroke} stroke-width="3.5">
+      <path d="M127 144q7-5 12 1l1 10q0 9-8 10-8 0-9-7l1-10Z" fill="url(#${id}-skin)"/>
+      <path d="M136 153v5" fill="none" stroke-opacity=".3" stroke-width="1.5"/>
+      <path d="M127 152v6" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+    </g>
     ${shirtSvg(av.seat,id)}${headSvg(av.head,tone,id)}${faceSvg(av.face,av.head)}${hatSvg(av.hat,id)}
     <g data-part="held-putter" ${stroke}>
       <path d="M23 109 42 190" fill="none" stroke-width="8"/>
