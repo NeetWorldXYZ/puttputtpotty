@@ -48,21 +48,24 @@ interface Props {
 
 export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClose, headProgress, progressLoading }: Props) {
   const [category, setCategory] = useState<keyof AvatarSpec>('head');
-  const [expanded, setExpanded] = useState<Partial<Record<keyof AvatarSpec, boolean>>>({});
   const [inspected,setInspected]=useState<{part:keyof AvatarSpec;value:string}|null>(null);
   const preview=inspected?{...avatar,[inspected.part]:inspected.value}:avatar;
   const inspectedReward=inspected?rewardFor(inspected.part,inspected.value):null;
   const inspectedCurrent=inspectedReward?headProgress?.stats[inspectedReward.metric]??0:0;
   const dialog = useRef<HTMLDivElement>(null);
+  const collection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (collection.current) collection.current.scrollTop = 0;
+    setInspected(null);
+  }, [category]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const id = useId();
   const group = LOOK_CATEGORIES.find((item) => item.key === category)!;
   const options = lookOptions(avatar, category);
   const label = category === 'porcelain' && avatar.head !== 'classic' ? 'Colour' : group.label;
-  const showingAll = expanded[category] ?? !group.featured.includes(avatar[category]);
   const ordered = [...group.featured, ...options.map(([key]) => key).filter((key) => !group.featured.includes(key))];
-  const visible = (showingAll ? ordered : group.featured).map((key) => options.find(([value]) => value === key)!);
+  const visible = ordered.flatMap(key => options.filter(([value]) => value === key));
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -102,9 +105,9 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
               event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
             }}>{item.key === 'porcelain' && avatar.head !== 'classic' ? 'Colour' : item.label}</button>)}
           </div>
-          <div className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
+          <div ref={collection} className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
             {inspectedReward&&<div className="studio-unlock-detail" aria-live="polite"><div><strong>{inspectedReward.label}</strong><button onClick={()=>setInspected(null)}>Back to my look ×</button></div><p>{inspectedReward.requirement}</p><progress value={Math.min(inspectedCurrent,inspectedReward.target)} max={inspectedReward.target}/><small>{progressLoading?'Checking progress…':`${inspectedCurrent.toLocaleString()} / ${inspectedReward.target.toLocaleString()} ${progressUnit(inspectedReward.metric)}`} · Permanent unlock · No TP spent</small></div>}
-            <div className="studio-options" data-expanded={showingAll||undefined} aria-label={`Choose ${label.toLowerCase()}`}>
+            <div className="studio-options" data-expanded="true" aria-label={`Choose ${label.toLowerCase()}`}>
               {visible.map(([value, title]) => {
                 const locked=category==='head' ? !headUnlocked(value,headProgress) : !gearUnlocked(category,value,headProgress);
                 const reward=rewardFor(category,value);
@@ -112,7 +115,7 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
                 const unit=progressUnit(reward?.metric??'');
                 return <button key={`${category}-${value}`} className="studio-option" data-locked={locked||undefined} aria-pressed={preview[category] === value} disabled={busy} aria-label={locked?`${title}. Locked. ${reward?.requirement}. Tap to preview.`:title} onClick={() => {
                   if(locked){setInspected({part:category,value});return;}
-                  setInspected(null);setExpanded((state) => ({ ...state, [category]: showingAll })); onChange({ ...avatar, [category]: value });
+                  setInspected(null); onChange({ ...avatar, [category]: value });
                 }}>
                   <span className="studio-option-art">
                     <Part avatar={{ ...avatar, [category]: value }} part={category} />
@@ -126,7 +129,6 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
                 </button>;
               })}
             </div>
-            {options.length > group.featured.length && <button className="studio-more" aria-expanded={showingAll} onClick={() => setExpanded((current) => ({ ...current, [category]: !showingAll }))}>{showingAll ? 'Show favourites' : `More ${label === 'Skin' || label === 'Colour' ? 'colours' : label.toLowerCase() + 's'}`}<span aria-hidden="true">{showingAll ? '−' : '+'}</span></button>}
           </div>
         </div>
         <footer className="studio-footer">
