@@ -114,9 +114,15 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
                   if(locked){setInspected({part:category,value});return;}
                   setInspected(null);setExpanded((state) => ({ ...state, [category]: showingAll })); onChange({ ...avatar, [category]: value });
                 }}>
-                  <Part avatar={{ ...avatar, [category]: value }} part={category} />
+                  <span className="studio-option-art">
+                    <Part avatar={{ ...avatar, [category]: value }} part={category} />
+                    {locked&&<span className="studio-lock-overlay" aria-hidden="true">
+                      <svg viewBox="0 0 48 56"><path d="M13 24V15a11 11 0 0 1 22 0v9" fill="none" stroke="#061e30" strokeWidth="10"/><path d="M13 24V15a11 11 0 0 1 22 0v9" fill="none" stroke="#ffe999" strokeWidth="6"/><rect x="5" y="21" width="38" height="30" rx="7" fill="#ffdb62" stroke="#061e30" strokeWidth="3"/><path d="M8 40v4q0 4 5 4h22q5 0 5-4v-4" fill="#dca332"/><path d="M12 26h24" stroke="#fff3b8" strokeWidth="3" strokeLinecap="round"/><circle cx="24" cy="33" r="4" fill="#09283c"/><path d="m22 35-1 8h6l-1-8" fill="#09283c"/></svg>
+                      <strong>LOCKED</strong>
+                    </span>}
+                  </span>
                   <span>{title}</span>
-                  {locked&&reward&&<small className="studio-lock"><b aria-hidden="true">●</b>{progressLoading?'Checking…':`${Math.min(current,reward.target)} / ${reward.target} ${unit}`}</small>}
+                  {locked&&reward&&<small className="studio-lock">{progressLoading?'Checking…':`${Math.min(current,reward.target)} / ${reward.target} ${unit}`}</small>}
                 </button>;
               })}
             </div>
