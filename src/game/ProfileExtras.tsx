@@ -1,54 +1,79 @@
 import { useEffect, useState } from 'react';
-import { api, fmtElapsed, type PlayerProfile, type FriendRelation } from '../net/api';
+import { api, type PlayerProfile, type FriendRelation } from '../net/api';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
-import { GameIcon } from './GameIcon';
 import { ProfileStatIcon } from './ProfileStatIcon';
 
 export function ProfileStage() {
   return <svg className="pf-stage" viewBox="0 0 220 210" aria-hidden="true">
-    {/* An open patch of course turf: no raised rim or wooden pedestal. */}
-    <path d="M15 188q8-18 36-20l99-9q43-3 61 18l-5 17q-23 14-76 13l-71-1q-34-2-44-18Z" fill="#032f32" opacity=".2"/>
-    <path d="m12 181 8-10-2-10 12 5q13-13 36-10l31 6 36-10q28-7 51 7l10-8 1 14 13 8-4 13 6 7-17 1q-25 14-60 10l-31-4-25 5q-29-1-43-11l-17 1 4-8Z" fill="#27874d" stroke="#08283d" strokeWidth="3" strokeLinejoin="round"/>
-    <path d="M30 179q8-17 34-14l34 6 32-11q27-8 48 4 18 11 11 20-9 10-36 11l-51-4-28 7q-37-1-44-19Z" fill="#80c94d"/>
-    <path d="m46 168 14-3 57 26-15 0-7 2Zm38 0 14 3 12-4 53 26-15 1Zm43-7 10-3 48 22q-1 5-6 7Z" fill="#a9dd69" opacity=".65"/>
-    <path d="m27 183-6-6m6 6 1-10m24 23-4-7m4 7 5-7m122 8 3-7m-3 7 9-3m13-16 3-8" fill="none" stroke="#b0df72" strokeWidth="2.5" strokeLinecap="round"/>
-    <ellipse cx="108" cy="180" rx="48" ry="9" fill="#164b38" opacity=".22"/>
-    {/* A visible cup and red flag make the setting unmistakably golf. */}
-    <ellipse cx="180" cy="173" rx="14" ry="7" fill="#e1f5a3"/>
-    <ellipse cx="180" cy="172" rx="10" ry="4.5" fill="#08283d"/>
-    <path d="M180 171V45" stroke="#08283d" strokeWidth="7" strokeLinecap="round"/>
-    <path d="M180 169V47" stroke="#fff2d2" strokeWidth="2.5" strokeLinecap="round"/>
-    <path d="M181 48q14-3 30 10l-30 17Z" fill="#ff674f" stroke="#08283d" strokeWidth="3.5" strokeLinejoin="round"/>
-    <path d="m185 53 15 5-15 8Z" fill="#ff9e72"/>
-    {/* A small roll keeps the bathroom theme, tucked into the rough. */}
-    <path d="M25 174v-21q10-7 20 0v21q-10 7-20 0Z" fill="#fff6df" stroke="#08283d" strokeWidth="3"/>
-    <path d="M39 158v16q8 8 18 3l-4 9q-17 4-19-10v-18" fill="#fff6df" stroke="#08283d" strokeWidth="3" strokeLinejoin="round"/>
-    <ellipse cx="35" cy="153" rx="10" ry="4" fill="#e8e7d4" stroke="#08283d" strokeWidth="3"/>
-    <ellipse cx="35" cy="153" rx="3.5" ry="1.5" fill="#08283d"/>
+    <path d="M8 181q14-25 54-22l38 4 37-10q36-8 69 18l6 18q-23 18-82 17l-71-1q-39-2-51-24Z" fill="#248f50" stroke="#08283d" strokeWidth="3"/>
+    <path d="M23 178q14-18 43-14l34 7 31-10q29-9 57 9 16 11 3 20-17 10-56 7l-36-3-28 7q-39-2-48-23Z" fill="#87d151"/>
+    <path d="M33 178q38-1 70 14M94 166q28 8 55 29" fill="none" stroke="#b7eb73" strokeWidth="3" opacity=".65"/>
+    <ellipse cx="183" cy="176" rx="14" ry="7" fill="#e4f3a3"/><ellipse cx="183" cy="175" rx="10" ry="4.5" fill="#08283d"/>
+    <path d="M183 174V51" stroke="#08283d" strokeWidth="7" strokeLinecap="round"/><path d="M183 171V52" stroke="#fff5dd" strokeWidth="2.5" strokeLinecap="round"/>
+    <path d="M184 53q17-3 31 10l-31 17Z" fill="#ff5d54" stroke="#08283d" strokeWidth="3.5" strokeLinejoin="round"/>
+    <circle cx="50" cy="181" r="12" fill="#fff" stroke="#08283d" strokeWidth="3"/><g fill="#b8d0da"><circle cx="45" cy="176" r="1.5"/><circle cx="53" cy="175" r="1.5"/><circle cx="49" cy="183" r="1.5"/></g>
   </svg>;
 }
-export function ProfileCareer({p}:{p:PlayerProfile}) {
-  const stats=[['best',p.best_rel===null?'–':p.best_rel>0?`+${p.best_rel}`:p.best_rel===0?'E':p.best_rel,'Best 9 holes'],['rounds',p.runs,'Rounds played'],['win',p.matches?`${Math.round(p.matches_won/p.matches*100)}%`:'–','Win rate'],['throne',p.thrones,'Thrones held']] as const;
-  return <section className="pf-panel pf-career"><h2>Career stats</h2><div className="pf-career-grid">{stats.map(([icon,value,label])=><div key={label}><ProfileStatIcon kind={icon}/><strong>{value}</strong><small>{label}</small></div>)}</div></section>;
+
+function winRate(p: PlayerProfile) { return p.matches ? `${Math.round((p.matches_won / p.matches) * 100)}%` : '–'; }
+
+export function ProfileStats({ p, mine }: { p: PlayerProfile; mine: boolean }) {
+  const rows = mine
+    ? ([['throne', p.thrones, 'Thrones', 'Locations owned'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches, 'Matches', 'Played'], ['win', winRate(p), 'Win rate', p.matches ? 'Nice.' : 'Play to rank']] as const)
+    : ([['throne', p.thrones, 'Thrones', 'Locations controlled'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches_won, 'Ranked wins', 'Ranked matches'], ['win', winRate(p), 'Win rate', p.matches ? 'Impressive!' : 'No matches yet']] as const);
+  return <section className="pf3-stat-card" aria-label="Career stats">{rows.map(([kind, value, label, detail]) => <div key={label}>
+    <ProfileStatIcon kind={kind}/><strong>{value}</strong><b>{label}</b><small>{detail}</small>
+  </div>)}</section>;
 }
-export function PublicProfileExtras({p,me,onFriends}:{p:PlayerProfile;me:string|null;onFriends:()=>void}) {
-  const [own,setOwn]=useState<PlayerProfile|null>(null);
-  const [relation,setRelation]=useState<FriendRelation|null>(null);
-  const [busy,setBusy]=useState(false);const [error,setError]=useState('');
-  useEffect(()=>{let live=true;setOwn(null);setRelation(me ? null : 'none');setError('');
-    if(me) {void api.profile(me).then(x=>{if(live)setOwn(x);}).catch(()=>{});void api.friendLookup(p.name).then(rows=>{if(live)setRelation(rows.find(r=>r.user_id===p.id)?.relation??'none');}).catch(()=>{});}
-    return()=>{live=false;};
-  },[p.id,me,p.name]);
-  async function add(){setBusy(true);setError('');try{setRelation(relation==='incoming'?await api.friendRespond(p.id,true):await api.friendRequest(p.id));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  async function challenge(){if(relation!=='friend'){onFriends();return;}setBusy(true);setError('');try{const match=await api.createInvite(9);await api.inviteFriend(p.id,match.id);navigate('match',null,null,{match:match.id});}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+
+function crownAge(iso: string) {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+  return days === 0 ? 'Today' : days === 1 ? '1 day ago' : days < 7 ? `${days} days ago` : days < 14 ? '1 week ago' : `${Math.floor(days / 7)} weeks ago`;
+}
+
+export function ProfileRecentCrowns({ p, onViewAll }: { p: PlayerProfile; onViewAll: () => void }) {
+  return <section className="pf3-recent">
+    <header><span aria-hidden="true">♛</span><h2>Recent Crowns</h2>{p.throne_list.length > 0 && <button onClick={onViewAll}>View all&nbsp; ›</button>}</header>
+    {p.throne_list.length ? <div className="pf3-crown-grid">{p.throne_list.slice(0, 4).map((t, i) => <button key={t.location_id} className={`pf3-crown-place pf3-crown-place-${i + 1}`} onClick={onViewAll}>
+      <span className="pf3-crown-art"><i/><em>♛</em></span><strong>{t.name}</strong><small>{crownAge(t.since)}</small>
+    </button>)}</div> : <button className="pf3-no-crowns" onClick={() => navigate('map')}>No crowns yet · find one on the map&nbsp; →</button>}
+  </section>;
+}
+
+export function PublicProfileExtras({ p, me, onFriends, onThrones, onShare }: { p: PlayerProfile; me: string | null; onFriends: () => void; onThrones: () => void; onShare: () => void }) {
+  const [own, setOwn] = useState<PlayerProfile | null>(null);
+  const [relation, setRelation] = useState<FriendRelation | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let live = true; setOwn(null); setRelation(me ? null : 'none'); setError('');
+    if (me) {
+      void api.profile(me).then(x => { if (live) setOwn(x); }).catch(() => {});
+      void api.friendLookup(p.name).then(rows => { if (live) setRelation(rows.find(r => r.user_id === p.id)?.relation ?? 'none'); }).catch(() => {});
+    }
+    return () => { live = false; };
+  }, [p.id, me, p.name]);
+  async function add() { setBusy(true); setError(''); try { setRelation(relation === 'incoming' ? await api.friendRespond(p.id, true) : await api.friendRequest(p.id)); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
+  async function challenge() { if (relation !== 'friend') { onFriends(); return; } setBusy(true); setError(''); try { const match = await api.createInvite(9); await api.inviteFriend(p.id, match.id); navigate('match', null, null, { match: match.id }); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
+  const addLabel = relation === 'friend' ? 'Friends' : relation === 'incoming' ? 'Accept Friend' : relation === 'outgoing' ? 'Request Sent' : relation === 'blocked' ? 'Unavailable' : 'Add Friend';
   return <>
-    <div className="pf-public-actions"><button disabled={busy||relation===null||relation==='outgoing'||relation==='blocked'} onClick={()=>relation==='friend'?onFriends():void add()}>{relation==='friend'?'✓ Friends':relation==='incoming'?'Accept friend':relation==='outgoing'?'Request sent':relation==='blocked'?'Unavailable':'Add friend'}</button><button className="primary" disabled={busy} onClick={()=>void challenge()}>{busy?'Please wait…':relation==='friend'?'Challenge · 9 holes':'Invite to play'}</button></div>
-    {error&&<p className="pf-note" role="alert">{error}</p>}
-    <section className="pf-panel"><h2><GameIcon kind="crown"/>Thrones currently ruled <span>{p.thrones}</span></h2>
-      {p.throne_list.length===0?<p className="pf-note">No thrones held yet. Every reign starts somewhere.</p>:<div className="pf-showcase">{p.throne_list.slice(0,3).map(t=><div className="pf-place-card" key={t.location_id}><div className="pf-place-art" aria-hidden="true"><GameIcon kind="crown"/></div><strong>{t.name}</strong><small>{t.score} strokes · par {t.par}{t.elapsed_ms!==null?` · ${fmtElapsed(t.elapsed_ms)}`:''}</small></div>)}</div>}
+    <div className="pf3-public-actions">
+      <button className="pf3-add" disabled={busy || relation === null || relation === 'outgoing' || relation === 'blocked'} onClick={() => relation === 'friend' ? onFriends() : void add()}><span>♟+</span>{addLabel}</button>
+      <button className="pf3-challenge" disabled={busy} onClick={() => void challenge()}><span>⚔</span>{busy ? 'Please wait…' : 'Challenge'}</button>
+      <button className="pf3-share" onClick={onShare}><span>⇧</span>Share</button>
+    </div>
+    {error && <p className="pf3-error" role="alert">{error}</p>}
+    <ProfileStats p={p} mine={false}/>
+    <section className="pf3-h2h">
+      <header><ProfileStatIcon kind="match"/><span><h2>Head-to-Head</h2><small>How you stack up against {p.name}</small></span></header>
+      <div className="pf3-versus-card">
+        <div className="pf3-player-side"><span>You</span>{own ? <Avatar av={own.avatar} size={62}/> : <i className="pf3-avatar-placeholder"/>}<dl><div><dt>♛</dt><dd>{own?.thrones ?? '–'}</dd></div><div><dt>●</dt><dd>{own?.aces ?? '–'}</dd></div><div><dt>⚔</dt><dd>{own?.matches_won ?? '–'}</dd></div><div><dt>♜</dt><dd>{own ? winRate(own) : '–'}</dd></div></dl></div>
+        <b className="pf3-vs">VS</b>
+        <div className="pf3-player-side pf3-player-them"><span>{p.name}</span><Avatar av={p.avatar} size={62}/><dl><div><dt>♛</dt><dd>{p.thrones}</dd></div><div><dt>●</dt><dd>{p.aces}</dd></div><div><dt>⚔</dt><dd>{p.matches_won}</dd></div><div><dt>♜</dt><dd>{winRate(p)}</dd></div></dl></div>
+      </div>
+      <div className="pf3-h2h-cta"><small>Challenge {p.name} to improve your record!</small><button disabled={busy} onClick={() => void challenge()}>⚔&nbsp; Challenge</button></div>
     </section>
-    <ProfileCareer p={p}/>
-    <section className="pf-panel"><h2>Head to head</h2><p className="pf-note">Career comparison · you vs. {p.name}</p>{own?<><div className="pf-versus"><Avatar av={own.avatar} size={44}/><span>{own.name}<b>VS</b>{p.name}</span><Avatar av={p.avatar} size={44}/></div><div className="pf-comparison">{[['Thrones',own.thrones,p.thrones],['Aces',own.aces,p.aces],['Rounds',own.runs,p.runs],['Match wins',own.matches_won,p.matches_won]].map(([label,a,b])=><div key={label}><strong>{a} <em>vs</em> {b}</strong><small>{label}</small></div>)}</div></>:<p className="pf-note">Your comparison is unavailable right now.</p>}<button className="pf-cta" disabled={busy} onClick={()=>void challenge()}>Play a round together →</button></section>
+    <ProfileRecentCrowns p={p} onViewAll={onThrones}/>
   </>;
 }
