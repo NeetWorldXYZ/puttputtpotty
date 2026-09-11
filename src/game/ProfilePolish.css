@@ -94,7 +94,7 @@
 @media(max-height:720px){.profile-v3 .pf3-avatar,.pf-public.profile-v3 .pf3-avatar{--pf-golfer-max:149px}}
 
 /* Editable sign and a shared golfer/flag frame leave a clear slogan area. */
-.profile-v3 .pf3-golfer-group{position:relative;display:flex;align-items:flex-end;justify-content:center;flex:none;width:min(calc(100% - 28px),var(--pf-golfer-max));transform:translateX(18px)}
+.profile-v3 .pf3-golfer-group{position:relative;z-index:2;display:flex;align-items:flex-end;justify-content:center;flex:none;width:min(calc(100% - 28px),var(--pf-golfer-max));transform:translateX(18px)}
 .profile-v3 .pf3-golfer-group>.avatar{position:relative;z-index:2;display:block;width:100%;height:auto;filter:none}
 .profile-v3 .pf3-golfer-group>.pf-stage{position:absolute;z-index:1;bottom:0;left:50%;transform:translateX(-50%);width:137.5%;height:auto;max-width:none;pointer-events:none}
 .profile-v3 .pf3-sign{position:absolute;z-index:1;left:-20px;bottom:18px;width:clamp(74px,21vw,100px);aspect-ratio:.56;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:#28160d;transform:rotate(-3deg);text-shadow:none}

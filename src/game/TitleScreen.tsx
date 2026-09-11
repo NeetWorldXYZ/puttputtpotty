@@ -92,7 +92,7 @@ export function TitleScreen() {
   const untilNext = `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`;
   const go = (fn: () => void, sound: 'tap' | 'whoosh' = 'tap') => { unlockAudio(); sfx[sound](); fn(); };
   const openDaily = () => {
-    if (played) go(() => navigate('leaders', seed));
+    if (played) go(() => navigate(standing ? 'leaders' : 'play', seed));
     else if (current?.error) { setDaily(null); setRefresh(n => n + 1); }
     else go(() => goToCourse('daily'), 'whoosh');
   };
@@ -115,7 +115,7 @@ export function TitleScreen() {
         <button className="kh-map" onClick={() => go(() => navigate('map'), 'whoosh')}>OPEN THRONE MAP <span aria-hidden="true">➜</span></button>
         <section className="kh-secondary" aria-label="More ways to play">
           <button className={`kh-card kh-daily${played ? ' kh-played' : ''}`} onClick={openDaily} disabled={!played && !current} aria-label={`Daily course. ${dailyDescription}`}>
-            <span className="kh-card-icon"><ProfileStatIcon kind="win"/></span><span className="kh-card-copy"><strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong><span>{played ? 'Your round is in.' : current?.error ? 'Tap to retry your daily status.' : !current ? 'Checking your round…' : 'Play today to join the leaderboard.'}</span></span><span className="kh-chevron" aria-hidden="true">›</span>
+            <span className="kh-card-icon"><ProfileStatIcon kind="win"/></span><span className="kh-card-copy"><strong>{played ? 'DAILY RESULTS' : 'DAILY COURSE'}</strong><span>{played ? (standing ? 'Your round is in.' : 'Round saved on device · sync incomplete.') : current?.error ? 'Tap to retry your daily status.' : !current ? 'Checking your round…' : 'Play today to join the leaderboard.'}</span></span><span className="kh-chevron" aria-hidden="true">›</span>
             {played ? <span className="kh-daily-result"><b>{standing ? relative(standing.total - standing.par) : best}</b><span>{standing ? `#${standing.rank} on the board` : 'strokes · view results'}<small>Next in {untilNext}</small></span></span> : <HomePodium/>}
           </button>
           <button className="kh-card kh-quick" onClick={() => go(() => navigate('match'), 'whoosh')}>

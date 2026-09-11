@@ -218,12 +218,7 @@ export function generateSlot(courseSeed: string, slot: CourseSlot, params: Physi
   return g;
 }
 
-/** Today's daily seed (UTC). */
-/**
- * Two daily courses a day in US Eastern time: the morning course (midnight
- * to noon) and the evening course (noon to midnight). en-CA formats as
- * YYYY-MM-DD.
- */
+/** One course per calendar day in US Eastern time. */
 export const DAILY_TIME_ZONE = 'America/New_York';
 function easternClock(date: Date): { day: string; seconds: number } {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: DAILY_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
@@ -232,14 +227,14 @@ function easternClock(date: Date): { day: string; seconds: number } {
   return { day, seconds: (num('hour') % 24) * 3600 + num('minute') * 60 + num('second') };
 }
 export function dailySeed(date = new Date()): string {
-  const { day, seconds } = easternClock(date);
-  return `${day}-${seconds < 43200 ? 'am' : 'pm'}`;
+  // Keep the existing evening seed so rounds already played retain their course.
+  return `${easternClock(date).day}-pm`;
 }
 export function dailyEdition(seed = dailySeed()): 'morning' | 'evening' {
   return seed.endsWith('-pm') ? 'evening' : 'morning';
 }
-/** Seconds until the next daily rollover (noon or midnight Eastern). */
+/** Seconds until the next daily rollover (midnight Eastern). */
 export function secondsUntilNextDaily(date = new Date()): number {
   const { seconds } = easternClock(date);
-  return seconds < 43200 ? 43200 - seconds : 86400 - seconds;
+  return 86400 - seconds;
 }

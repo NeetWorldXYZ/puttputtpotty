@@ -25,8 +25,8 @@ function winRate(p: PlayerProfile) { return p.matches ? `${Math.round((p.matches
 
 export function ProfileStats({ p, mine }: { p: PlayerProfile; mine: boolean }) {
   const rows = mine
-    ? ([['throne', p.thrones, 'Thrones', 'Locations owned'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches, 'Matches', 'Played'], ['win', winRate(p), 'Win rate', p.matches ? 'Nice.' : 'Play to rank']] as const)
-    : ([['throne', p.thrones, 'Thrones', 'Locations controlled'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches_won, 'Ranked wins', 'Ranked matches'], ['win', winRate(p), 'Win rate', p.matches ? 'Impressive!' : 'No matches yet']] as const);
+    ? ([['throne', p.thrones, 'Thrones', 'Locations owned'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches, 'Matches', 'Ranked played'], ['win', winRate(p), 'Win rate', p.matches ? 'Ranked matches' : 'Play to rank']] as const)
+    : ([['throne', p.thrones, 'Thrones', 'Locations controlled'], ['ace', p.aces, 'Aces', 'Hole in ones'], ['match', p.matches_won, 'Ranked wins', 'Ranked matches'], ['win', winRate(p), 'Win rate', p.matches ? 'Ranked matches' : 'No matches yet']] as const);
   return <section className="pf3-stat-card" aria-label="Career stats">{rows.map(([kind, value, label, detail]) => <div key={label}>
     <ProfileStatIcon kind={kind}/><strong>{value}</strong><b>{label}</b><small>{detail}</small>
   </div>)}</section>;

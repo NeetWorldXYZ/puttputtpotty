@@ -4,7 +4,7 @@ import { courseSlots, type GeneratedHole } from '../generator/generator';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { EarnedTP } from './EarnedTP';
 import { useTuning } from './paramsStore';
-import { dailySeed, getBest, goToCourse, secondsUntilNextDaily } from './courses';
+import { getBest, goToCourse, secondsUntilNextDaily } from './courses';
 import { navigate } from '../router';
 import { DEFAULT_PARAMS } from '../sim/params';
 import { api } from '../net/api';
@@ -30,8 +30,23 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The daily is ranked: generated with default physics (the server replays with the same) and each hole is submitted.
-  const daily = seed === dailySeed();
-  const alreadyPlayed = daily && getBest(seed) !== null;
+  const daily = /^\d{4}-\d{2}-\d{2}-(am|pm)$/.test(seed);
+  const [alreadyPlayed, setAlreadyPlayed] = useState(daily && getBest(seed) !== null);
+  const [checked, setChecked] = useState(!daily);
+  const [statusError, setStatusError] = useState('');
+  const [revision, setRevision] = useState(0);
+  const [savedTotal, setSavedTotal] = useState<number | null>(getBest(seed));
+  useEffect(() => {
+    if (!daily) return;
+    let live = true;
+    setStatusError('');
+    void api.dailyStanding(seed).then(standing => {
+      if (!live) return;
+      if (standing) { setAlreadyPlayed(true); setSavedTotal(standing.total); }
+      setChecked(true);
+    }).catch(() => { if (live) setStatusError('Could not check your round. Please retry.'); });
+    return () => { live = false; };
+  }, [seed, daily, revision]);
   const [askName, setAskName] = useState(daily && !getSavedName());
   const [submitted, setSubmitted] = useState(0);
   const [submissionFailed,setSubmissionFailed]=useState(false);
@@ -77,6 +92,8 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed, count]);
 
+  if (daily && !checked) return <div className="play"><div className="overlay"><div className="card"><h2>{statusError || 'Checking your daily round…'}</h2>{statusError && <button onClick={() => setRevision(n => n + 1)}>Retry</button>}<button onClick={() => goToCourse('title')}>Home</button></div></div></div>;
+
   if (alreadyPlayed) {
     const h = Math.floor(secondsUntilNextDaily() / 3600);
     const m = Math.floor((secondsUntilNextDaily() % 3600) / 60);
@@ -86,11 +103,11 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
           <div className="card" style={{ minWidth: 300 }}>
             <h2>You&apos;ve played this one</h2>
             <div className="sub">
-              You shot {getBest(seed)} · the next course opens in {h > 0 ? `${h}h ` : ''}
+              You shot {savedTotal} · the next course opens in {h > 0 ? `${h}h ` : ''}
               {m}m
             </div>
-            <DailyBoard seed={seed} />
-            <button className="primary" onClick={() => navigate('leaders')}>
+            <p>Only a fully synced round appears on the leaderboard.</p><button onClick={() => { setChecked(false); setRevision(n => n + 1); }}>Retry leaderboard sync</button><DailyBoard seed={seed} refreshKey={revision} />
+            <button className="primary" onClick={() => navigate('leaders', seed)}>
               Full leaderboard
             </button>
             <button onClick={() => goToCourse('random')}>Custom game instead</button>
@@ -157,7 +174,8 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
         courseSeed={seed}
         lockedParams={daily ? DEFAULT_PARAMS : undefined}
         onHoleDone={onHoleDone}
-        scorecardExtra={daily ? <>{submissionFailed?<p role="status">Some holes were not saved or were already played. TP is unavailable for this attempt.</p>:<EarnedTP context={`daily:${seed}`} pending={submitted<9}/>}<DailyBoard seed={seed} refreshKey={submitted} /></> : undefined}
+        noRetry={daily}
+        scorecardExtra={daily ? <>{submissionFailed?<p role="status">Some holes have not synced. Your shots are saved on this device; return Home and open Daily Results to retry.</p>:<EarnedTP context={`daily:${seed}`} pending={submitted<9}/>}<DailyBoard seed={seed} refreshKey={submitted} /></> : undefined}
       />
       {askName && <NamePrompt title="Name for the leaderboard" sub="Today's course is ranked. Pick the name others will see." onDone={() => setAskName(false)} onCancel={() => setAskName(false)} />}
     </>
