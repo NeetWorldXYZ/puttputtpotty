@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Avatar } from './Avatar';
 import { BALLS, FACES, HATS, HEADS, SEATS, avatarPartSvg, headTones, type Avatar as AvatarSpec } from './avatarParts';
 import './AvatarCustomizer.css';
-import { STARTER_HEADS } from './earnedHeads';
+import { EARNABLE_HEADS, headUnlocked, isEarnableHead, type HeadProgress } from './earnedHeads';
 
 export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; featured: readonly string[] }[] = [
   { key: 'head', label: 'Head', featured: ['classic', 'roll', 'turd', 'alien', 'dawg'] },
@@ -16,8 +16,7 @@ export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; f
 /** Keep every existing saved choice accessible, including the additional colours. */
 export function lookOptions(av: AvatarSpec, part: keyof AvatarSpec): [string, string][] {
   switch (part) {
-    // Earned heads are artwork-review only until server-verified unlocks ship.
-    case 'head': return STARTER_HEADS.map(id => [id, HEADS[id].label]);
+    case 'head': return Object.entries(HEADS).map(([id,value]) => [id,value.label]);
     case 'porcelain': return Object.entries(headTones(av.head)).map(([id, value]) => [id, value.label]);
     case 'seat': return Object.entries(SEATS).map(([id, value]) => [id, value.label]);
     case 'hat': return Object.entries(HATS);
@@ -39,9 +38,11 @@ interface Props {
   onChange: (avatar: AvatarSpec) => void;
   onSave: () => void;
   onClose: () => void;
+  headProgress: HeadProgress | null;
+  progressLoading: boolean;
 }
 
-export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClose }: Props) {
+export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClose, headProgress, progressLoading }: Props) {
   const [category, setCategory] = useState<keyof AvatarSpec>('head');
   const [expanded, setExpanded] = useState<Partial<Record<keyof AvatarSpec, boolean>>>({});
   const dialog = useRef<HTMLDivElement>(null);
@@ -95,10 +96,17 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
           </div>
           <div className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
             <div className="studio-options" aria-label={`Choose ${label.toLowerCase()}`}>
-              {visible.map(([value, title]) => <button key={`${category}-${value}`} className="studio-option" aria-pressed={avatar[category] === value} disabled={busy} onClick={() => { setExpanded((current) => ({ ...current, [category]: showingAll })); onChange({ ...avatar, [category]: value }); }}>
-                <Part avatar={{ ...avatar, [category]: value }} part={category} />
-                <span>{title}</span>
-              </button>)}
+              {visible.map(([value, title]) => {
+                const locked=category==='head' && !headUnlocked(value,headProgress);
+                const reward=isEarnableHead(value)?EARNABLE_HEADS[value]:null;
+                const current=reward ? headProgress?.stats[reward.metric] ?? 0 : 0;
+                const unit=reward?.metric==='points'?'TP':reward?.metric==='rankedWins'?'wins':reward?.metric==='places'?'places':reward?.metric==='dailyDays'?'days':reward?.metric==='aces'?'aces':'thrones';
+                return <button key={`${category}-${value}`} className="studio-option" data-locked={locked||undefined} aria-pressed={avatar[category] === value} disabled={busy||locked} title={locked?reward?.requirement:undefined} onClick={() => { setExpanded((state) => ({ ...state, [category]: showingAll })); onChange({ ...avatar, [category]: value }); }}>
+                  <Part avatar={{ ...avatar, [category]: value }} part={category} />
+                  <span>{title}</span>
+                  {locked&&reward&&<small className="studio-lock"><b aria-hidden="true">●</b>{progressLoading?'Checking…':`${Math.min(current,reward.target)} / ${reward.target} ${unit}`}</small>}
+                </button>;
+              })}
             </div>
             {options.length > group.featured.length && <button className="studio-more" aria-expanded={showingAll} onClick={() => setExpanded((current) => ({ ...current, [category]: !showingAll }))}>{showingAll ? 'Show favourites' : `More ${label === 'Skin' || label === 'Colour' ? 'colours' : label.toLowerCase() + 's'}`}<span aria-hidden="true">{showingAll ? '−' : '+'}</span></button>}
           </div>

@@ -116,7 +116,8 @@ export const DEFAULT_AVATAR: Avatar = { porcelain: 'white', seat: 'white', hat: 
 /** Any input (server rows, old caches, user payloads) -> a valid avatar. Unknown parts fall back. */
 export function normalizeAvatar(input: unknown): Avatar {
   const o = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-  const pick = (v: unknown, allowed: Record<string, unknown>, fallback: string) => (typeof v === 'string' && v in allowed ? v : fallback);
+  const pick = (v: unknown, allowed: Record<string, unknown>, fallback: string) =>
+    typeof v === 'string' && Object.prototype.hasOwnProperty.call(allowed, v) ? v : fallback;
   return {
     porcelain: pick(o.porcelain, PORCELAIN, DEFAULT_AVATAR.porcelain),
     seat: pick(o.seat, SEATS, DEFAULT_AVATAR.seat),

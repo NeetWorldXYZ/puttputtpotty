@@ -2,6 +2,7 @@
 // daily-course holes, and verifies submitted runs by re-simulating them.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { EARNED_HEAD_IDS, normalizeAvatarChoice } from './avatarUnlocks.ts';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
 import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, placeNameProblem, sloganProblem, normalizeAvatar, starterAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/26fcf4621098b49d7aa759981df2665deb16ea61/server/potty/engine.js';
@@ -569,6 +570,13 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = body.action as string;
 
+    if (action === 'avatar-heads') {
+      await ensureProfile(user.id);
+      const { data, error } = await admin.rpc('refresh_avatar_heads', { in_user: user.id });
+      if (error) throw new Error('Your head collection could not be loaded. Please try again.');
+      return json(data);
+    }
+
     if (action === 'profile') {
       const raw = typeof body.displayName === 'string' ? body.displayName.trim() : undefined;
       const slogan = typeof body.slogan === 'string' ? body.slogan.trim().replace(/\s+/g, ' ').slice(0, 60) : undefined;
@@ -588,7 +596,18 @@ Deno.serve(async (req: Request) => {
         throw e;
       }
       if (slogan !== undefined) await admin.from('profiles').update({ slogan: slogan || null }).eq('id', user.id);
-      if (body.avatar && typeof body.avatar === 'object') await admin.from('profiles').update({ avatar: normalizeAvatar(body.avatar) }).eq('id', user.id);
+      if (body.avatar && typeof body.avatar === 'object') {
+        const avatar = normalizeAvatarChoice(body.avatar, normalizeAvatar);
+        if ((EARNED_HEAD_IDS as readonly string[]).includes(avatar.head)) {
+          const { data, error } = await admin.rpc('refresh_avatar_heads', { in_user: user.id });
+          if (error) throw new Error('Unable to verify this head. Please try again.');
+          if (!data?.unlocked?.includes(avatar.head)) {
+            return json({ error: 'That head is still locked. Complete its milestone first.' }, 403);
+          }
+        }
+        const { error } = await admin.from('profiles').update({ avatar }).eq('id', user.id);
+        if (error) throw new Error(error.message);
+      }
       return json({ ok: true });
     }
 
@@ -1040,7 +1059,7 @@ Deno.serve(async (req: Request) => {
       if (!lc) return json({ error: 'that code is wrong or expired' }, 404);
       if (lc.user_id === user.id) return json({ error: 'that is this phone' }, 400);
       await ensureProfile(user.id);
-      const { data: name, error } = await admin.rpc('move_account', { old_id: lc.user_id, new_id: user.id });
+      const { data: name, error } = await admin.rpc('move_account_with_heads', { old_id: lc.user_id, new_id: user.id });
       if (error) return json({ error: error.message }, 500);
       return json({ ok: true, displayName: name });
     }

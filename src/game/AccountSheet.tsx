@@ -8,6 +8,7 @@ import { getSavedAvatar, saveAvatar } from '../net/supabase';
 import { Avatar } from './Avatar';
 import { DEFAULT_AVATAR, type Avatar as AvatarSpec } from './avatarParts';
 import { AvatarCustomizer } from './AvatarCustomizer';
+import type { HeadProgress } from './earnedHeads';
 
 interface Props {
   onClose: (name: string | null) => void;
@@ -40,6 +41,8 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const [note, setNote] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [claim, setClaim] = useState('');
+  const [headProgress, setHeadProgress] = useState<HeadProgress | null>(null);
+  const [headProgressLoading, setHeadProgressLoading] = useState(initialMode === 'look');
 
   useEffect(() => {
     let active = true;
@@ -56,6 +59,20 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
     }).catch(() => { /* The cached profile remains available while offline. */ });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'look') return;
+    let active=true;
+    setHeadProgressLoading(true);
+    void api.avatarHeads().then((progress) => {
+      if(active) setHeadProgress(progress);
+    }).catch(() => {
+      if(active) setError('Your earned heads could not be checked. Please try again.');
+    }).finally(() => {
+      if(active) setHeadProgressLoading(false);
+    });
+    return () => { active=false; };
+  }, [mode]);
 
   const trimmed = name.trim().slice(0, 24);
   const run = async (fn: () => Promise<void>) => {
@@ -128,7 +145,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const close = () => onClose(current?.name ?? getSavedName());
   const tabs = (['name', 'friends', 'account'] as const).map((id) => [id, id === 'name' ? 'Identity' : id === 'friends' ? 'Friends' : 'Account'] as const);
   const inTabs = mode === 'name' || mode === 'friends' || mode === 'account';
-  if (mode === 'look') return <AvatarCustomizer avatar={avatar} busy={busy} error={error} onChange={(next) => { lookEdited.current = true; setAvatar(next); setError(null); }} onSave={() => void saveLook()} onClose={close} />;
+  if (mode === 'look') return <AvatarCustomizer avatar={avatar} busy={busy} error={error} onChange={(next) => { lookEdited.current = true; setAvatar(next); setError(null); }} onSave={() => void saveLook()} onClose={close} headProgress={headProgress} progressLoading={headProgressLoading} />;
   return (
     <div className="overlay locker-overlay" onClick={close}>
       <div className={`card pop account locker${lookOnly ? ' locker-look' : ''}`} role="dialog" aria-modal="true" aria-label={lookOnly ? 'Your look' : 'Player locker'} onClick={(e) => e.stopPropagation()}>

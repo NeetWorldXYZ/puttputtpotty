@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BALLS, DEFAULT_AVATAR, FACES, HEADS, avatarPartSvg, avatarSvg, resultAvatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
 import { LOOK_CATEGORIES, lookOptions } from '../src/game/AvatarCustomizer';
 import { EARNABLE_HEADS, STARTER_HEADS, headUnlocked } from '../src/game/earnedHeads';
+import { normalizeAvatarChoice } from '../server/potty/avatarUnlocks';
 // @ts-expect-error The checked-in production engine is prebuilt JavaScript.
 import { normalizeAvatar as serverNormalizeAvatar } from '../server/potty/engine.js';
 
@@ -27,7 +28,7 @@ describe('avatars', () => {
       const before = JSON.stringify(av);
       const svg = avatarSvg(av,`polish-${head}`);
       expect(svg).toContain('M88 134'); // shirt crest
-      expect(svg).toContain('cx="66" cy="70"'); // visible happy eyes
+      expect(svg).toContain(head === 'doughnut' ? 'cx="59" cy="70"' : 'cx="66" cy="70"'); // visible happy eyes
       expect(svg).not.toContain('NaN');
       expect(JSON.stringify(av)).toBe(before);
     }
@@ -64,8 +65,8 @@ describe('avatars', () => {
         expect(featured.every((id) => options.some(([value]) => value === id))).toBe(true);
         for (const [value] of options) {
           const chosen = { ...DEFAULT_AVATAR, head, [key]: value };
-          expect(serverNormalizeAvatar(chosen)).toEqual(chosen);
-          expect(normalizeAvatar(serverNormalizeAvatar(chosen))).toEqual(chosen);
+          expect(normalizeAvatarChoice(chosen, serverNormalizeAvatar)).toEqual(chosen);
+          expect(normalizeAvatar(normalizeAvatarChoice(chosen, serverNormalizeAvatar))).toEqual(chosen);
         }
       }
     }
@@ -129,11 +130,11 @@ describe('avatars', () => {
     expect([...seen].sort()).toEqual([...STARTER_HEADS].sort());
   });
 
-  it('adds thirteen distinct, well-formed earned portraits without granting them to starters', () => {
+  it('adds thirteen distinct, visible earned portraits without granting them to starters', () => {
     expect(Object.keys(EARNABLE_HEADS)).toHaveLength(13);
     for(const head of Object.keys(EARNABLE_HEADS)) {
       expect(headUnlocked(head,null)).toBe(false);
-      expect(lookOptions(DEFAULT_AVATAR,'head').some(([id])=>id===head)).toBe(false);
+      expect(lookOptions(DEFAULT_AVATAR,'head').some(([id])=>id===head)).toBe(true);
       for(const face of Object.keys(FACES)) for(const hat of ['none','crown','cap','tophat','plunger','halo']) {
         const look={...DEFAULT_AVATAR,head,face,hat};
         const markup=avatarSvg(look,head+'-'+face+'-'+hat);
@@ -156,5 +157,8 @@ describe('avatars', () => {
     expect(art('doughnut')).toContain('data-material="doughnut-ring" fill-rule="evenodd"');
     expect(art('flame')).toContain('data-material="living-fire"');
     expect(art('flame')).toContain('fill="url(#look-material-heat)"/>');
+    const doughnut=avatarSvg({...DEFAULT_AVATAR,head:'doughnut'},'donut-eyes');
+    expect(doughnut).toContain('cx="59" cy="70"');
+    expect(doughnut).toContain('cx="101" cy="70"');
   });
 });

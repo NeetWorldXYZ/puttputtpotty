@@ -2,6 +2,7 @@ import type { Hole, Stroke } from '../sim/types';
 import { FUNCTION_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
 import { ensureSession, quickToken, supabase } from './supabase';
 import type { Avatar } from '../game/avatarParts';
+import type { HeadProgress } from '../game/earnedHeads';
 
 export interface NearbyLocation {
   id: string;
@@ -253,6 +254,7 @@ async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { t
 }
 
 export const api = {
+  avatarHeads: () => call<HeadProgress>({ action: 'avatar-heads' }),
   async gameplayReward(context: string): Promise<{points:number;items:{reason:string;points:number}[]}> {
     await ensureSession();
     const {data,error}=await supabase.rpc('gameplay_reward',{in_context:context});

@@ -142,6 +142,13 @@ export function earnedHeadArt(head:string,tone:{top:string;bottom:string},id:str
 
 /** Material-specific face details stay separate from the head and from hats. */
 export function earnedFace(head:string,face:string,markup:string):string {
+  if(head==='doughnut') {
+    // Leave breathing room around the real doughnut hole.
+    markup=markup
+      .replace(/cx="66"/g,'cx="59"').replace(/cx="65"/g,'cx="58"')
+      .replace(/cx="94"/g,'cx="101"').replace(/cx="93"/g,'cx="100"')
+      .replace(/m88 70 6-3 6 3/g,'m95 70 6-3 6 3');
+  }
   if(head==='robot') return markup.replace(/fill="#071f32"/g,'fill="#7ffff2"');
   if(head==='raccoon') markup=markup.replace(/(<g data-feature="eyes">)([\s\S]*?)(<\/g>)/,(_all,start,eyes,end)=>start+eyes.replace(/fill="#071f32"/g,'fill="#fff1cf"')+end);
   if(['raccoon','lion'].includes(head)) markup=markup.replace(/(data-feature="mouth" d="M\d+ )85/g,(_all,start)=>start+'92');
