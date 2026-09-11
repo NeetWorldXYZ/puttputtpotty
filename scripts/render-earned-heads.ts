@@ -1,13 +1,3 @@
-// Local visual-QA contact sheet. Render the actual modular game art, not a mockup.
-import { avatarSvg, avatarPartSvg, DEFAULT_AVATAR } from '../src/game/avatarParts';
-import { EARNABLE_HEADS } from '../src/game/earnedHeads';
-const labels=['LEVEL 4 · 450 TP','10 RANKED WINS','5 MAP LOCATIONS','10 DAILY COURSE DAYS','25 LIFETIME ACES','LEVEL 8 · 1,750 TP','15 MAP LOCATIONS','50 RANKED WINS','HOLD 5 THRONES','LEVEL 12 · 3,850 TP'];
-const cards=Object.entries(EARNABLE_HEADS).map(([head,h],i)=>{
-  const x=28+(i%5)*254,y=195+Math.floor(i/5)*385;
-  const av={...DEFAULT_AVATAR,head,seat:h.shirt};
-  const part=avatarPartSvg(av,'head',`sheet-${head}`);
-  return `<g transform="translate(${x} ${y})"><rect width="238" height="365" rx="22" fill="#082c43" stroke="#367a95" stroke-width="2"/><text x="16" y="25" fill="#98c7d5" font-size="10" letter-spacing="1">NO. ${String(i+1).padStart(2,'0')}</text><svg x="22" y="32" width="194" height="184" viewBox="20 10 120 116">${part.markup}</svg><text x="119" y="239" text-anchor="middle" font-weight="bold" font-size="18" fill="#ffedb9">${h.label}</text><text x="119" y="262" text-anchor="middle" font-size="10" fill="#99bcc9">${labels[i]}</text><path d="M20 280h198" stroke="#46778b"/><svg x="38" y="289" width="53" height="56" viewBox="0 0 160 170">${avatarSvg(av,'mini-'+head)}</svg><svg x="102" y="289" width="53" height="56" viewBox="0 0 160 170">${avatarSvg({...av,hat:'crown',face:'cool'},'crown-'+head)}</svg><svg x="167" y="289" width="53" height="56" viewBox="0 0 160 170">${avatarSvg({...av,hat:'cap'},'cap-'+head)}</svg></g>`;
-}).join('');
-const sheet=`<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1030" viewBox="0 0 1320 1030"><defs><linearGradient id="sheet-bg" x2=".5" y2="1"><stop stop-color="#14516e"/><stop offset="1" stop-color="#021b2d"/></linearGradient></defs><rect width="1320" height="1030" fill="url(#sheet-bg)"/><g font-family="DejaVu Sans,Arial,sans-serif"><text x="660" y="47" text-anchor="middle" font-size="12" letter-spacing="4" fill="#96d9e7">PUTT PUTT POTTY · THE EARNED COLLECTION</text><text x="660" y="105" text-anchor="middle" font-size="40" font-weight="bold" fill="#fff3d1">GOOD LOOKS. EARNED, NOT GIVEN.</text><text x="660" y="139" text-anchor="middle" font-size="15" fill="#b1d5df">Ten new heads · Separate hats &amp; expressions · Actual vector game art</text>${cards}<text x="660" y="1001" text-anchor="middle" font-size="13" fill="#b8cfd8">ARTWORK REVIEW · Unlock requirements are planned, not active. Production is unchanged.</text></g></svg>`;
-// This script is bundled for Node for QA; no Node code enters the game bundle.
-console.log(sheet);
+// Local contact sheet entry point; the v2 renderer includes the full 13-head set.
+import { reviewSheet } from './render-earned-heads-v2';
+console.log(reviewSheet());

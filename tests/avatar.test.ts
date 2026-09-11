@@ -129,8 +129,8 @@ describe('avatars', () => {
     expect([...seen].sort()).toEqual([...STARTER_HEADS].sort());
   });
 
-  it('adds ten distinct, well-formed earned portraits without granting them to starters', () => {
-    expect(Object.keys(EARNABLE_HEADS)).toHaveLength(10);
+  it('adds thirteen distinct, well-formed earned portraits without granting them to starters', () => {
+    expect(Object.keys(EARNABLE_HEADS)).toHaveLength(13);
     for(const head of Object.keys(EARNABLE_HEADS)) {
       expect(headUnlocked(head,null)).toBe(false);
       expect(lookOptions(DEFAULT_AVATAR,'head').some(([id])=>id===head)).toBe(false);
@@ -147,5 +147,14 @@ describe('avatars', () => {
         for(const mood of ['win','loss','draw'] as const) expect(resultAvatarSvg(look,mood,'result')).toContain(`data-emotion="${mood}"`);
       }
     }
+  });
+
+  it('gives the new objects recognizable materials and keeps the fire core unoutlined', () => {
+    const art=(head:string)=>avatarPartSvg({...DEFAULT_AVATAR,head},'head','material').markup;
+    expect(art('basketball')).toContain('pebble');
+    expect(art('pickle')).toContain('brine');
+    expect(art('doughnut')).toContain('data-material="doughnut-ring" fill-rule="evenodd"');
+    expect(art('flame')).toContain('data-material="living-fire"');
+    expect(art('flame')).toContain('fill="url(#look-material-heat)"/>');
   });
 });

@@ -19,7 +19,7 @@ export function HeadGallery() {
     setSelected(key);setLook({...DEFAULT_AVATAR,head:key,seat:EARNABLE_HEADS[key].shirt});setInspect(true);
   };
   return <main className="head-gallery">
-    <header className="hg-intro"><p>PUTT PUTT POTTY · THE EARNED COLLECTION</p><h1>GOOD LOOKS.<br/><em>EARNED, NOT GIVEN.</em></h1><span>10 new heads. Your same golfer. A little more personality.</span><small>Artwork preview · Unlock rules shown below are planned, not active.</small></header>
+    <header className="hg-intro"><p>PUTT PUTT POTTY · THE EARNED COLLECTION</p><h1>GOOD LOOKS.<br/><em>EARNED, NOT GIVEN.</em></h1><span>{Object.keys(EARNABLE_HEADS).length} new heads. Your same golfer. A little more personality.</span><small>Artwork preview · Unlock rules shown below are planned, not active.</small></header>
     <div className="hg-grid">{(Object.keys(EARNABLE_HEADS) as EarnableHead[]).map((key,index)=>{
       const h=EARNABLE_HEADS[key];
       return <button className={`hg-card hg-${key}`} key={key} onClick={()=>choose(key)} aria-label={`Inspect ${h.label}`}>

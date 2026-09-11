@@ -11,6 +11,9 @@ export const EARNABLE_HEADS = {
   flame: { label: 'Hot Head', blurb: 'The winning streak has a face.', metric: 'rankedWins', target: 50, requirement: 'Win 50 ranked matches', palette: ['#ffe180','#ed7640'], shirt: 'ink' },
   lion: { label: 'Royal Lion', blurb: 'A mane event. No crown required.', metric: 'thrones', target: 5, requirement: 'Hold 5 thrones at the same time', palette: ['#ffe2a0','#d1a14f'], shirt: 'ink' },
   diamond: { label: 'Diamond Dome', blurb: 'Pressure makes a legend.', metric: 'points', target: 3850, requirement: 'Reach level 12 · 3,850 TP', palette: ['#d9ffff','#659ae4'], shirt: 'blue' },
+  basketball: { label: 'Dunk Head', blurb: 'Nothing but cup.', metric: 'rankedWins', target: 25, requirement: 'Win 25 ranked matches', palette: ['#ffa343','#cc501c'], shirt: 'ink' },
+  pickle: { label: 'Big Dill', blurb: 'Kind of a big dill around here.', metric: 'places', target: 10, requirement: 'Finish rounds at 10 different map locations', palette: ['#c1e660','#537c30'], shirt: 'white' },
+  doughnut: { label: 'Glazed & Confused', blurb: 'A sweet little hole in one.', metric: 'dailyDays', target: 20, requirement: 'Finish a daily course on 20 different days', palette: ['#ffb5d8','#d65a99'], shirt: 'blue' },
 } as const satisfies Record<string, {label:string;blurb:string;metric:HeadMetric;target:number;requirement:string;palette:readonly string[];shirt:string}>;
 
 export type EarnableHead = keyof typeof EARNABLE_HEADS;
