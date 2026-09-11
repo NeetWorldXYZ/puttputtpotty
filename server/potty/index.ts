@@ -797,7 +797,7 @@ Deno.serve(async (req: Request) => {
       if (elapsedMs === null && typeof locationId !== 'string') elapsedMs = simMs;
       const score = holeScores.reduce((a, b) => a + b, 0);
       const isLocation = typeof locationId === 'string';
-      const { error } = await admin.from('runs').insert({
+      const { data: savedRun, error } = await admin.from('runs').insert({
         user_id: user.id,
         location_id: isLocation ? locationId : null,
         course_seed: typeof courseSeed === 'string' ? courseSeed : null,
@@ -811,14 +811,14 @@ Deno.serve(async (req: Request) => {
         lat: typeof lat === 'number' ? lat : null,
         lng: typeof lng === 'number' ? lng : null,
         accuracy: typeof accuracy === 'number' ? accuracy : null,
-      });
+      }).select('id').single();
       if (error) return json({ error: error.message }, 500);
       let king = null;
       if (isLocation) {
         const { data } = await admin.from('thrones').select('*').eq('location_id', locationId).eq('season', currentSeason()).maybeSingle();
         king = data;
       }
-      return json({ score, par, sunk, holeScores, elapsedMs, king, isKing: king ? king.user_id === user.id : false });
+      return json({ runId: savedRun.id, score, par, sunk, holeScores, elapsedMs, king, isKing: king ? king.user_id === user.id : false });
     }
 
     if (action === 'found') {

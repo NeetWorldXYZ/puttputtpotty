@@ -253,6 +253,12 @@ async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { t
 }
 
 export const api = {
+  async gameplayReward(context: string): Promise<{points:number;items:{reason:string;points:number}[]}> {
+    await ensureSession();
+    const {data,error}=await supabase.rpc('gameplay_reward',{in_context:context});
+    if(error) throw new Error(error.message);
+    return data;
+  },
   setProfile: (displayName?: string, slogan?: string, avatar?: Avatar) => call<{ ok: true }>({ action: 'profile', displayName, slogan, avatar }),
   /** Flag a name or slogan; three different reporters reset it. */
   report: (userId: string, reason: 'name' | 'slogan' | 'cheating' | 'other') => call<{ ok: true; reset: boolean }>({ action: 'report', userId, reason }),
@@ -269,7 +275,7 @@ export const api = {
   start: (locationId: string) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId }),
   /** One stroke list per hole, in order. The server replays all three. */
   submitLocation: (locationId: string, strokes: Stroke[][], lat: number, lng: number, accuracy: number) =>
-    call<{ score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy }),
+    call<{ runId?: string; score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy }),
   submitDaily: (courseSeed: string, holeIndex: number, strokes: Stroke[]) =>
     call<{ score: number; par: number; sunk: boolean }>({ action: 'submit', courseSeed, holeIndex, strokes }),
 
