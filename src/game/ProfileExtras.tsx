@@ -36,7 +36,7 @@ export function ProfileRecentCrowns({ p, onViewAll }: { p: PlayerProfile; onView
   return <section className="pf3-recent">
     <header><span aria-hidden="true">♛</span><h2>Recent Crowns</h2>{p.throne_list.length > 0 && <button onClick={onViewAll}>View all&nbsp; ›</button>}</header>
     {p.throne_list.length ? <div className="pf3-crown-grid">{p.throne_list.slice(0, 4).map((t, i) => <button key={t.location_id} className={`pf3-crown-place pf3-crown-place-${i + 1}`} onClick={onViewAll}>
-      <span className="pf3-crown-art"><i/><em>♛</em></span><strong>{t.name}</strong><small>{crownAge(t.since)}</small>
+      <span className="pf3-crown-art"><em>♛</em></span><strong>{t.name}</strong><small>{crownAge(t.since)}</small>
     </button>)}</div> : <button className="pf3-no-crowns" onClick={() => navigate('map')}>No crowns yet · find one on the map&nbsp; →</button>}
   </section>;
 }

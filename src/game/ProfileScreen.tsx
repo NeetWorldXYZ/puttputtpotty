@@ -5,6 +5,7 @@ import { POI_ICON } from '../net/places';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
 import { Avatar } from './Avatar';
+import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
@@ -18,6 +19,14 @@ import { useOnline } from '../net/presence';
 function ago(iso: string): string { const s = (Date.now() - new Date(iso).getTime()) / 1000; if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m`; if (s < 86400) return `${Math.round(s / 3600)}h`; return `${Math.round(s / 86400)}d`; }
 function relPar(n: number | null): string { if (n === null) return '–'; return n > 0 ? `+${n}` : n === 0 ? 'E' : String(n); }
 function memberSince(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
+
+function FriendsIcon() {
+  return <svg className="pf3-row-art" viewBox="0 0 72 56" aria-hidden="true"><defs><linearGradient id="pf3-friend-fill" x2="0" y2="1"><stop stopColor="#e8eeff"/><stop offset="1" stopColor="#8d9fe4"/></linearGradient></defs><g fill="url(#pf3-friend-fill)" stroke="#08283d" strokeWidth="3"><circle cx="25" cy="18" r="11"/><circle cx="47" cy="18" r="11"/><path d="M7 50q1-19 18-19t18 19Z"/><path d="M29 50q1-19 18-19t18 19Z"/></g></svg>;
+}
+
+function ChallengeIcon() {
+  return <svg className="pf3-row-art" viewBox="0 0 64 64" aria-hidden="true"><circle cx="29" cy="34" r="23" fill="#fff5df" stroke="#08283d" strokeWidth="4"/><circle cx="29" cy="34" r="15" fill="none" stroke="#f14e5d" strokeWidth="6"/><circle cx="29" cy="34" r="5" fill="#f14e5d"/><path d="m32 30 20-20m-8 1 9-2-2 9" fill="none" stroke="#51c8d9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
 
 export function ProfileScreen({ userId, addCode = null }: { userId: string | null; addCode?: string | null }) {
   const [me, setMe] = useState<string | null>(null);
@@ -48,7 +57,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
   const back = () => { if (history.length > 1) history.back(); else navigate('leaders'); };
 
   return <div className={`leaders profile profile-polished profile-v3 ${mine ? 'pf-private' : 'pf-public'}`}>
-    {mine ? <div className="pf3-topbar"><button className="pf3-round-button" aria-label="Profile settings" onClick={() => setAccount(true)}>⚙</button><button className="pf3-points" onClick={() => setChallenges(true)} aria-label={`${p?.points ?? 0} Throne Points`}><span>♛</span>{(p?.points ?? 0).toLocaleString()}<b>+</b></button></div>
+    {mine ? <div className="pf3-topbar"><button className="pf3-round-button" aria-label="Profile settings" onClick={() => setAccount(true)}>⚙</button><button className="pf3-points" onClick={() => setChallenges(true)} aria-label={`${p?.points ?? 0} Throne Points`}><GameIcon kind="crown"/>{(p?.points ?? 0).toLocaleString()}<b>+</b></button></div>
       : <div className="pf3-topbar"><button className="pf3-round-button pf3-back" aria-label="Go back" onClick={back}>‹</button><button className="pf3-round-button pf3-more" aria-label="Report player" onClick={() => setReport(true)}>•••</button></div>}
 
     {error && <div className="lb-note">Profile offline · {error}</div>}
@@ -66,7 +75,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
         </div>
       </section>
 
-      {mine ? <><ProfileStats p={p} mine/><button className="pf3-row" onClick={() => setFriends(true)}><span className="pf3-row-icon">♟♟</span><span><strong>Friends</strong><small>{friendCount} {friendCount === 1 ? 'friend' : 'friends'}{friendRows.some(f => f.relation === 'friend' && isOnline(f.user_id)) ? ' · friends online' : ''}</small></span><b>›</b></button><button className="pf3-row" onClick={() => setChallenges(true)}><span className="pf3-row-icon pf3-target">◎</span><span><strong>Challenges</strong><small>Daily and weekly · Earn Throne Points</small></span><b>›</b></button><ProfileRecentCrowns p={p} onViewAll={() => setThrones(true)}/></> : <PublicProfileExtras p={p} me={me} onFriends={() => setFriends(true)} onThrones={() => setThrones(true)} onShare={() => void share()}/>}
+      {mine ? <><ProfileStats p={p} mine/><button className="pf3-row" onClick={() => setFriends(true)}><FriendsIcon/><span><strong>Friends</strong><small>{friendCount} {friendCount === 1 ? 'friend' : 'friends'}{friendRows.some(f => f.relation === 'friend' && isOnline(f.user_id)) ? ' · friends online' : ''}</small></span><b>›</b></button><button className="pf3-row" onClick={() => setChallenges(true)}><ChallengeIcon/><span><strong>Challenges</strong><small>Daily and weekly · Earn Throne Points</small></span><b>›</b></button><ProfileRecentCrowns p={p} onViewAll={() => setThrones(true)}/></> : <PublicProfileExtras p={p} me={me} onFriends={() => setFriends(true)} onThrones={() => setThrones(true)} onShare={() => void share()}/>}
     </div>}
 
     {thrones && p && <div className="overlay" onClick={() => setThrones(false)}><div className="card pop pf-sheet" role="dialog" aria-modal="true" aria-label="Thrones held" onClick={e => e.stopPropagation()}><h2>{mine ? 'Your thrones' : `${p.name}'s thrones`}</h2><div className="sub">{p.thrones === 0 ? (mine ? 'None yet. The map is full of empty ones.' : 'None yet.') : `${p.thrones} held this season`}</div>{p.throne_list.length > 0 && <ul className="pf-thrones">{p.throne_list.map(t => <li key={t.location_id} className="pf-throne"><span className="pf-emoji" aria-hidden="true">{POI_ICON[t.poi_type] ?? '🚽'}</span><span className="pf-throne-text"><strong>{t.name}</strong><span>par {t.par}{t.elapsed_ms !== null ? ` · ${fmtElapsed(t.elapsed_ms)}` : ''} · held {ago(t.since)}</span></span><b>{t.score}<small>{relPar(t.score - t.par)}</small></b></li>)}</ul>}<button className={mine ? 'primary' : ''} onClick={() => mine ? navigate('map') : setThrones(false)}>{mine ? 'Open the map' : 'Close'}</button></div></div>}
