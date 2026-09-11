@@ -4,6 +4,7 @@ import { navigate } from '../router';
 import { Avatar } from './Avatar';
 import { profileAvatarSvg, type Avatar as AvatarSpec } from './avatarParts';
 import { ProfileStatIcon } from './ProfileStatIcon';
+import { levelProgress } from './progress';
 
 export function ProfileStage() {
   return <svg className="pf-stage" viewBox="0 0 220 210" aria-hidden="true">
@@ -69,15 +70,41 @@ export function PublicProfileExtras({ p, me, onFriends, onThrones, onShare }: { 
     </div>
     {error && <p className="pf3-error" role="alert">{error}</p>}
     <ProfileStats p={p} mine={false}/>
-    <section className="pf3-h2h">
-      <header><ProfileStatIcon kind="match"/><span><h2>Head-to-Head</h2><small>How you stack up against {p.name}</small></span></header>
-      <div className="pf3-versus-card">
-        <div className="pf3-player-side"><span>You</span>{own ? <Avatar av={own.avatar} size={62}/> : <i className="pf3-avatar-placeholder"/>}<dl><div><dt>♛</dt><dd>{own?.thrones ?? '–'}</dd></div><div><dt>●</dt><dd>{own?.aces ?? '–'}</dd></div><div><dt>⚔</dt><dd>{own?.matches_won ?? '–'}</dd></div><div><dt>♜</dt><dd>{own ? winRate(own) : '–'}</dd></div></dl></div>
-        <b className="pf3-vs">VS</b>
-        <div className="pf3-player-side pf3-player-them"><span>{p.name}</span><Avatar av={p.avatar} size={62}/><dl><div><dt>♛</dt><dd>{p.thrones}</dd></div><div><dt>●</dt><dd>{p.aces}</dd></div><div><dt>⚔</dt><dd>{p.matches_won}</dd></div><div><dt>♜</dt><dd>{winRate(p)}</dd></div></dl></div>
-      </div>
-      <div className="pf3-h2h-cta"><small>Challenge {p.name} to improve your record!</small><button disabled={busy} onClick={() => void challenge()}>⚔&nbsp; Challenge</button></div>
-    </section>
+    <ProfileComparison p={p} own={own} busy={busy} onChallenge={() => void challenge()}/>
     <ProfileRecentCrowns p={p} onViewAll={onThrones}/>
   </>;
+}
+
+/** These are career totals, not a record of direct games between the players. */
+export function ProfileComparison({ p, own, busy, onChallenge }: { p: PlayerProfile; own: PlayerProfile | null; busy: boolean; onChallenge: () => void }) {
+  const rows = [
+    { label: 'Thrones', mine: own?.thrones, theirs: p.thrones },
+    { label: 'Aces', mine: own?.aces, theirs: p.aces },
+    { label: 'Ranked wins', mine: own?.matches_won, theirs: p.matches_won },
+    { label: 'Win rate', mine: own?.matches ? own.matches_won / own.matches : undefined, theirs: p.matches ? p.matches_won / p.matches : undefined, percent: true },
+  ];
+  const value = (n: number | undefined, percent?: boolean) => n === undefined ? '–' : percent ? `${Math.round(n * 100)}%` : n;
+  return <section className="pf3-h2h pf3-duel" aria-label={`Career comparison with ${p.name}`}>
+    <header><h2>Head-to-Head</h2><span>Career comparison</span></header>
+    <div className="pf3-duel-players">
+      <div className="pf3-duel-player pf3-duel-you">
+        <div className="pf3-duel-portrait">{own ? <Avatar av={own.avatar} size={94}/> : <span className="pf3-duel-placeholder" aria-label="Your profile unavailable">?</span>}</div>
+        <strong title={own?.name}>You</strong><small>{own ? `LEVEL ${levelProgress(own.points ?? 0).level}` : '—'}</small>
+      </div>
+      <span className="pf3-duel-vs" aria-hidden="true">VS</span>
+      <div className="pf3-duel-player pf3-duel-them">
+        <div className="pf3-duel-portrait"><Avatar av={p.avatar} size={94}/></div>
+        <strong title={p.name}>{p.name}</strong><small>LEVEL {levelProgress(p.points ?? 0).level}</small>
+      </div>
+    </div>
+    <table className="pf3-duel-stats">
+      <thead className="pf3-visually-hidden"><tr><th scope="col">You</th><th scope="col">Career stat</th><th scope="col">{p.name}</th></tr></thead>
+      <tbody>{rows.map(row => <tr key={row.label}>
+        <td className={row.mine !== undefined && row.theirs !== undefined && row.mine > row.theirs ? 'pf3-duel-leading' : ''}>{value(row.mine, row.percent)}</td>
+        <th scope="row">{row.label}</th>
+        <td className={row.mine !== undefined && row.theirs !== undefined && row.theirs > row.mine ? 'pf3-duel-leading' : ''}>{value(row.theirs, row.percent)}</td>
+      </tr>)}</tbody>
+    </table>
+    <button className="pf3-duel-challenge" disabled={busy} onClick={onChallenge}><span aria-hidden="true">⚔</span><span>{busy ? 'Sending challenge…' : 'Challenge to a match'}</span><b aria-hidden="true">›</b></button>
+  </section>;
 }
