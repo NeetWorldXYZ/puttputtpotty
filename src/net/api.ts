@@ -1,3 +1,4 @@
+import { queueDaily, pendingDaily, acknowledgeDaily, type PendingHole } from './dailyOutbox';
 import type { Hole, Stroke } from '../sim/types';
 import { FUNCTION_URL, SUPABASE_KEY, SUPABASE_URL } from './config';
 import { ensureSession, quickToken, supabase } from './supabase';
@@ -192,6 +193,30 @@ export interface LocationSummary {
   difficulty: string;
 }
 
+const dailyFlights = new Map<string, Promise<{ score: number; par: number; sunk: boolean }>>();
+function sendDaily(hole: PendingHole): Promise<{ score: number; par: number; sunk: boolean }> {
+  const key = `${hole.user}/${hole.seed}/${hole.index}`;
+  const active = dailyFlights.get(key);
+  if (active) return active;
+  const task = (async () => {
+    let last: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // Resolve a lost response as success without submitting a second score.
+      const { data } = await supabase.from('runs').select('score,par').eq('user_id', hole.user).eq('course_seed', hole.seed).eq('hole_index', hole.index).maybeSingle();
+      if (data) { acknowledgeDaily(hole); return { ...data, sunk: true }; }
+      try {
+        const result = await call<{ score: number; par: number; sunk: boolean }>({ action: 'submit', courseSeed: hole.seed, holeIndex: hole.index, strokes: hole.strokes });
+        acknowledgeDaily(hole);
+        return result;
+      } catch (error) { last = error; }
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+    }
+    throw last;
+  })().finally(() => dailyFlights.delete(key));
+  dailyFlights.set(key, task);
+  return task;
+}
+
 const CALL_TIMEOUT_MS = 30000;
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
@@ -279,8 +304,15 @@ export const api = {
   /** One stroke list per hole, in order. The server replays all three. */
   submitLocation: (locationId: string, strokes: Stroke[][], lat: number, lng: number, accuracy: number) =>
     call<{ runId?: string; score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy }),
-  submitDaily: (courseSeed: string, holeIndex: number, strokes: Stroke[]) =>
-    call<{ score: number; par: number; sunk: boolean }>({ action: 'submit', courseSeed, holeIndex, strokes }),
+  async submitDaily(courseSeed: string, holeIndex: number, strokes: Stroke[]) {
+    const session = await ensureSession();
+    const hole = queueDaily({ user: session.user.id, seed: courseSeed, index: holeIndex, strokes });
+    return sendDaily(hole);
+  },
+  async syncDaily(seed: string) {
+    const session = await ensureSession();
+    await Promise.allSettled(pendingDaily().filter(h => h.user === session.user.id && h.seed === seed).map(sendDaily));
+  },
 
   async nearby(lat: number, lng: number, radiusM = 2500): Promise<NearbyLocation[]> {
     const rows = await readRpc<NearbyLocation[] | null>('nearby_locations', { in_lat: lat, in_lng: lng, radius_m: radiusM });
@@ -361,11 +393,15 @@ export const api = {
     return Number(data ?? 0);
   },
   async profile(userId: string): Promise<PlayerProfile | null> {
-    return await readRpc<PlayerProfile | null>('player_profile', { in_user: userId });
+    const [profile, record] = await Promise.all([
+      readRpc<PlayerProfile | null>('player_profile', { in_user: userId }),
+      readRpc<{ wins: number; matches: number }[]>('ranked_profile_record', { in_user: userId }),
+    ]);
+    return profile ? { ...profile, matches_won: Number(record[0]?.wins ?? 0), matches: Number(record[0]?.matches ?? 0) } : null;
   },
   /** Your rank on a daily course among everyone who finished it, or null if you have not. */
   async dailyStanding(seed: string): Promise<{ rank: number; of: number; total: number; par: number } | null> {
-    await ensureSession();
+    await api.syncDaily(seed);
     const { data, error } = await supabase.rpc('daily_standing', { in_seed: seed });
     if (error) throw new Error(error.message);
     const row = (Array.isArray(data) ? data[0] : data) as { rank: number; of_players: number; total: number; par: number } | undefined;
@@ -434,6 +470,7 @@ export const api = {
   },
 
   async leaderboard(seed: string): Promise<DailyRow[]> {
+    await api.syncDaily(seed);
     const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);
     return data ?? [];
