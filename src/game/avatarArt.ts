@@ -1,4 +1,5 @@
 import type { Avatar, BallLook } from './avatarParts';
+import { earnedHeadArt, earnedFace } from './earnedHeadArt';
 
 const INK = '#071f32';
 type Tone = {top:string;bottom:string};
@@ -31,6 +32,8 @@ function shirtSvg(key:string,id:string):string {
 }
 
 function headSvg(head:string,tone:Tone,id:string):string {
+  const earned=earnedHeadArt(head,tone,id);
+  if(earned) return earned;
   const paint=`fill="url(#${id}-skin)" ${stroke} stroke-width="6"`;
   let shape='';
   switch(head){
@@ -52,7 +55,7 @@ function faceSvg(face:string,head='classic'):string {
   if(face==='wink')art=`<g data-feature="eyes"><ellipse cx="66" cy="70" rx="3.6" ry="4.8" fill="${INK}"/><circle cx="65" cy="68" r="1" fill="#fff"/><path d="m88 70 6-3 6 3" fill="none" ${stroke} stroke-width="3.5"/></g>${smile}`;
   if(face==='angry')art=`${eyes}<path d="m58 59 15 5m29-5-15 5" fill="none" ${stroke} stroke-width="3.8"/><path data-feature="mouth" d="M70 ${mouthY+5}q10-9 20 0" fill="none" ${stroke} stroke-width="3.5"/>`;
   if(face==='sleepy')art=`${eyes}<path data-feature="mustache" d="M80 84c-9-11-14 9-23-2 0 13 14 13 23 6 9 7 23 7 23-6-9 11-14-9-23 2Z" fill="${INK}"/><path data-feature="mouth" d="M74 97q6 5 12 0" fill="none" ${stroke} stroke-width="3"/>`;
-  return `<g data-part="face" data-face="${face}">${art}</g>`;
+  return `<g data-part="face" data-face="${face}">${earnedFace(head,face,art)}</g>`;
 }
 
 function hatSvg(hat:string,id:string):string {

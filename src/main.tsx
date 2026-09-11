@@ -7,6 +7,8 @@ import './compact.css';
 import './open-home.css';
 import './match-ranks.css';
 import { invalidateStaticLayers } from './render/drawHole';
+const HeadGallery = React.lazy(() => import('./game/HeadGallery').then(m => ({default:m.HeadGallery})));
+const headPreview = new URLSearchParams(window.location.search).get('preview') === 'heads';
 
 // Sign text on the cached static layer should use the game font once it arrives.
 if (typeof document !== 'undefined' && document.fonts?.ready) {
@@ -15,6 +17,6 @@ if (typeof document !== 'undefined' && document.fonts?.ready) {
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {headPreview ? <React.Suspense fallback={<p>Loading the collection…</p>}><HeadGallery /></React.Suspense> : <App />}
   </React.StrictMode>,
 );

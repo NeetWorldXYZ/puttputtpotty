@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALLS, DEFAULT_AVATAR, FACES, HEADS, avatarPartSvg, avatarSvg, resultAvatarSvg, ballLook, normalizeAvatar, starterAvatar } from '../src/game/avatarParts';
 import { LOOK_CATEGORIES, lookOptions } from '../src/game/AvatarCustomizer';
+import { EARNABLE_HEADS, STARTER_HEADS, headUnlocked } from '../src/game/earnedHeads';
 // @ts-expect-error The checked-in production engine is prebuilt JavaScript.
 import { normalizeAvatar as serverNormalizeAvatar } from '../server/potty/engine.js';
 
@@ -57,7 +58,7 @@ describe('avatars', () => {
   });
 
   it('round-trips every editor option through the deployed server catalog', () => {
-    for (const head of Object.keys(HEADS)) {
+    for (const head of STARTER_HEADS) {
       for (const { key, featured } of LOOK_CATEGORIES) {
         const options = lookOptions({ ...DEFAULT_AVATAR, head }, key);
         expect(featured.every((id) => options.some(([value]) => value === id))).toBe(true);
@@ -119,12 +120,32 @@ describe('avatars', () => {
 
   it('starter looks cover every head and always normalize clean', () => {
     const seen = new Set<string>();
-    for (let i = 0; i < Object.keys(HEADS).length; i++) {
-      const av = starterAvatar(() => (i + 0.1) / Object.keys(HEADS).length);
+    for (let i = 0; i < STARTER_HEADS.length; i++) {
+      const av = starterAvatar(() => (i + 0.1) / STARTER_HEADS.length);
       seen.add(av.head);
       expect(normalizeAvatar(av)).toEqual(av);
       expect(av.face).toBe('happy');
     }
-    expect([...seen].sort()).toEqual(Object.keys(HEADS).sort());
+    expect([...seen].sort()).toEqual([...STARTER_HEADS].sort());
+  });
+
+  it('adds ten distinct, well-formed earned portraits without granting them to starters', () => {
+    expect(Object.keys(EARNABLE_HEADS)).toHaveLength(10);
+    for(const head of Object.keys(EARNABLE_HEADS)) {
+      expect(headUnlocked(head,null)).toBe(false);
+      expect(lookOptions(DEFAULT_AVATAR,'head').some(([id])=>id===head)).toBe(false);
+      for(const face of Object.keys(FACES)) for(const hat of ['none','crown','cap','tophat','plunger','halo']) {
+        const look={...DEFAULT_AVATAR,head,face,hat};
+        const markup=avatarSvg(look,head+'-'+face+'-'+hat);
+        expect(markup).toContain(`data-head="${head}"`);
+        expect(markup).toContain(`data-hat="${hat}"`);
+        expect(markup).toContain('data-feature="eyes"');
+        expect(markup).toContain('data-feature="mouth"');
+        expect(markup).not.toMatch(/undefined|NaN/);
+        const ids=[...markup.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+        for(const [,reference] of markup.matchAll(/url\(#([^)]+)\)/g))expect(ids).toContain(reference);
+        for(const mood of ['win','loss','draw'] as const) expect(resultAvatarSvg(look,mood,'result')).toContain(`data-emotion="${mood}"`);
+      }
+    }
   });
 });

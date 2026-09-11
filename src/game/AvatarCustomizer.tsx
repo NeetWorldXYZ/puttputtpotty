@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Avatar } from './Avatar';
 import { BALLS, FACES, HATS, HEADS, SEATS, avatarPartSvg, headTones, type Avatar as AvatarSpec } from './avatarParts';
 import './AvatarCustomizer.css';
+import { STARTER_HEADS } from './earnedHeads';
 
 export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; featured: readonly string[] }[] = [
   { key: 'head', label: 'Head', featured: ['classic', 'roll', 'turd', 'alien', 'dawg'] },
@@ -15,7 +16,8 @@ export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; f
 /** Keep every existing saved choice accessible, including the additional colours. */
 export function lookOptions(av: AvatarSpec, part: keyof AvatarSpec): [string, string][] {
   switch (part) {
-    case 'head': return Object.entries(HEADS).map(([id, value]) => [id, value.label]);
+    // Earned heads are artwork-review only until server-verified unlocks ship.
+    case 'head': return STARTER_HEADS.map(id => [id, HEADS[id].label]);
     case 'porcelain': return Object.entries(headTones(av.head)).map(([id, value]) => [id, value.label]);
     case 'seat': return Object.entries(SEATS).map(([id, value]) => [id, value.label]);
     case 'hat': return Object.entries(HATS);

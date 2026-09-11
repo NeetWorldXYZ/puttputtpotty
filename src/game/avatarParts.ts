@@ -1,5 +1,6 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
 import { renderAvatarArt, renderAvatarPart, renderResultAvatarArt } from './avatarArt';
+import { EARNABLE_HEADS, STARTER_HEADS, earnedHeadTones } from './earnedHeads';
 
 export interface Avatar {
   /** Skin tone for the classic golfer; for the other heads, that head's colour. */
@@ -18,6 +19,7 @@ export const HEADS: Record<string, { label: string; blurb: string }> = {
   turd: { label: 'Turd King', blurb: 'Legendary status.' },
   alien: { label: 'Area Bowl', blurb: 'Out of this world putting.' },
   dawg: { label: 'Dawg', blurb: "Man's best bogey buddy." },
+  ...EARNABLE_HEADS,
 };
 
 /** Head colours by the same seven keys as skin tones, so one picker serves every head. */
@@ -62,7 +64,7 @@ const HEAD_TONES: Record<string, Record<string, { top: string; bottom: string; l
 
 /** The colour swatches the picker should show for a head. */
 export function headTones(head: string): Record<string, { top: string; bottom: string; label: string }> {
-  return HEAD_TONES[head] ?? PORCELAIN;
+  return earnedHeadTones(head) ?? HEAD_TONES[head] ?? PORCELAIN;
 }
 
 export const PORCELAIN: Record<string, { top: string; bottom: string; label: string }> = {
@@ -151,7 +153,7 @@ export function avatarPartSvg(input: Avatar, part: keyof Avatar, id: string): {m
 /** A new player's first look: any of the five heads in any colour, the rest kept plain so the editor has somewhere to go. */
 export function starterAvatar(r: () => number): Avatar {
   const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
-  const head = pick(Object.keys(HEADS));
+  const head = pick([...STARTER_HEADS]);
   return {
     head,
     porcelain: pick(Object.keys(headTones(head))),
@@ -171,6 +173,6 @@ export function randomAvatar(r: () => number): Avatar {
     hat: pick(Object.keys(HATS)),
     face: pick(Object.keys(FACES)),
     ball: pick(Object.keys(BALLS)),
-    head: pick(Object.keys(HEADS)),
+    head: pick([...STARTER_HEADS]),
   };
 }
