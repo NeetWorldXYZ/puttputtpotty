@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Hole } from '../sim/types';
 import { courseSlots, type GeneratedHole } from '../generator/generator';
 import { PlayView, type HoleDoneInfo } from './PlayView';
+import { EarnedTP } from './EarnedTP';
 import { useTuning } from './paramsStore';
 import { dailySeed, getBest, goToCourse, secondsUntilNextDaily } from './courses';
 import { navigate } from '../router';
@@ -33,6 +34,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
   const alreadyPlayed = daily && getBest(seed) !== null;
   const [askName, setAskName] = useState(daily && !getSavedName());
   const [submitted, setSubmitted] = useState(0);
+  const [submissionFailed,setSubmissionFailed]=useState(false);
 
   useEffect(() => {
     const slots = courseSlots(seed, count);
@@ -142,7 +144,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
           .submitDaily(seed, info.holeIndex, info.strokes)
           .then(() => setSubmitted((n) => n + 1))
           .catch(() => {
-            /* one attempt per hole per day; a rejected duplicate is fine to ignore */
+            setSubmissionFailed(true);
           });
       }
     : undefined;
@@ -155,7 +157,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
         courseSeed={seed}
         lockedParams={daily ? DEFAULT_PARAMS : undefined}
         onHoleDone={onHoleDone}
-        scorecardExtra={daily ? <DailyBoard seed={seed} refreshKey={submitted} /> : undefined}
+        scorecardExtra={daily ? <>{submissionFailed?<p role="status">Some holes were not saved or were already played. TP is unavailable for this attempt.</p>:<EarnedTP context={`daily:${seed}`} pending={submitted<9}/>}<DailyBoard seed={seed} refreshKey={submitted} /></> : undefined}
       />
       {askName && <NamePrompt title="Name for the leaderboard" sub="Today's course is ranked. Pick the name others will see." onDone={() => setAskName(false)} onCancel={() => setAskName(false)} />}
     </>

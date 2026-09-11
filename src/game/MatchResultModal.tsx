@@ -23,7 +23,7 @@ export function MatchResultModal({match,me,holes,onLeave,onEnter,friendAction}:{
   closeRef.current=onLeave;
   useEffect(()=>{
     let active=true;setPointsError(false);
-    void api.profile(me).then(p=>{if(active){setPoints(typeof p?.points==='number'?p.points:null);setPointsError(typeof p?.points!=='number');}}).catch(()=>{if(active)setPointsError(true);});
+    void api.gameplayReward(`match:${match.id}`).then(p=>{if(active){setPoints(typeof p?.points==='number'?p.points:null);setPointsError(typeof p?.points!=='number');}}).catch(()=>{if(active)setPointsError(true);});
     return()=>{active=false;};
   },[me,match.id,revision]);
   useEffect(()=>{
@@ -60,7 +60,7 @@ export function MatchResultModal({match,me,holes,onLeave,onEnter,friendAction}:{
           <p className="mr-subtitle">{subtitle}</p>
           <div className="mr-score">{score??'DNF'}{score!==null&&<small className={score<par?'mr-under':score>par?'mr-over':''}>{relative(score,par)}</small>}</div>
           <p className="mr-par">par {par}</p>
-          <div className="mr-points"><Crown/><div>{points===null?(pointsError?<button onClick={()=>setRevision(n=>n+1)}>Retry points</button>:<strong aria-label="Loading points">…</strong>):<strong>{points.toLocaleString()}</strong>}<span>Throne Points <small>total</small></span></div></div>
+          <div className="mr-points"><Crown/><div>{points===null?(pointsError?<button onClick={()=>setRevision(n=>n+1)}>TP unavailable · Retry</button>:<strong aria-label="Loading points">…</strong>):<strong>+{points.toLocaleString()}</strong>}<span>Throne Points <small>earned</small></span></div></div>
         </div>
       </div>
       <div className="mr-scorecard" role="region" aria-label="Both players, hole by hole" tabIndex={0}>

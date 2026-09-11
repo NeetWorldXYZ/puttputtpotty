@@ -9,6 +9,7 @@ import { bandFor, recallPlace } from '../net/places';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
+import { EarnedTP } from './EarnedTP';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { sfx } from './sound';
 import { buzz } from './haptics';
@@ -19,7 +20,7 @@ interface Props {
   throne: boolean;
 }
 
-type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; score: number; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean } | { state: 'error'; message: string };
+type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; runId?:string; score: number; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean } | { state: 'error'; message: string };
 
 const RAMP: Record<string, ('easy' | 'medium' | 'hard')[]> = {
   easy: ['easy', 'easy', 'medium'],
@@ -181,7 +182,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     api
       .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy)
       .then((r) => {
-        setSubmit({ state: 'done', score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
+        setSubmit({ state: 'done', runId:r.runId, score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
         if (r.isKing) {
           sfx.fanfare('ace');
           buzz([30, 40, 30, 40, 80]);
@@ -276,6 +277,7 @@ export function LocationPlay({ locationId, throne }: Props) {
         throne ? (
           <>
             {throneStatus}
+            {submit.state==='done'&&submit.runId&&<EarnedTP context={`run:${submit.runId}`}/>}
             <LocationBoard locationId={locationId} refreshKey={submit.state === 'done' ? 1 : 0} />
           </>
         ) : (
