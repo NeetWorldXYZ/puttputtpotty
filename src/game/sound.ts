@@ -8,37 +8,51 @@ import { primeTheme, stinger, type StingerLevel } from './music';
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
 let backgrounded = typeof document !== 'undefined' && document.hidden;
-let silentMedia: HTMLAudioElement | null = null;
+let audioTransition: Promise<void> | null = null;
+type GameAudioSession = { type: string; state?: string; addEventListener?: (event: string, listener: () => void) => void };
+let observedSession: GameAudioSession | undefined;
+
+function audioSession(): GameAudioSession | undefined {
+  try { return (navigator as unknown as { audioSession?: GameAudioSession }).audioSession; }
+  catch { return undefined; }
+}
+
+function configureGameAudio(): void {
+  const session = audioSession();
+  if (!session) return;
+  try {
+    // Game audio should mix with the car's music, not take exclusive playback.
+    // Keep this stable across taps and app switches to avoid route churn.
+    if (session.type !== 'ambient') session.type = 'ambient';
+    if (observedSession !== session) {
+      session.addEventListener?.('statechange', syncAudioVisibility);
+      observedSession = session;
+    }
+  } catch { /* Optional Safari API; Web Audio is still usable without it. */ }
+}
 
 function isBackgrounded(): boolean {
   return backgrounded || (typeof document !== 'undefined' && document.hidden);
 }
 
 function syncAudioVisibility(): void {
-  const hidden = isBackgrounded();
+  const quiet = isBackgrounded() || muted;
   if (master) {
     master.gain.cancelScheduledValues(ctx?.currentTime ?? 0);
-    master.gain.value = hidden || muted ? 0 : 0.8;
+    master.gain.value = quiet ? 0 : 0.8;
   }
-  if (hidden) {
-    silentMedia?.pause();
-    try {
-      const nav = navigator as unknown as { audioSession?: { type: string } };
-      if (nav.audioSession) nav.audioSession.type = 'auto';
-    } catch { /* Optional Safari API. */ }
-  }
-  if (!(ctx instanceof AudioContext)) return;
+  if (!(ctx instanceof AudioContext) || audioTransition || ctx.state === 'closed') return;
   const live = ctx;
-  if (hidden) void live.suspend().then(() => {
-    if (!isBackgrounded()) syncAudioVisibility();
-  }).catch(() => {});
-  else if (live.state !== 'running') void live.resume().then(() => {
-    // A pending foreground resume must not restart audio after another app switch.
-    if (isBackgrounded()) {
-      if (master) master.gain.value = 0;
-      return live.suspend();
-    }
-  }).catch(() => {});
+  // Let Safari finish Siri/navigation/route interruptions instead of fighting
+  // its audio session with a resume attempt on every input event.
+  if (!quiet && audioSession()?.state === 'interrupted') return;
+  if (quiet ? live.state === 'suspended' : live.state === 'running') return;
+  audioTransition = quiet ? live.suspend() : live.resume();
+  void audioTransition.then(() => {
+    audioTransition = null;
+    // Mute or app visibility may change while the native operation is pending.
+    if (quiet !== (isBackgrounded() || muted)) syncAudioVisibility();
+  }).catch(() => { audioTransition = null; });
 }
 
 /**
@@ -84,46 +98,20 @@ export function isMuted(): boolean {
 
 export function setMuted(m: boolean): void {
   muted = m;
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
   try {
     localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   } catch {
     /* ignore */
   }
-  if (master) master.gain.value = m || isBackgrounded() ? 0 : 0.8;
-}
-
-/**
- * iOS keeps Web Audio silent while the ring/silent switch is on silent unless
- * the page is treated as media. Two things flip that: the AudioSession API
- * (Safari 17+) and playing any media element once inside a user gesture.
- */
-const SILENT_WAV = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
-let mediaPrimed = false;
-function primeMediaSession(): void {
-  try {
-    const nav = navigator as unknown as { audioSession?: { type: string } };
-    if (nav.audioSession) nav.audioSession.type = 'playback';
-  } catch {
-    /* ignore */
-  }
-  if (mediaPrimed) return;
-  try {
-    const el = new Audio(SILENT_WAV);
-    silentMedia = el;
-    el.setAttribute('playsinline', '');
-    el.volume = 0.01;
-    const p = el.play();
-    if (p && typeof p.then === 'function') p.then(() => { mediaPrimed = true; el.pause(); }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
+  if (m) syncAudioVisibility();
+  else unlockAudio();
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
 }
 
 /** Call from a pointer/touch handler so the context is allowed to start. */
 export function unlockAudio(): void {
-  if (isBackgrounded()) return;
-  primeMediaSession();
+  if (isBackgrounded() || muted) return;
+  configureGameAudio();
   if (ctx) {
     syncAudioVisibility();
     return;
@@ -154,8 +142,8 @@ if (typeof window !== 'undefined') {
   for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
   window.addEventListener('pagehide', () => { backgrounded = true; syncAudioVisibility(); });
   window.addEventListener('pageshow', () => { backgrounded = document.hidden; syncAudioVisibility(); });
-  window.addEventListener('blur', () => { backgrounded = true; syncAudioVisibility(); });
-  window.addEventListener('focus', () => { backgrounded = document.hidden; syncAudioVisibility(); });
+  // Focus can briefly change for system UI while the page remains visible.
+  // Only actual page visibility/lifecycle events should pause game audio.
   document.addEventListener('visibilitychange', () => {
     backgrounded = document.hidden;
     syncAudioVisibility();
