@@ -51,7 +51,9 @@
 .profile-v3 .pf3-points>.game-icon{width:24px;height:24px;color:#ffd340;filter:drop-shadow(0 1px 0 #08283d)}.profile-v3 .pf3-points>b{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#38ce78;border:2px solid #c7ffcb;color:#08383c;font-size:20px}
 .profile-v3 .profile-body{max-width:620px;width:100%;gap:8px;padding:0 13px 14px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}.profile-v3 .profile-body::-webkit-scrollbar{display:none}
 .profile-v3 .pf3-hero{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(138px,.9fr) minmax(0,1.25fr);align-items:end;min-height:248px;padding:5px 7px 3px;border:0;border-radius:0;background:none;box-shadow:none;text-align:center}
-.profile-v3 .pf3-hero:before{content:'';position:absolute;z-index:-2;inset:-58px -13px -8px;background:linear-gradient(180deg,#4fc6ff05,#32b16d05 60%,#083d2942);border-radius:0 0 24px 24px}
+/* Frame the course around the hero, rather than the full phone height. The
+   foreground green must stay beneath the golfer when the viewport changes. */
+.profile-v3 .pf3-hero:before{content:'';position:absolute;z-index:-2;inset:-58px -13px -8px;background:url('/art/profile-course-v3.webp') center 48%/100% auto no-repeat;pointer-events:none;-webkit-mask-image:linear-gradient(transparent,#000 38px,#000 calc(100% - 8px),transparent);mask-image:linear-gradient(transparent,#000 38px,#000 calc(100% - 8px),transparent)}
 .profile-v3 .pf3-avatar{position:relative;align-self:end;height:222px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:25px;box-sizing:border-box}
 .profile-v3 .pf3-avatar>.avatar{position:relative;z-index:2;width:min(100%,176px);height:auto;filter:drop-shadow(0 5px 0 #08283d44)}
 .profile-v3 .pf3-avatar>.pf-stage{position:absolute;z-index:1;bottom:0;left:50%;transform:translateX(-50%);width:220px;height:auto;max-width:155%;pointer-events:none}
@@ -84,8 +86,9 @@
 @media(max-height:720px){.profile-v3 .pf3-hero{min-height:220px}.profile-v3 .pf3-avatar{height:200px}.profile-v3 .pf3-stat-card .pf-stat-icon{width:37px;height:37px}.profile-v3 .pf3-row{min-height:56px}.profile-v3 .pf3-recent{padding-top:5px}.pf-public.profile-v3 .pf3-hero{min-height:205px}.pf-public.profile-v3 .pf3-avatar{height:200px}}
 @media(max-width:370px){.profile-v3 .profile-body{padding-left:8px;padding-right:8px}.profile-v3 .pf3-hero{grid-template-columns:125px minmax(0,1fr)}.profile-v3 .pf3-avatar>.pf-stage{width:195px}.profile-v3 .pf3-stat-card small{display:none}.profile-v3 .pf3-public-actions>button>span{display:none}.profile-v3 .pf3-versus-card{grid-template-columns:1fr 34px 1fr}.profile-v3 .pf3-player-side{grid-template-columns:52px 1fr}.profile-v3 .pf3-player-side>.avatar{width:50px}.profile-v3 .pf3-vs{font-size:28px}}
 
-/* Stand directly on the scenery, without a raised display platform. */
-.profile-v3 .pf3-avatar{padding-bottom:4px}
-.profile-v3 .pf3-avatar>.pf-standing-golfer{width:min(100%,176px);max-height:100%;filter:none}
-.profile-v3 .pf3-avatar>.pf-stage{bottom:0;max-width:145%;width:205px}
-.pf-public.profile-v3 .pf3-avatar{padding-bottom:4px}
+/* The golfer and flag share a scale and baseline on the foreground green. */
+.profile-v3 .pf3-avatar{--pf-golfer-max:166px;padding-bottom:4px}
+.profile-v3 .pf3-avatar>.pf-standing-golfer{width:min(100%,var(--pf-golfer-max));max-height:none;filter:none}
+.profile-v3 .pf3-avatar>.pf-stage{bottom:4px;max-width:none;width:min(137.5%,calc(var(--pf-golfer-max)*1.375));left:50%;transform:translateX(-50%)}
+.pf-public.profile-v3 .pf3-avatar{--pf-golfer-max:163px;padding-bottom:4px}
+@media(max-height:720px){.profile-v3 .pf3-avatar,.pf-public.profile-v3 .pf3-avatar{--pf-golfer-max:149px}}

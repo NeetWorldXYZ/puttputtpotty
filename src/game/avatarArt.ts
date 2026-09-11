@@ -95,7 +95,12 @@ export function renderAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:BallLook,r
 export function renderProfileAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:BallLook,rawId:string):string {
   const id=cleanId(rawId);
   return defs(id,tone,shirt)+`
-    <ellipse cx="79" cy="193" rx="53" ry="7" fill="#082d31" opacity=".22"/>
+    <g data-part="ground-contact" fill="#082d31">
+      <ellipse cx="79" cy="194" rx="49" ry="6" opacity=".18"/>
+      <ellipse cx="55" cy="194" rx="20" ry="3" opacity=".24"/>
+      <ellipse cx="101" cy="194" rx="19" ry="3" opacity=".24"/>
+      <ellipse cx="128" cy="204" rx="11" ry="3" opacity=".28"/>
+    </g>
     <g data-part="standing-legs" ${stroke} stroke-width="4">
       <path d="M49 150h62l-4 31-23 1-5-18-5 19-25-2Z" fill="#16314b"/>
       <path d="M49 178q-12 4-14 12 11 8 37 2l2-14Z" fill="#315876"/>
