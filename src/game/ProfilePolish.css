@@ -83,3 +83,9 @@
 .pf-public.profile-v3 .pf3-hero{min-height:222px}.pf-public.profile-v3 .pf3-avatar{height:218px;padding-bottom:23px}.pf-public.profile-v3 .pf3-identity{padding-bottom:40px}.pf-public.profile-v3 .pf3-name-row h1{font-size:clamp(27px,7.3vw,38px)}
 @media(max-height:720px){.profile-v3 .pf3-hero{min-height:220px}.profile-v3 .pf3-avatar{height:200px}.profile-v3 .pf3-stat-card .pf-stat-icon{width:37px;height:37px}.profile-v3 .pf3-row{min-height:56px}.profile-v3 .pf3-recent{padding-top:5px}.pf-public.profile-v3 .pf3-hero{min-height:205px}.pf-public.profile-v3 .pf3-avatar{height:200px}}
 @media(max-width:370px){.profile-v3 .profile-body{padding-left:8px;padding-right:8px}.profile-v3 .pf3-hero{grid-template-columns:125px minmax(0,1fr)}.profile-v3 .pf3-avatar>.pf-stage{width:195px}.profile-v3 .pf3-stat-card small{display:none}.profile-v3 .pf3-public-actions>button>span{display:none}.profile-v3 .pf3-versus-card{grid-template-columns:1fr 34px 1fr}.profile-v3 .pf3-player-side{grid-template-columns:52px 1fr}.profile-v3 .pf3-player-side>.avatar{width:50px}.profile-v3 .pf3-vs{font-size:28px}}
+
+/* Stand directly on the scenery, without a raised display platform. */
+.profile-v3 .pf3-avatar{padding-bottom:4px}
+.profile-v3 .pf3-avatar>.pf-standing-golfer{width:min(100%,176px);max-height:100%;filter:none}
+.profile-v3 .pf3-avatar>.pf-stage{bottom:0;max-width:145%;width:205px}
+.pf-public.profile-v3 .pf3-avatar{padding-bottom:4px}

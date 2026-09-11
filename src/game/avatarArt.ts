@@ -91,6 +91,32 @@ export function renderAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:BallLook,r
 }
 
 /** Result-only poses. Saved cosmetics and the normal portrait renderer are untouched. */
+/** Standing version of the same modular golfer, with shoes and a held putter. */
+export function renderProfileAvatarArt(av:Avatar,tone:Tone,shirt:string,ball:BallLook,rawId:string):string {
+  const id=cleanId(rawId);
+  return defs(id,tone,shirt)+`
+    <ellipse cx="79" cy="193" rx="53" ry="7" fill="#082d31" opacity=".22"/>
+    <g data-part="standing-legs" ${stroke} stroke-width="4">
+      <path d="M49 150h62l-4 31-23 1-5-18-5 19-25-2Z" fill="#16314b"/>
+      <path d="M49 178q-12 4-14 12 11 8 37 2l2-14Z" fill="#315876"/>
+      <path d="M85 179v13q22 5 35-1 0-9-13-13Z" fill="#315876"/>
+      <path d="M38 190q16 5 32 0m18 1q16 3 28-1" fill="none" stroke="#c1dce8" stroke-width="3"/>
+    </g>
+    ${shirtSvg(av.seat,id)}${headSvg(av.head,tone,id)}${faceSvg(av.face,av.head)}${hatSvg(av.hat,id)}
+    <g data-part="held-putter" ${stroke}>
+      <path d="M23 109 42 190" fill="none" stroke-width="8"/>
+      <path d="M24 112 42 190" fill="none" stroke="#c7e1ed" stroke-width="3"/>
+      <path d="m20 104 5 23" fill="none" stroke-width="9"/>
+      <path d="m20 104 5 20" fill="none" stroke="#586b98" stroke-width="4"/>
+      <path d="M29 187q10-4 29-2l3 8q-17 10-34 5-8-4 2-11Z" fill="#819bbd" stroke-width="4"/>
+      <path d="M31 190q13-3 24-2" fill="none" stroke="#edf7ff" stroke-width="3"/>
+      <ellipse cx="26" cy="139" rx="11" ry="12" fill="url(#${id}-skin)" stroke-width="4"/>
+      <path d="M22 134q-3 4 0 8" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="2"/>
+    </g>
+    ${ballSvg(ball,128,192,11,id)}
+  `;
+}
+
 export function renderResultAvatarArt(av:Avatar,tone:Tone,shirt:string,rawId:string,mood:'win'|'loss'|'draw'):string {
   const id=cleanId(rawId),won=mood==='win',lost=mood==='loss';
   const mouthY=av.head==='dawg'?94:87;

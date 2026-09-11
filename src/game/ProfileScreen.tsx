@@ -4,13 +4,12 @@ import { currentUserId, ensureSession } from '../net/supabase';
 import { POI_ICON } from '../net/places';
 import { navigate } from '../router';
 import { AccountSheet } from './AccountSheet';
-import { Avatar } from './Avatar';
 import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import './Profile.css';
 import './ProfilePolish.css';
-import { ProfileRecentCrowns, ProfileStage, ProfileStats, PublicProfileExtras } from './ProfileExtras';
+import { ProfileGolfer, ProfileRecentCrowns, ProfileStage, ProfileStats, PublicProfileExtras } from './ProfileExtras';
 import { ChallengesSheet } from './ChallengesSheet';
 import { checkProgress, levelProgress, royalTitle, type PromoEvent } from './progress';
 import { PromoSheet } from './PromoSheet';
@@ -65,7 +64,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
     {!error && p === null && <div className="lb-note">No such player.</div>}
     {p && <div className="profile-body">
       <section className="pf3-hero" aria-label={`${p.name}'s profile`}>
-        <div className="pf3-avatar"><ProfileStage/><Avatar av={p.avatar} size={176}/></div>
+        <div className="pf3-avatar"><ProfileStage/><ProfileGolfer av={p.avatar}/></div>
         <div className="pf3-identity">
           <div className="pf3-name-row"><h1>{p.name}</h1>{mine && <button aria-label="Edit profile" onClick={() => setAccount(true)}>✎</button>}{!mine && <span className="pf3-level-shield">♛<b>LVL</b><strong>{progress.level}</strong></span>}</div>
           <span className="pf3-title">♛&nbsp; {p.house_tag ?? royalTitle(p.thrones)}</span>

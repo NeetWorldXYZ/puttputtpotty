@@ -1,5 +1,5 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
-import { renderAvatarArt, renderAvatarPart, renderResultAvatarArt } from './avatarArt';
+import { renderAvatarArt, renderAvatarPart, renderProfileAvatarArt, renderResultAvatarArt } from './avatarArt';
 import { EARNABLE_HEADS, STARTER_HEADS, earnedHeadTones } from './earnedHeads';
 import { EARNABLE_BALLS, EARNABLE_SHIRTS, STARTER_BALLS, STARTER_SHIRTS, type EarnedBall } from '../../server/potty/cosmeticCatalog';
 
@@ -142,6 +142,11 @@ export const AVATAR_VIEWBOX = '0 0 160 170';
 export function avatarSvg(input: Avatar | null | undefined, id = 'av'): string {
   const av = normalizeAvatar(input);
   return renderAvatarArt(av, headTones(av.head)[av.porcelain], SEATS[av.seat].color, ballLook(av), id);
+}
+
+export function profileAvatarSvg(input: Avatar | null | undefined, id: string): string {
+  const av = normalizeAvatar(input);
+  return renderProfileAvatarArt(av, headTones(av.head)[av.porcelain], SEATS[av.seat].color, ballLook(av), id);
 }
 
 export function resultAvatarSvg(input: Avatar | null | undefined, mood:'win'|'loss'|'draw', id:string):string {

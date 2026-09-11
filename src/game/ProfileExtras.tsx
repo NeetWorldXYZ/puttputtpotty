@@ -1,19 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { api, type PlayerProfile, type FriendRelation } from '../net/api';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
+import { profileAvatarSvg, type Avatar as AvatarSpec } from './avatarParts';
 import { ProfileStatIcon } from './ProfileStatIcon';
 
 export function ProfileStage() {
   return <svg className="pf-stage" viewBox="0 0 220 210" aria-hidden="true">
-    <path d="M8 181q14-25 54-22l38 4 37-10q36-8 69 18l6 18q-23 18-82 17l-71-1q-39-2-51-24Z" fill="#248f50" stroke="#08283d" strokeWidth="3"/>
-    <path d="M23 178q14-18 43-14l34 7 31-10q29-9 57 9 16 11 3 20-17 10-56 7l-36-3-28 7q-39-2-48-23Z" fill="#87d151"/>
-    <path d="M33 178q38-1 70 14M94 166q28 8 55 29" fill="none" stroke="#b7eb73" strokeWidth="3" opacity=".65"/>
     <ellipse cx="183" cy="176" rx="14" ry="7" fill="#e4f3a3"/><ellipse cx="183" cy="175" rx="10" ry="4.5" fill="#08283d"/>
     <path d="M183 174V51" stroke="#08283d" strokeWidth="7" strokeLinecap="round"/><path d="M183 171V52" stroke="#fff5dd" strokeWidth="2.5" strokeLinecap="round"/>
     <path d="M184 53q17-3 31 10l-31 17Z" fill="#ff5d54" stroke="#08283d" strokeWidth="3.5" strokeLinejoin="round"/>
-    <circle cx="50" cy="181" r="12" fill="#fff" stroke="#08283d" strokeWidth="3"/><g fill="#b8d0da"><circle cx="45" cy="176" r="1.5"/><circle cx="53" cy="175" r="1.5"/><circle cx="49" cy="183" r="1.5"/></g>
+
   </svg>;
+}
+
+/** Full golfer pose is confined to profiles; other avatar portraits stay compact. */
+export function ProfileGolfer({ av }: { av: AvatarSpec | null | undefined }) {
+  const id = useId().replace(/:/g, '');
+  return <svg className="avatar pf-standing-golfer" viewBox="0 0 160 210" aria-hidden="true" dangerouslySetInnerHTML={{ __html: profileAvatarSvg(av, `profile-${id}`) }}/>;
 }
 
 function winRate(p: PlayerProfile) { return p.matches ? `${Math.round((p.matches_won / p.matches) * 100)}%` : '–'; }
