@@ -17,7 +17,7 @@ export const EARNABLE_HEADS = {
 } as const satisfies Record<string, {label:string;blurb:string;metric:HeadMetric;target:number;requirement:string;palette:readonly string[];shirt:string}>;
 
 export type EarnableHead = keyof typeof EARNABLE_HEADS;
-export interface HeadProgress { unlocked: string[]; shirts?:string[]; balls?:string[]; stats: Record<HeadMetric, number> }
+export interface HeadProgress { unlocked: string[]; shirts?:string[]; balls?:string[]; hats?:string[]; faces?:string[]; colors?:string[]; stats: Record<HeadMetric, number> }
 export const STARTER_HEADS = ['classic','roll','turd','alien','dawg'] as const;
 export function isEarnableHead(head:string):head is EarnableHead { return Object.prototype.hasOwnProperty.call(EARNABLE_HEADS,head); }
 export function headUnlocked(head:string, progress:HeadProgress|null):boolean {

@@ -31,16 +31,64 @@ export const EARNABLE_SHIRTS = {
   monarch: {label:'Royal Robes',metric:'points',target:4400,requirement:'Earn 4,400 lifetime TP',color:'#6737a4',accent:'#ffdc73'},
   champion: {label:'Ace of Clubs',metric:'aces',target:60,requirement:'Make 60 lifetime aces',color:'#122f45',accent:'#ffdc73'},
 } as const satisfies Record<string,GearReward>;
+export const EARNABLE_HATS = {
+  visor: {"label": "Tour Visor", "metric": "points", "target": 200, "requirement": "Earn 200 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  bucket: {"label": "Bucket Brigade", "metric": "dailyDays", "target": 3, "requirement": "Finish a daily course on 3 different days", "color": "#ffe18a", "accent": "#338da8"},
+  cowboy: {"label": "Rough Rider", "metric": "places", "target": 3, "requirement": "Finish rounds at 3 different map locations", "color": "#ffe18a", "accent": "#338da8"},
+  beanie: {"label": "Chill Caddy", "metric": "points", "target": 650, "requirement": "Earn 650 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  chef: {"label": "Chef Bogey", "metric": "aces", "target": 8, "requirement": "Make 8 lifetime aces", "color": "#ffe18a", "accent": "#338da8"},
+  piratehat: {"label": "Captain Flush", "metric": "rankedWins", "target": 10, "requirement": "Win 10 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+  viking: {"label": "Viking Throne", "metric": "places", "target": 8, "requirement": "Finish rounds at 8 different map locations", "color": "#ffe18a", "accent": "#338da8"},
+  wizard: {"label": "Putt Wizard", "metric": "points", "target": 1800, "requirement": "Earn 1,800 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  safari: {"label": "Safari Scout", "metric": "dailyDays", "target": 12, "requirement": "Finish a daily course on 12 different days", "color": "#ffe18a", "accent": "#338da8"},
+  hardhat: {"label": "Course Crew", "metric": "rankedWins", "target": 25, "requirement": "Win 25 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+  propeller: {"label": "Air Head", "metric": "aces", "target": 30, "requirement": "Make 30 lifetime aces", "color": "#ffe18a", "accent": "#338da8"},
+  party: {"label": "Party Putter", "metric": "points", "target": 3500, "requirement": "Earn 3,500 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  toilethat: {"label": "Royal Flush", "metric": "rankedWins", "target": 50, "requirement": "Win 50 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+} as const satisfies Record<string,GearReward>;
+export const EARNABLE_FACES = {
+  grin: {"label": "Big Grin", "metric": "points", "target": 200, "requirement": "Earn 200 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  smirk: {"label": "2 EZ", "metric": "dailyDays", "target": 3, "requirement": "Finish a daily course on 3 different days", "color": "#ffe18a", "accent": "#338da8"},
+  shocked: {"label": "No Way", "metric": "places", "target": 3, "requirement": "Finish rounds at 3 different map locations", "color": "#ffe18a", "accent": "#338da8"},
+  laugh: {"label": "Laughing", "metric": "points", "target": 650, "requirement": "Earn 650 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  tears: {"label": "Bogey Tears", "metric": "aces", "target": 8, "requirement": "Make 8 lifetime aces", "color": "#ffe18a", "accent": "#338da8"},
+  heart: {"label": "Heart Eyes", "metric": "rankedWins", "target": 10, "requirement": "Win 10 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+  star: {"label": "Star Struck", "metric": "places", "target": 8, "requirement": "Finish rounds at 8 different map locations", "color": "#ffe18a", "accent": "#338da8"},
+  dizzy: {"label": "Dizzy", "metric": "points", "target": 1800, "requirement": "Earn 1,800 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  tongue: {"label": "Goofball", "metric": "dailyDays", "target": 12, "requirement": "Finish a daily course on 12 different days", "color": "#ffe18a", "accent": "#338da8"},
+  focused: {"label": "Locked In", "metric": "rankedWins", "target": 25, "requirement": "Win 25 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+  monocle: {"label": "Fancy Pants", "metric": "aces", "target": 30, "requirement": "Make 30 lifetime aces", "color": "#ffe18a", "accent": "#338da8"},
+  eyepatch: {"label": "One Eye", "metric": "points", "target": 3500, "requirement": "Earn 3,500 lifetime TP", "color": "#ffe18a", "accent": "#338da8"},
+  zipit: {"label": "Zip It", "metric": "rankedWins", "target": 50, "requirement": "Win 50 ranked matches", "color": "#ffe18a", "accent": "#338da8"},
+} as const satisfies Record<string,GearReward>;
+export const EARNABLE_COLORS = {
+  arctic: {"label": "Arctic", "metric": "points", "target": 200, "requirement": "Earn 200 lifetime TP", "color": "#e9ffff", "accent": "#66b6d1"},
+  lava: {"label": "Lava", "metric": "dailyDays", "target": 3, "requirement": "Finish a daily course on 3 different days", "color": "#ffbf62", "accent": "#d84537"},
+  deepsea: {"label": "Deep Sea", "metric": "places", "target": 3, "requirement": "Finish rounds at 3 different map locations", "color": "#48bfce", "accent": "#234778"},
+  radioactive: {"label": "Radioactive", "metric": "points", "target": 650, "requirement": "Earn 650 lifetime TP", "color": "#d6ff61", "accent": "#54ac36"},
+  cottoncandy: {"label": "Cotton Candy", "metric": "aces", "target": 8, "requirement": "Make 8 lifetime aces", "color": "#ffc8ef", "accent": "#a475de"},
+  royalviolet: {"label": "Royal Violet", "metric": "rankedWins", "target": 10, "requirement": "Win 10 ranked matches", "color": "#bda0ff", "accent": "#6342b6"},
+  rosegold: {"label": "Rose Gold", "metric": "places", "target": 8, "requirement": "Finish rounds at 8 different map locations", "color": "#ffe1ca", "accent": "#bb7784"},
+  copper: {"label": "Copper", "metric": "points", "target": 1800, "requirement": "Earn 1,800 lifetime TP", "color": "#edb279", "accent": "#984f37"},
+  silver: {"label": "Silver", "metric": "dailyDays", "target": 12, "requirement": "Finish a daily course on 12 different days", "color": "#e2edf6", "accent": "#7c94ab"},
+  nightshade: {"label": "Nightshade", "metric": "rankedWins", "target": 25, "requirement": "Win 25 ranked matches", "color": "#919dd4", "accent": "#3b3d73"},
+  sunset: {"label": "Sunset", "metric": "aces", "target": 30, "requirement": "Make 30 lifetime aces", "color": "#ffd58c", "accent": "#e26da1"},
+  aurora: {"label": "Aurora", "metric": "points", "target": 3500, "requirement": "Earn 3,500 lifetime TP", "color": "#a0ffdf", "accent": "#6970d6"},
+  obsidian: {"label": "Obsidian", "metric": "rankedWins", "target": 50, "requirement": "Win 50 ranked matches", "color": "#65798c", "accent": "#263a50"},
+} as const satisfies Record<string,GearReward>;
+export const STARTER_HATS = ['none','crown','cap','tophat','plunger','halo'] as const;
+export const STARTER_FACES = ['happy','cool','wink','angry','sleepy'] as const;
+export const STARTER_COLORS = ['white','mint','pink','sky','lavender','gold','onyx'] as const;
 export type EarnedBall = keyof typeof EARNABLE_BALLS;
 export type EarnedShirt = keyof typeof EARNABLE_SHIRTS;
 export const STARTER_SHIRTS = ['white','ink','red','blue','wood','gold'] as const;
 export const STARTER_BALLS = ['white','tomato','lemon','lime','sky','grape','bubblegum','ink','stripe','dots','tiger'] as const;
 export function gearReward(slot:string,key:string):GearReward|null {
-  const catalog=slot==='seat'?EARNABLE_SHIRTS:slot==='ball'?EARNABLE_BALLS:null;
+  const catalog=slot==='seat'?EARNABLE_SHIRTS:slot==='ball'?EARNABLE_BALLS:slot==='hat'?EARNABLE_HATS:slot==='face'?EARNABLE_FACES:slot==='porcelain'?EARNABLE_COLORS:null;
   return catalog && Object.prototype.hasOwnProperty.call(catalog,key) ? (catalog as Record<string,GearReward>)[key] : null;
 }
-export interface GearAwards { shirts?:string[]; balls?:string[] }
+export interface GearAwards { shirts?:string[]; balls?:string[]; hats?:string[]; faces?:string[]; colors?:string[] }
 export function gearUnlocked(slot:string,key:string,progress:GearAwards|null):boolean {
   if(!gearReward(slot,key)) return true;
-  return (slot==='seat'?progress?.shirts:progress?.balls)?.includes(key) ?? false;
+  return (slot==='seat'?progress?.shirts:slot==='ball'?progress?.balls:slot==='hat'?progress?.hats:slot==='face'?progress?.faces:progress?.colors)?.includes(key) ?? false;
 }

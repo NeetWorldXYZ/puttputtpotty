@@ -1,7 +1,7 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
 import { renderAvatarArt, renderAvatarPart, renderProfileAvatarArt, renderResultAvatarArt } from './avatarArt';
 import { EARNABLE_HEADS, STARTER_HEADS, earnedHeadTones } from './earnedHeads';
-import { EARNABLE_BALLS, EARNABLE_SHIRTS, STARTER_BALLS, STARTER_SHIRTS, type EarnedBall } from '../../server/potty/cosmeticCatalog';
+import { EARNABLE_BALLS, EARNABLE_SHIRTS, EARNABLE_HATS, EARNABLE_FACES, EARNABLE_COLORS, STARTER_HATS, STARTER_FACES, STARTER_COLORS, STARTER_BALLS, STARTER_SHIRTS, type EarnedBall } from '../../server/potty/cosmeticCatalog';
 
 export interface Avatar {
   /** Skin tone for the classic golfer; for the other heads, that head's colour. */
@@ -65,7 +65,7 @@ const HEAD_TONES: Record<string, Record<string, { top: string; bottom: string; l
 
 /** The colour swatches the picker should show for a head. */
 export function headTones(head: string): Record<string, { top: string; bottom: string; label: string }> {
-  return earnedHeadTones(head) ?? HEAD_TONES[head] ?? PORCELAIN;
+  return { ...(earnedHeadTones(head) ?? HEAD_TONES[head] ?? PORCELAIN), ...Object.fromEntries(Object.entries(EARNABLE_COLORS).map(([key,v]) => [key,{top:v.color,bottom:v.accent,label:v.label}])) };
 }
 
 export const PORCELAIN: Record<string, { top: string; bottom: string; label: string }> = {
@@ -88,9 +88,9 @@ export const SEATS: Record<string, { color: string; label: string }> = {
   ...EARNABLE_SHIRTS,
 };
 
-export const HATS: Record<string, string> = { none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo' };
+export const HATS: Record<string, string> = { none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo', ...Object.fromEntries(Object.entries(EARNABLE_HATS).map(([k,v]) => [k,v.label])) };
 // The old sleepy slot becomes the moustache design; other face choices retain their identity.
-export const FACES: Record<string, string> = { happy: 'Default', cool: 'Cool', wink: 'Wink', angry: 'Angry', sleepy: 'Mustache' };
+export const FACES: Record<string, string> = { happy: 'Default', cool: 'Cool', wink: 'Wink', angry: 'Angry', sleepy: 'Mustache', ...Object.fromEntries(Object.entries(EARNABLE_FACES).map(([k,v]) => [k,v.label])) };
 
 export interface BallLook {
   color: string;
@@ -123,7 +123,7 @@ export function normalizeAvatar(input: unknown): Avatar {
   const pick = (v: unknown, allowed: Record<string, unknown>, fallback: string) =>
     typeof v === 'string' && Object.prototype.hasOwnProperty.call(allowed, v) ? v : fallback;
   return {
-    porcelain: pick(o.porcelain, PORCELAIN, DEFAULT_AVATAR.porcelain),
+    porcelain: pick(o.porcelain, headTones(typeof o.head === 'string' ? o.head : 'classic'), DEFAULT_AVATAR.porcelain),
     seat: pick(o.seat, SEATS, DEFAULT_AVATAR.seat),
     hat: pick(o.hat, HATS, DEFAULT_AVATAR.hat),
     face: pick(o.face, FACES, DEFAULT_AVATAR.face),
@@ -166,7 +166,7 @@ export function starterAvatar(r: () => number): Avatar {
   const head = pick([...STARTER_HEADS]);
   return {
     head,
-    porcelain: pick(Object.keys(headTones(head))),
+    porcelain: pick([...STARTER_COLORS]),
     seat: pick([...STARTER_SHIRTS]),
     hat: head === 'turd' || head === 'alien' || head === 'dawg' ? 'crown' : 'none',
     face: 'happy',
@@ -178,10 +178,10 @@ export function starterAvatar(r: () => number): Avatar {
 export function randomAvatar(r: () => number): Avatar {
   const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
   return {
-    porcelain: pick(Object.keys(PORCELAIN)),
+    porcelain: pick([...STARTER_COLORS]),
     seat: pick([...STARTER_SHIRTS]),
-    hat: pick(Object.keys(HATS)),
-    face: pick(Object.keys(FACES)),
+    hat: pick([...STARTER_HATS]),
+    face: pick([...STARTER_FACES]),
     ball: pick([...STARTER_BALLS]),
     head: pick([...STARTER_HEADS]),
   };
