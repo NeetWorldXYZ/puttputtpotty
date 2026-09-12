@@ -50,7 +50,7 @@ async function loadProfiles(ids: string[]): Promise<PlayerProfile[]> {
 
 export function LeaderboardScreen() {
   const [board, setBoard] = useState<Board>(() =>
-    new URLSearchParams(window.location.search).get('seed') === dailySeed() ? 'daily' : 'wins',
+    new URLSearchParams(window.location.search).get('seed') === dailySeed() ? 'daily' : 'thrones',
   );
   const [friendsOnly, setFriendsOnly] = useState(false);
   const [rows, setRows] = useState<RankRow[] | null>(null);
