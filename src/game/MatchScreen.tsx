@@ -19,6 +19,8 @@ import { MatchResultModal } from './MatchResultModal';
 import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
 import './MatchLobby.css';
 import './MatchWaiting.css';
+import { bounded, loadMatchCourse } from './loadMatchCourse';
+import './CourseLoading.css';
 
 interface Props {
   /** Invite code from a shared link. */
@@ -27,7 +29,7 @@ interface Props {
   matchId: string | null;
 }
 
-type Phase = 'lobby' | 'waiting' | 'loading' | 'playing' | 'result';
+type Phase = 'lobby' | 'waiting' | 'loading' | 'load-error' | 'playing' | 'result';
 /** Broadcast after each hole: the hole just finished (1-based), its strokes, the running total. */
 interface Progress {
   hole: number;
@@ -61,6 +63,9 @@ export function MatchScreen({ code, matchId }: Props) {
   const [me, setMe] = useState<string | null>(null);
   const [holes, setHoles] = useState<Hole[] | null>(null);
   const [building, setBuilding] = useState(0);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [entryRetry, setEntryRetry] = useState(0);
+  const courseCache = useRef<{ seed: string; holes: Hole[] }>({ seed: '', holes: [] });
   const [error, setError] = useState<string | null>(null);
   const [askName, setAskName] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -89,33 +94,25 @@ export function MatchScreen({ code, matchId }: Props) {
   const matchIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    void ensureSession()
-      .then((s) => setMe(s.user.id))
-      .catch((e: Error) => setError(e.message));
+    const controller = new AbortController();
+    void bounded(ensureSession(), controller.signal, 35000)
+      .then(s => { if (!controller.signal.aborted) setMe(s.user.id); })
+      .catch((e: Error) => { if (!controller.signal.aborted) { setError(e.message); setPhase('lobby'); } });
+    return () => controller.abort();
   }, []);
 
-  // Entry from a link or a reload.
+  // Entry requests also need a bounded recovery path, before we have a match row.
   useEffect(() => {
-    if (!me) return;
-    if (matchId) {
-      api
-        .matchState(matchId)
-        .then((m) => enter(m))
-        .catch((e: Error) => {
-          setError(e.message);
-          setPhase('lobby');
-        });
-    } else if (code) {
-      api
-        .joinInvite(code)
-        .then((m) => enter(m))
-        .catch((e: Error) => {
-          setError(e.message);
-          setPhase('lobby');
-        });
-    }
+    if (!me || (!matchId && !code)) return;
+    const controller = new AbortController();
+    void bounded(matchId ? api.matchState(matchId) : api.joinInvite(code!), controller.signal, 35000)
+      .then(m => { if (!controller.signal.aborted) enter(m); })
+      .catch((e: Error) => {
+        if (!controller.signal.aborted) { setError(e.message); setPhase('load-error'); }
+      });
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, matchId, code]);
+  }, [me, matchId, code, entryRetry]);
 
   const enter = (m: MatchRow) => {
     if (m.id !== matchIdRef.current) {
@@ -172,35 +169,23 @@ export function MatchScreen({ code, matchId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, match?.id]);
 
-  // Loading: fetch the three holes from the server (it generates and caches them).
+  // Loading: fetch the authoritative course, preserving completed downloads for retry.
   useEffect(() => {
     if (phase !== 'loading' || !match) return;
     let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
-        const hs: Hole[] = [];
         const n = match.holes || 9;
-        for (let i = 0; i < n; i++) {
-          setBuilding(i + 1);
-          // The server builds a match hole a couple of attempts per request; keep asking until it is laid out.
-          let hole: Hole | null = null;
-          let failures = 0;
-          for (let attempt = 0; attempt < 30 && !hole; attempt++) {
-            if (cancelled) return;
-            try {
-              const r = await api.courseHole(match.seed, i);
-              failures = 0;
-              if (r.hole) hole = r.hole;
-              else await new Promise((res) => setTimeout(res, 250));
-            } catch (e) {
-              failures++;
-              if (failures >= 4) throw e;
-              await new Promise((res) => setTimeout(res, 600 * failures));
-            }
-          }
-          if (!hole) throw new Error(`hole ${i + 1} is taking too long to build, try again`);
-          hs.push(hole);
-        }
+        if (courseCache.current.seed !== match.seed) courseCache.current = { seed: match.seed, holes: [] };
+        setError(null);
+        setReconnecting(false);
+        setBuilding(courseCache.current.holes.length);
+        const hs = await loadMatchCourse({
+          count: n, cache: courseCache.current.holes, signal: controller.signal,
+          fetchHole: index => api.courseHole(match.seed, index),
+          onProgress: (ready, retrying) => { if (!cancelled) { setBuilding(ready); setReconnecting(retrying); } },
+        });
         if (cancelled) return;
         setHoles(hs);
         if (match.status === 'done' || (me && ((match.p1 === me && match.p1_score !== null) || (match.p2 === me && match.p2_score !== null)))) {
@@ -209,11 +194,12 @@ export function MatchScreen({ code, matchId }: Props) {
           setPhase('result');
         } else setPhase('playing');
       } catch (e) {
-        if (!cancelled) setError((e as Error).message);
+        if (!cancelled) { setError((e as Error).message); setPhase('load-error'); }
       }
     })();
     return () => {
       cancelled = true;
+      controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, match?.id]);
@@ -477,7 +463,7 @@ export function MatchScreen({ code, matchId }: Props) {
       </div>
 
       <div className="board match-board">
-        {error && <div className="err" role="alert">{error}</div>}
+        {error && phase !== 'load-error' && phase !== 'loading' && <div className="err" role="alert">{error}</div>}
 
         {phase === 'waiting' && match && (
           <div className="waiting">
@@ -516,13 +502,20 @@ export function MatchScreen({ code, matchId }: Props) {
           </div>
         )}
 
-        {phase === 'loading' && (
-          <div className="waiting">
-            <div className="match-search-orbit" aria-hidden="true">⛳</div>
-            <h2>Getting the course ready</h2>
-            {building > 0 && <progress aria-label="Course loading progress" value={building} max={match?.holes || 9} />}
-            <div className="sub">{building ? `Laying out hole ${building} of ${match?.holes ?? 9}…` : 'Opening the match…'}</div>
-          </div>
+        {(phase === 'loading' || phase === 'load-error') && (
+          <section className={`course-ready ${phase === 'load-error' ? 'course-paused' : ''}`} aria-labelledby="course-ready-title" aria-busy={phase === 'loading'}>
+            <div className="course-ready-kicker">{phase === 'load-error' ? 'QUICK PIT STOP' : 'YOUR MATCH IS NEXT'}</div>
+            <img src="/art/results/par-mascot-v2.webp" alt="" width="640" height="640" />
+            <h2 id="course-ready-title">{phase === 'load-error' ? 'Let’s get you back in' : 'Rolling out the greens'}</h2>
+            <p role={phase === 'load-error' ? 'alert' : 'status'} aria-live="polite">{phase === 'load-error'
+              ? 'The connection hit a snag. Retry to pick up where course loading stopped.'
+              : reconnecting ? 'Reconnecting to the clubhouse…' : building ? `${building} of ${match?.holes || 9} holes ready` : 'Opening your match…'}</p>
+            <div className="course-ready-holes" aria-label={`${building} holes ready`}>
+              {Array.from({ length: match?.holes || 9 }, (_, i) => <span key={i} className={i < building ? 'ready' : i === building && phase === 'loading' ? 'preparing' : ''}>{i < building ? '✓' : i + 1}</span>)}
+            </div>
+            {phase === 'load-error' && <button className="primary" onClick={() => { setError(null); setPhase('loading'); if (!match) setEntryRetry(n => n + 1); }}>Retry course →</button>}
+            <button className="course-ready-exit" onClick={leave}>Back to Home</button>
+          </section>
         )}
 
         {phase === 'result' && match && (
