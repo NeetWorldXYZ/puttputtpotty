@@ -383,6 +383,7 @@ export const api = {
   /** Today's and this week's challenges with your progress, plus challenge TP and streak. */
   async challenges(): Promise<ChallengeBoard | null> {
     await ensureSession();
+    await api.heartbeat();
     const b = await readRpc<ChallengeBoard | null>('challenge_board', {});
     return b && Array.isArray(b.daily?.items) && Array.isArray(b.weekly?.items) ? b : null;
   },
@@ -394,6 +395,8 @@ export const api = {
     return Number(data ?? 0);
   },
   async profile(userId: string): Promise<PlayerProfile | null> {
+    await ensureSession();
+    await api.heartbeat();
     const [profile, record] = await Promise.all([
       readRpc<PlayerProfile | null>('player_profile', { in_user: userId }),
       readRpc<{ wins: number; matches: number }[]>('ranked_profile_record', { in_user: userId }),
