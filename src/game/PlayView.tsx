@@ -16,6 +16,7 @@ import { goToCourse, dailySeed, recordBest, getBest } from './courses';
 import { Fx } from './fx';
 import { sfx, unlockAudio, isMuted, setMuted } from './sound';
 import { buzz } from './haptics';
+import { HoleResultCard } from './HoleResultCard';
 
 interface Props {
   holes: Hole[];
@@ -79,7 +80,7 @@ const INTRO_SECONDS = 1.4;
 
 function scoreTerm(strokes: number, par: number, sunk: boolean): string {
   if (!sunk) return 'Stroke cap';
-  if (strokes === 1) return 'Hole in one!';
+  if (strokes === 1) return 'ACE!';
   const d = strokes - par;
   if (d <= -3) return 'Albatross!';
   if (d === -2) return 'Eagle!';
@@ -783,12 +784,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       {fast && <div className="ff-badge">⏩ ×{FAST_FORWARD}</div>}
 
       {hud.done && !courseDone && (
-        <div className="overlay">
-          <div className="card pop">
-            <h2>{hud.sunk ? scoreTerm(thisScore, par, true) : 'Stroke cap'}</h2>
-            <div className="sub">
-              {hud.sunk ? `${cur} stroke${cur === 1 ? '' : 's'}` : `${STROKE_CAP} strokes, scored ${thisScore}`} · par {par}
-            </div>
+        <HoleResultCard score={thisScore} strokes={cur} par={par} sunk={hud.sunk} holeIndex={holeIndex} holeCount={holes.length}>
             {renderDoneCard ? (
               renderDoneCard({ holeIndex, hole, strokes: hud.strokeHistory, score: thisScore, sunk: hud.sunk }, { next: nextHole, retry: retryHole })
             ) : (
@@ -801,8 +797,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
                 {onExit && <button onClick={onExit}>{exitLabel ?? 'Back'}</button>}
               </>
             )}
-          </div>
-        </div>
+        </HoleResultCard>
       )}
 
       {courseDone && (renderScorecard ? renderScorecard() : (
