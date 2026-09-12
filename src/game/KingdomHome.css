@@ -27,3 +27,22 @@
 @media(max-width:359px){.kh-tools{left:9px;right:9px}.kh-actions{padding-inline:7px}.kingdom-home .kh-map{font-size:23px;gap:8px}.kh-map>span{font-size:30px}.kh-card-copy strong{font-size:14px}.kh-card-copy>span{font-size:10px}.kingdom-home .kh-card{padding-inline:5px;column-gap:3px}.kh-record{width:100%;gap:3px}.kh-record b{font-size:13px}.kh-record small{font-size:9px}}
 /* Short landscape windows scroll the content, never conceal a destination. */
 @media(max-height:500px){.kh-content{overflow-y:auto;touch-action:pan-y;padding-bottom:calc(var(--dock-height) + 14px)}.kh-hero{flex:none;height:440px}.kh-hero-art{object-fit:cover;object-position:center bottom}.kh-tools{top:8px}}
+
+/* Result panels retain the existing home-card footprint. */
+.kingdom-home .kh-played,.kingdom-home .kh-quick{grid-template-rows:minmax(0,1fr) 43px;row-gap:3px}
+.kh-played .kh-card-icon svg,.kh-quick .kh-card-icon svg{max-height:43px}
+.kh-daily-result,.kh-record{box-sizing:border-box;grid-column:1/-1;align-self:stretch;justify-self:stretch;width:100%;min-width:0;min-height:0;margin:0;padding:3px 6px;border:1px solid #54b9d1;border-radius:10px;background:linear-gradient(120deg,#104965,#03243d);box-shadow:inset 0 1px 0 #ffffff20,0 2px 3px #00132455}
+.kh-daily-result{justify-content:space-evenly;gap:7px;border-color:#e3bd52;background:linear-gradient(115deg,#fff09a,#ffd54a);color:#062b42}
+.kh-daily-result>b{flex:none;font:400 clamp(25px,7vw,34px)/.95 'Kingdom Anton',Impact,sans-serif;text-shadow:0 1px 0 #ffffff66;text-align:center}
+.kh-daily-result>b small{margin:2px 0 0;color:#234455;font:700 7px/1 var(--game-font);letter-spacing:.5px}
+.kh-daily-result>span{min-width:0;border-left:1px solid #a8803655;padding-left:7px}
+.kh-daily-result>span strong{display:block;font:800 clamp(8px,2.25vw,12px)/1.1 var(--game-font)}
+.kh-daily-result>span small{margin-top:3px;color:#27485b;font:600 clamp(8px,2.15vw,10px)/1.1 var(--game-font);white-space:nowrap}
+.kh-record{display:flex;justify-content:space-evenly;gap:0}
+.kh-record>span{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-width:0}
+.kh-record>span+span{border-left:1px solid #4ba0b066}
+.kh-record b{font:400 clamp(25px,7vw,34px)/1 'Kingdom Anton',Impact,sans-serif;color:#fff5d2}
+.kh-record small{font:700 clamp(7px,2vw,10px)/1 var(--game-font);letter-spacing:.25px;color:#d9edf5}
+.kh-record .kh-record-wins b{color:#b7ef86}
+.kh-record .kh-record-losses b{color:#ff99af}
+@media(max-width:359px){.kh-record>span{gap:3px}.kh-daily-result{gap:4px;padding-inline:4px}.kh-daily-result>span{padding-left:4px}}
