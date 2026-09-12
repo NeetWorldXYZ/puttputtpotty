@@ -1,9 +1,5 @@
 .leaders.profile-v3{background-color:#168fe2!important}
-.profile-v3 .pf-loading-control{display:block;height:46px;width:46px}
-.profile-v3 .pf-loading-copy{align-self:center;display:grid;gap:10px;padding:12px}
-.profile-v3 .pf-loading-copy i{height:15px;border-radius:8px;background:#06334d66}
-.profile-v3 .pf-loading-copy i:first-child{height:28px}
-.profile-v3 .pf-loading-copy i:last-child{width:70%;justify-self:center}
-.profile-v3 .pf-loading-card,.profile-v3 .pf-loading-row{border:2px solid #2593c266;border-radius:17px;background:#043650b3;box-sizing:border-box}
-.profile-v3 .pf-loading-card{height:108px}
-.profile-v3 .pf-loading-row{height:66px}
+.pf-loading-screen{height:100dvh;box-sizing:border-box;padding-bottom:var(--dock-height);display:grid;place-items:center;background:#05273c;color:#e2f2f5}
+.pf-loading-status{text-align:center;font:600 14px/1.4 var(--game-font)}
+.pf-loading-status>span{display:block;color:#ffdf68;font:48px/1.2 Georgia,serif}
+.pf-loading-status>p{margin:10px 0}

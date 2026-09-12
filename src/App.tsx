@@ -8,7 +8,7 @@ import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
 import { InviteBanner } from './game/InviteBanner';
 import { startPresence } from './net/presence';
-import { ProfileLoading } from './game/ProfileLoading';
+import { ProfileLoading, prepareProfileArtwork } from './game/ProfileLoading';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
@@ -39,9 +39,7 @@ export function App() {
     if (!menu) return;
     const timer = window.setTimeout(() => {
       void loadProfile().catch(() => {});
-      const art = new Image();
-      art.src = '/art/profile-course-v4.webp';
-      void art.decode().catch(() => {});
+      void prepareProfileArtwork();
     }, 300);
     return () => window.clearTimeout(timer);
   }, [menu]);
