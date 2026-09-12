@@ -34,3 +34,47 @@
 .pf-challenges:active{transform:translateY(2px)}
 .pf-points{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font:800 11px/1.2 var(--game-font);color:#c5d8ee}
 .pf-points b{color:#ffdb66}
+
+/* Navy course panels, illustrated emblems and gold rewards match the profile. */
+@font-face{font-family:ChallengeDisplay;src:url('/art/ranks-anton.ttf') format('truetype');font-display:swap}
+.overlay.ch-overlay{position:fixed;inset:0;z-index:1200;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));background:#021623df;backdrop-filter:blur(7px);display:grid;place-items:center}
+.card.ch-sheet{width:min(100%,560px);max-width:560px;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;padding:0;border:2px solid #338fb6;border-radius:22px;background:linear-gradient(135deg,#09415a,#03263d 65%);box-shadow:0 7px 0 #021827,0 20px 65px #0009,inset 0 0 0 2px #5ab0c328;color:#fff7df}
+.ch-sheet *{box-sizing:border-box}
+.ch-hero{flex:none;position:relative;display:flex;align-items:center;gap:10px;padding:23px 43px 19px 15px;background:linear-gradient(95deg,#03253ee6,#07374ba6),url('/art/profile-course-v4.webp') center 48%/cover;border-bottom:2px solid #2e7a96}
+.ch-hero>.pf-stat-icon{width:62px;height:68px;flex:none;filter:drop-shadow(0 4px 0 #001c30)}
+.ch-eyebrow{font:800 9px/1.2 var(--game-font);letter-spacing:.14em;color:#ffdd70}
+.card.ch-sheet h2{margin:3px 0 5px;text-align:left;font:italic 400 clamp(29px,7vw,41px)/1.05 ChallengeDisplay,Impact,sans-serif;-webkit-text-stroke:0;text-shadow:0 3px 0 #031b2b;letter-spacing:.2px}
+.ch-hero p{margin:0;font:600 11px/1.35 var(--game-font);color:#d3e9e9}
+.card.ch-sheet .ch-close-icon{position:absolute;right:10px;top:12px;width:32px;height:32px;min-height:0;margin:0;padding:0;display:grid;place-items:center;border:2px solid #6ac2d6;border-radius:50%;background:#073349;color:#fff2d3;font:26px/1 Arial;box-shadow:0 3px 0 #021b2b}
+.ch-top{flex:none;margin:12px 13px 0;padding:10px 5px;border:1px solid #65b6c6;border-radius:14px;background:linear-gradient(130deg,#0f516c,#082e47);color:#e6f3ef;box-shadow:inset 0 1px #78c3d044,0 3px 0 #021b2e}
+.ch-top span{font-size:10px;letter-spacing:.06em;gap:4px}
+.ch-top span+span{border-color:#33788e}
+.ch-top b{display:flex;align-items:center;justify-content:center;gap:5px;font:400 28px/1 ChallengeDisplay,Impact,sans-serif;color:#ffe484}
+.ch-top b svg{width:28px;height:30px}
+.ch-streak-note{flex:none;margin:9px 18px 2px;text-align:center;font:500 10px/1.4 var(--game-font);color:#bfdbe2}
+.ch-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:1px 13px 13px;scrollbar-width:thin;scrollbar-color:#408aa4 #052b42}
+.ch-section{margin:15px 2px 8px;font:400 20px/1.1 ChallengeDisplay,Impact,sans-serif;letter-spacing:.03em}
+.ch-section small{font-size:10px;color:#b7d8e3}
+.ch-list{gap:8px}
+.ch-row{gap:8px;min-height:78px;padding:10px 9px;border:1.5px solid #317594;border-radius:14px;background:linear-gradient(130deg,#0b3c56,#052b43);box-shadow:inset 0 1px #69a5bb20,0 3px 0 #032236}
+.ch-row.done{border-color:#ffe07a;background:linear-gradient(130deg,#355459,#123c49);box-shadow:0 0 12px #ffda4820,0 3px 0 #032236}
+.ch-row.claimed{opacity:1;border-color:#286d79}
+.ch-emoji{width:43px;height:49px;border:0;background:none;border-radius:0}
+.ch-emoji svg{width:100%;height:100%;filter:drop-shadow(0 2px 0 #011b2c)}
+.ch-text{gap:6px}
+.ch-text strong{font:700 12px/1.3 var(--game-font);color:#fff6df}
+.ch-row.claimed .ch-text strong{color:#c3dbe0}
+.ch-text small{font-size:10px;color:#abd1dc}
+.ch-bar{height:7px;background:#011e30;box-shadow:inset 0 1px 2px #0005}
+.ch-bar>span{background:linear-gradient(90deg,#fff2ae,#ffd13e)}
+.ch-row.claimed .ch-bar>span{background:linear-gradient(90deg,#3cad96,#79d9a6)}
+.ch-pts{display:flex;align-items:center;gap:2px;padding:5px 6px;font:400 18px/1 ChallengeDisplay,Impact,sans-serif;background:#073147;border-color:#366f89}
+.ch-pts svg{width:18px;height:17px}
+.ch-pts.got{font-size:16px;color:#b4f0ce;background:#0b403f;border-color:#438878}
+.card.ch-sheet button.ch-claim{font-size:11px;padding:8px;min-height:38px;border:2px solid #fff0a0;border-radius:11px;background:linear-gradient(135deg,#fff3a2,#ffce42);box-shadow:inset 0 -2px 0 #dc9d24,0 3px 0 #062536}
+.ch-footer{flex:none;padding:11px 13px 15px;border-top:1px solid #327088;background:#042a40}
+.card.ch-sheet .ch-footer button{width:100%;margin:0;min-height:47px;display:flex;align-items:center;justify-content:center;gap:15px;border:2px solid #fff0a0;border-radius:13px;background:linear-gradient(135deg,#fff2a0,#ffda50);color:#092b3c;box-shadow:inset 0 -3px #e4ad2f,0 3px 0 #927029;font:800 15px/1.2 var(--game-font)}
+.ch-footer button span{font-size:26px;line-height:1}
+.ch-sheet button:focus-visible{outline:3px solid #fff8c3;outline-offset:3px}
+@media(max-width:350px){.ch-hero{padding-left:10px;gap:5px}.ch-hero>.pf-stat-icon{width:45px}.ch-hero p{font-size:10px}.ch-scroll{padding-inline:9px}.ch-emoji{width:32px}.ch-text strong{font-size:11px}.ch-row{gap:6px;padding:8px 6px}.ch-pts{font-size:15px}.ch-pts svg{width:14px}.ch-section small{font-size:9px}}
+@media(max-height:600px){.ch-hero{padding-block:10px}.ch-hero>.pf-stat-icon{height:46px}.card.ch-sheet h2{font-size:28px}.ch-top{margin-top:7px;padding-block:6px}.ch-top b{font-size:22px}.ch-streak-note{margin-block:5px 0}.ch-footer{padding-block:8px 11px}}
