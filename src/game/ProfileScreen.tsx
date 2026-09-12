@@ -8,6 +8,7 @@ import { GameIcon } from './GameIcon';
 import { TabBar } from './TabBar';
 import { ReportSheet } from './ReportSheet';
 import { ProfileName, ProfileSign } from './ProfileIdentity';
+import { ProfilePlaceholder } from './ProfileLoading';
 import './Profile.css';
 import './ProfilePolish.css';
 import { ProfileGolfer, ProfileRecentCrowns, ProfileStage, ProfileStats, PublicProfileExtras } from './ProfileExtras';
@@ -48,9 +49,9 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
   const id = userId ?? me;
   const mineNow = !!me && (userId === null || userId === me);
   useEffect(() => { if (!mineNow || friends) return; api.friends().then(rows => setFriendRows(rows.map(r => ({ user_id: r.user_id, relation: r.relation })))).catch(() => {}); }, [mineNow, friends]);
-  useEffect(() => { if (!id) return; let cancelled = false; setError(null); setP(undefined); api.profile(id).then(r => { if (cancelled) return; setP(r); if (r && (userId === null || userId === me)) setPromo(checkProgress(r)); }).catch((e: Error) => !cancelled && setError(e.message)); return () => { cancelled = true; }; }, [id, reload]);
+  useEffect(() => { if (!id) return; let cancelled = false; setError(null); api.profile(id).then(r => { if (cancelled) return; setP(r); if (r && (userId === null || userId === me)) setPromo(checkProgress(r)); }).catch((e: Error) => !cancelled && setError(e.message)); return () => { cancelled = true; }; }, [id, reload]);
 
-  const mine = !!id && id === me;
+  const mine = userId === null || (!!id && id === me);
   const progress = useMemo(() => levelProgress(p?.points ?? 0), [p?.points]);
   const friendCount = friendRows.filter(f => f.relation === 'friend').length;
   const share = async () => { const url = location.href; try { if (navigator.share) await navigator.share({ title: `${p?.name ?? 'Player'} · Putt Putt Potty`, url }); else { await navigator.clipboard.writeText(url); setToast('Profile link copied'); } } catch { /* cancelled */ } };
@@ -61,7 +62,7 @@ export function ProfileScreen({ userId, addCode = null }: { userId: string | nul
       : <div className="pf3-topbar"><button className="pf3-round-button pf3-back" aria-label="Go back" onClick={back}>‹</button><button className="pf3-round-button pf3-more" aria-label="Report player" onClick={() => setReport(true)}>•••</button></div>}
 
     {error && <div className="lb-note">Profile offline · {error}</div>}
-    {!error && p === undefined && <div className="lb-note">Loading…</div>}
+    {!error && p === undefined && <ProfilePlaceholder/>}
     {!error && p === null && <div className="lb-note">No such player.</div>}
     {p && <div className="profile-body">
       <section className="pf3-hero" aria-label={`${p.name}'s profile`}>

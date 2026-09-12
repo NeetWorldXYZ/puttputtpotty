@@ -1,0 +1,9 @@
+.leaders.profile-v3{background-color:#168fe2!important}
+.profile-v3 .pf-loading-control{display:block;height:46px;width:46px}
+.profile-v3 .pf-loading-copy{align-self:center;display:grid;gap:10px;padding:12px}
+.profile-v3 .pf-loading-copy i{height:15px;border-radius:8px;background:#06334d66}
+.profile-v3 .pf-loading-copy i:first-child{height:28px}
+.profile-v3 .pf-loading-copy i:last-child{width:70%;justify-self:center}
+.profile-v3 .pf-loading-card,.profile-v3 .pf-loading-row{border:2px solid #2593c266;border-radius:17px;background:#043650b3;box-sizing:border-box}
+.profile-v3 .pf-loading-card{height:108px}
+.profile-v3 .pf-loading-row{height:66px}
