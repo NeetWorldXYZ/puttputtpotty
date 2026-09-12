@@ -85,6 +85,7 @@ export function ChallengesSheet({ onClose, initial }: { onClose: (board: Challen
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.querySelector<HTMLButtonElement>('.ch-close-icon')?.focus();
     const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       void api.challenges().then(b => b && setBoard(b)).catch(() => {});
     }, 60000);
     return () => { clearInterval(timer); if(previous?.isConnected) previous.focus(); };
