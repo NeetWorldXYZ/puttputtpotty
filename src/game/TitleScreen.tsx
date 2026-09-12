@@ -101,7 +101,7 @@ export function TitleScreen() {
   return <div className="kingdom-home" onPointerDown={unlockAudio}>
     <main className="kh-content">
       <section className="kh-hero" aria-labelledby="kh-title">
-        <img className="kh-hero-art" src={`${import.meta.env.BASE_URL}art/home-kingdom-city.webp`} alt="" draggable={false} fetchPriority="high" />
+        <img className="kh-hero-art" src={`${import.meta.env.BASE_URL}art/home-mascot-city.webp`} alt="" draggable={false} fetchPriority="high" />
         <h1 id="kh-title" className="kh-sr">Putt Putt Potty. Take over real bathrooms near you.</h1>
         <p className="kh-sr">Explore bars, restaurants, rest areas, hotels, and more. Beat the course record to claim their throne.</p>
         <header className="kh-tools">
