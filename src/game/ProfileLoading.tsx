@@ -3,20 +3,25 @@ import './Profile.css';
 import './ProfilePolish.css';
 import './ProfileLoading.css';
 
-/** Keep the course framing mounted while profile data is arriving. */
-export function ProfilePlaceholder() {
-  return <div className="profile-body pf-loading-body" role="status" aria-label="Loading profile" aria-busy="true">
-    <section className="pf3-hero" aria-hidden="true"><div/><div className="pf-loading-copy"><i/><i/><i/></div></section>
-    <div className="pf-loading-card" aria-hidden="true"/>
-    <div className="pf-loading-row" aria-hidden="true"/>
-    <div className="pf-loading-row" aria-hidden="true"/>
-  </div>;
+let artwork: Promise<void> | undefined;
+/** Decode the scene before revealing it alongside the profile data. */
+export function prepareProfileArtwork(): Promise<void> {
+  return artwork ??= Promise.all([
+    '/art/profile-course-v4.webp', '/art/profile-slogan-sign.webp',
+    '/art/ranks-nearby.webp', '/art/ranks-city-hero.webp',
+  ].map(async src => {
+    const image = new Image();
+    image.src = src;
+    try { await image.decode(); } catch { /* A failed asset must not block the profile. */ }
+  })).then(() => {});
 }
 
 export function ProfileLoading({ publicProfile = false }: { publicProfile?: boolean }) {
-  return <div className={`leaders profile profile-polished profile-v3 ${publicProfile ? 'pf-public' : 'pf-private'}`}>
-    <div className="pf3-topbar" aria-hidden="true"><span className="pf-loading-control"/></div>
-    <ProfilePlaceholder/>
+  return <div className="pf-loading-screen">
+    <div className="pf-loading-status" role="status" aria-busy="true">
+      <span aria-hidden="true">♛</span>
+      <p>{publicProfile ? 'Loading golfer…' : 'Loading your profile…'}</p>
+    </div>
     <TabBar active="profile"/>
   </div>;
 }
