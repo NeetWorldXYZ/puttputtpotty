@@ -17,6 +17,7 @@ import { Fx } from './fx';
 import { sfx, unlockAudio, isMuted, setMuted } from './sound';
 import { buzz } from './haptics';
 import { HoleResultCard } from './HoleResultCard';
+import { warmResultArt } from './HoleResultArt';
 
 interface Props {
   holes: Hole[];
@@ -105,6 +106,7 @@ function fmtClock(ms: number): string {
 }
 
 export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
+  useEffect(warmResultArt, []);
   const tuning = useTuning();
   const { prefsRef } = tuning;
   const lockedRef = useRef<PhysicsParams | undefined>(lockedParams);
