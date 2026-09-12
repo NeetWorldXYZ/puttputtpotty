@@ -8,13 +8,15 @@ import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
 import { InviteBanner } from './game/InviteBanner';
 import { startPresence } from './net/presence';
+import { ProfileLoading } from './game/ProfileLoading';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
 const LocationPlay = lazy(() => import('./game/LocationPlay').then((m) => ({ default: m.LocationPlay })));
 const LeaderboardScreen = lazy(() => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
 const MatchScreen = lazy(() => import('./game/MatchScreen').then((m) => ({ default: m.MatchScreen })));
-const ProfileScreen = lazy(() => import('./game/ProfileScreen').then((m) => ({ default: m.ProfileScreen })));
+const loadProfile = () => import('./game/ProfileScreen').then((m) => ({ default: m.ProfileScreen }));
+const ProfileScreen = lazy(loadProfile);
 
 function Loading() {
   return (
@@ -32,6 +34,17 @@ export function App() {
   const loc = useLocation();
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
   useEffect(() => { if (!menu) stopTheme(); }, [menu]);
+  // Warm the profile after the menu has painted, before its tab is opened.
+  useEffect(() => {
+    if (!menu) return;
+    const timer = window.setTimeout(() => {
+      void loadProfile().catch(() => {});
+      const art = new Image();
+      art.src = '/art/profile-course-v4.webp';
+      void art.decode().catch(() => {});
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [menu]);
   // Friends see you online, and their invites reach you, on every screen.
   useEffect(() => { startPresence(); }, []);
   return (
@@ -58,7 +71,7 @@ function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
     );
   if (loc.route === 'profile')
     return (
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<ProfileLoading publicProfile={!!loc.user} />}>
         <ProfileScreen key={loc.user ?? 'me'} userId={loc.user} addCode={loc.add} />
       </Suspense>
     );
