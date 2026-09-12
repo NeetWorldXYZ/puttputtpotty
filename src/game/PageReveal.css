@@ -1,0 +1,5 @@
+.page-scene-pending{visibility:hidden;pointer-events:none}
+.menu-loading{position:fixed;inset:0;z-index:50;background:#052536;display:grid;place-items:center;color:#d4eaf0;font:600 14px var(--game-font)}
+.menu-loading>div{text-align:center;padding:24px}
+.menu-loading>div>span{display:block;color:#ffe078;font-size:48px;line-height:1.2}
+.menu-loading p{margin:14px 0}

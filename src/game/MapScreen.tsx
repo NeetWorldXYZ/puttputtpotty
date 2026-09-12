@@ -1118,7 +1118,7 @@ export function MapScreen() {
   const myBest = board && selected && board.id === selected.id ? (board.rows.find((r) => r.user_id === me)?.score ?? null) : null;
 
   return (
-    <div className={`map-screen ${zoomClass}`}>
+    <div data-scene-pending={!mapLoaded || (!fix && !geoError) || (!!fix && !thronesSettled)} className={`map-screen ${zoomClass}`}>
       <div ref={mapEl} className="map-canvas" />
 
       <div className="map-head menu-controls-only">

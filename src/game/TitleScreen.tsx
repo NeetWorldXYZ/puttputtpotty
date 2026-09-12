@@ -43,6 +43,7 @@ function HomeSheet({ title, onClose, children }: { title: string; onClose: () =>
 }
 
 export function TitleScreen() {
+  const [summaryReady, setSummaryReady] = useState(false);
   const [name, setName] = useState(getSavedName);
   const [avatar, setAvatar] = useState(getSavedAvatar);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -69,13 +70,15 @@ export function TitleScreen() {
     let active = true;
     void (async () => {
       const session = await ensureSession().catch(() => null);
-      if (!active || !session) return;
+      if (!active) return;
+      if (!session) { setSummaryReady(true); return; }
       await Promise.allSettled([
         loadProfile().then(p => { if (active && p) { setName(p.name); setAvatar(getSavedAvatar()); } }),
         api.profile(session.user.id).then(p => { if (active && p) { setThrones(p.thrones); setPromo(checkProgress(p)); } }),
         loadRankedRecord(session.user.id).then(r => { if (active) setRecord(r); }),
         api.challenges().then(b => { if (active) setBoard(b); }),
       ]);
+      if (active) setSummaryReady(true);
     })();
     return () => { active = false; };
   }, [refresh]);
@@ -98,7 +101,7 @@ export function TitleScreen() {
   };
   const dailyDescription = played ? `${standing ? relative(standing.total - standing.par) : best} ${standing ? `· #${standing.rank}` : 'strokes'}. Next course in ${untilNext}. View daily rankings.` : current?.error ? 'Could not check your daily round. Tap to retry.' : !current ? 'Checking your round…' : 'Play today to join the leaderboard.';
 
-  return <div className="kingdom-home" onPointerDown={unlockAudio}>
+  return <div className="kingdom-home" data-scene-pending={!summaryReady || !daily} onPointerDown={unlockAudio}>
     <main className="kh-content">
       <section className="kh-hero" aria-labelledby="kh-title">
         <img className="kh-hero-art" src={`${import.meta.env.BASE_URL}art/home-mascot-city.webp`} alt="" draggable={false} fetchPriority="high" />

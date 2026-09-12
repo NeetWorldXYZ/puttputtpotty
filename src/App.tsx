@@ -8,13 +8,17 @@ import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
 import { InviteBanner } from './game/InviteBanner';
 import { startPresence } from './net/presence';
+import { PageReveal, MenuLoading, preparePageArtwork } from './game/PageReveal';
 import { ProfileLoading, prepareProfileArtwork } from './game/ProfileLoading';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
-const MapScreen = lazy(() => import('./game/MapScreen').then((m) => ({ default: m.MapScreen })));
+const loadMap = () => import('./game/MapScreen').then((m) => ({ default: m.MapScreen }));
+const MapScreen = lazy(loadMap);
 const LocationPlay = lazy(() => import('./game/LocationPlay').then((m) => ({ default: m.LocationPlay })));
-const LeaderboardScreen = lazy(() => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen })));
-const MatchScreen = lazy(() => import('./game/MatchScreen').then((m) => ({ default: m.MatchScreen })));
+const loadLeaderboard = () => import('./game/LeaderboardScreen').then((m) => ({ default: m.LeaderboardScreen }));
+const LeaderboardScreen = lazy(loadLeaderboard);
+const loadMatch = () => import('./game/MatchScreen').then((m) => ({ default: m.MatchScreen }));
+const MatchScreen = lazy(loadMatch);
 const loadProfile = () => import('./game/ProfileScreen').then((m) => ({ default: m.ProfileScreen }));
 const ProfileScreen = lazy(loadProfile);
 
@@ -34,12 +38,14 @@ export function App() {
   const loc = useLocation();
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
   useEffect(() => { if (!menu) stopTheme(); }, [menu]);
-  // Warm the profile after the menu has painted, before its tab is opened.
+  // Warm tab modules and hero art after the first menu paint.
   useEffect(() => {
     if (!menu) return;
     const timer = window.setTimeout(() => {
       void loadProfile().catch(() => {});
       void prepareProfileArtwork();
+      for (const load of [loadMatch, loadLeaderboard, loadMap]) void load().catch(() => {});
+      for (const page of ['play', 'match', 'leaders', 'map'] as const) void preparePageArtwork(page);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [menu]);
@@ -57,14 +63,14 @@ function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
   if (loc.route === 'editor') return <EditorView onExit={() => navigate('play')} />;
   if (loc.route === 'map')
     return (
-      <Suspense fallback={<Loading />}>
-        <MapScreen />
+      <Suspense fallback={<MenuLoading page="map" />}>
+        <PageReveal key="map" page="map"><MapScreen /></PageReveal>
       </Suspense>
     );
   if (loc.route === 'match')
     return (
-      <Suspense fallback={<Loading />}>
-        <MatchScreen key={loc.match ?? loc.code ?? 'lobby'} code={loc.code} matchId={loc.match} />
+      <Suspense fallback={<MenuLoading page="match" />}>
+        <PageReveal key={loc.match ?? loc.code ?? 'lobby'} page="match"><MatchScreen code={loc.code} matchId={loc.match} /></PageReveal>
       </Suspense>
     );
   if (loc.route === 'profile')
@@ -75,8 +81,8 @@ function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
     );
   if (loc.route === 'leaders')
     return (
-      <Suspense fallback={<Loading />}>
-        <LeaderboardScreen />
+      <Suspense fallback={<MenuLoading page="leaders" />}>
+        <PageReveal key="leaders" page="leaders"><LeaderboardScreen /></PageReveal>
       </Suspense>
     );
   if (loc.loc)
@@ -87,5 +93,5 @@ function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
     );
   if (loc.seed) return <GeneratedCourse key={`${loc.seed}:${loc.n ?? 9}`} seed={loc.seed} count={loc.n ?? 9} onOpenEditor={() => navigate('editor')} />;
   if (loc.course === 'handmade') return <PlayView holes={COURSE} onOpenEditor={() => navigate('editor')} courseSeed={null} />;
-  return <TitleScreen />;
+  return <PageReveal key="play" page="play"><TitleScreen /></PageReveal>;
 }
