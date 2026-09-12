@@ -148,6 +148,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const aimFillRef = useRef<HTMLDivElement>(null);
   const sinkRef = useRef<{ t: number; x: number; y: number } | null>(null);
   const timeRef = useRef(0);
+  const reducedMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const holeParRef = useRef(hole.par);
   holeParRef.current = hole.par;
 
@@ -510,6 +511,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         zoneLabels: prefs.showZoneLabels,
         dpr,
         time: timeRef.current,
+        crowdCheer: s.sunk,
+        reducedMotion: reducedMotion.current,
         clock: s.clock,
         extra: (c) => {
           if (showBall) {

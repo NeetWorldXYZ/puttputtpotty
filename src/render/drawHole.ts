@@ -6,6 +6,7 @@
  * before.
  */
 
+import { placeSpectators, drawSpectators, type Spectator } from './spectators';
 import type { Hole } from '../sim/types';
 import { spriteRevision } from './sprites';
 import { isMoving } from '../sim/types';
@@ -59,6 +60,8 @@ export interface DrawOptions {
   time?: number;
   /** Obstacle clock for moving obstacles (defaults to `time`, else 0). */
   clock?: number;
+  crowdCheer?: boolean;
+  reducedMotion?: boolean;
   /** Hide the static ball drawn by callers (e.g. during the sink animation). */
   extra?: (ctx: CanvasRenderingContext2D) => void;
 }
@@ -71,6 +74,7 @@ interface StaticLayer {
   ppu: number;
   key: string;
   animated: PropPlacement[];
+  spectators: Spectator[];
   region: Region;
 }
 
@@ -109,8 +113,8 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
   ctx.setTransform(ppu, 0, 0, ppu, -b.x * ppu, -b.y * ppu);
-  const { animated, region } = paintStatic(ctx, hole, cupR, ballR);
-  const layer: StaticLayer = { canvas, ppu, key, animated, region };
+  const { animated, region, spectators } = paintStatic(ctx, hole, cupR, ballR);
+  const layer: StaticLayer = { canvas, ppu, key, animated, region, spectators };
   // Small LRU.
   if (layerCache.size > 6) {
     const first = layerCache.keys().next().value;
@@ -120,7 +124,7 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   return layer;
 }
 
-function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): { animated: PropPlacement[]; region: Region } {
+function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): { animated: PropPlacement[]; region: Region; spectators: Spectator[] } {
   const theme: Theme = themeById(hole.theme);
   const b = hole.bounds;
   const seed = holeSeed(hole);
@@ -128,7 +132,8 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
 
   // Out of play area + props (animated ones are drawn per frame instead).
   drawSurround(ctx, b, theme);
-  const props = placeProps(hole, region, theme);
+  const props = placeProps(hole, region, { ...theme, props: theme.props.filter(p => p !== 'crowd') });
+  const spectators = placeSpectators(hole, region, props);
   const animated: PropPlacement[] = [];
   for (const p of props) {
     if (ANIMATED_KINDS.includes(p.kind)) animated.push(p);
@@ -173,7 +178,7 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   grad.addColorStop(1, 'rgba(0,0,0,0.38)');
   ctx.fillStyle = grad;
   ctx.fillRect(b.x, b.y, b.w, b.h);
-  return { animated, region };
+  return { animated, region, spectators };
 }
 
 /** Per-frame environment life: animated props, water ripples, neon flicker. */
@@ -228,6 +233,7 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
   if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
+  drawSpectators(ctx, layer.spectators, layer.region, o.reducedMotion ? 0 : o.time ?? 0, S, o.crowdCheer ?? false, !!o.aim || !!o.reducedMotion, { left:-cam.ox/S, right:(ctx.canvas.width/dpr-cam.ox)/S, top:(120-cam.oy)/S, bottom:(ctx.canvas.height/dpr-100-cam.oy)/S });
   const clock = o.clock ?? o.time ?? 0;
   for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
