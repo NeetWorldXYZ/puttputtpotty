@@ -1,8 +1,9 @@
 import { expect,test } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import headsMigration from '../supabase/migrations/20260911060146_avatar_head_unlocks.sql?raw';
+import extraMigration from '../supabase/migrations/20260912000809_avatar_hats_faces_colors.sql?raw';
 import gearMigration from '../supabase/migrations/20260911110527_avatar_gear_unlocks.sql?raw';
-import { EARNABLE_BALLS,EARNABLE_SHIRTS,STARTER_BALLS,STARTER_SHIRTS,gearUnlocked } from '../server/potty/cosmeticCatalog';
+import { EARNABLE_BALLS,EARNABLE_SHIRTS,EARNABLE_HATS,EARNABLE_FACES,EARNABLE_COLORS,gearReward,STARTER_BALLS,STARTER_SHIRTS,gearUnlocked } from '../server/potty/cosmeticCatalog';
 import { lockedAvatarPart,normalizeAvatarChoice } from '../server/potty/avatarUnlocks';
 import { DEFAULT_AVATAR,avatarPartSvg,avatarSvg,randomAvatar,resultAvatarSvg,starterAvatar } from '../src/game/avatarParts';
 import { ballMaterialPaths,ballMaterialSvg,paintBallMaterial } from '../src/game/ballMaterials';
@@ -64,7 +65,7 @@ test('gear awards use verified achievements, match UI milestones, survive losses
       create function move_account(old_id uuid,new_id uuid) returns text language plpgsql as $$
         declare n text; begin select display_name into n from profiles where id=old_id; delete from profiles where id=old_id; return n; end $$;
     `);
-    await db.exec(headsMigration);await db.exec(gearMigration);
+    await db.exec(headsMigration);await db.exec(gearMigration);await db.exec(extraMigration);
     await db.query("insert into profiles(id,display_name,points,avatar) values($1,'King',249,$3),($2,'New',0,$3)",[oldId,newId,DEFAULT_AVATAR]);
     const refresh=async(id=oldId)=>(await db.query<{result:HeadProgress}>('select refresh_avatar_collection($1) result',[id])).rows[0].result;
     expect((await refresh()).balls).toEqual([]);
@@ -84,25 +85,31 @@ test('gear awards use verified achievements, match UI milestones, survive losses
     const all=await refresh();
     expect(all.balls?.sort()).toEqual(Object.keys(EARNABLE_BALLS).sort());
     expect(all.shirts?.sort()).toEqual(Object.keys(EARNABLE_SHIRTS).sort());
+    expect(all.hats?.sort()).toEqual(Object.keys(EARNABLE_HATS).sort());
+    expect(all.faces?.sort()).toEqual(Object.keys(EARNABLE_FACES).sort());
+    expect(all.colors?.sort()).toEqual(Object.keys(EARNABLE_COLORS).sort());
     expect(all.stats).toMatchObject({rankedWins:60,dailyDays:20,aces:60,places:20,points:5000});
     const rows=await db.query<{slot:string;item_id:string;metric:string;target:number}>('select slot,item_id,metric,target from avatar_gear_catalog');
-    expect(rows.rows).toHaveLength(26);
+    expect(rows.rows).toHaveLength(65);
     for(const row of rows.rows){
-      const catalog=row.slot==='ball'?EARNABLE_BALLS:EARNABLE_SHIRTS;
-      expect(catalog[row.item_id as keyof typeof catalog]).toMatchObject({metric:row.metric,target:row.target});
+      const reward=gearReward(row.slot,row.item_id);
+      expect(reward).toMatchObject({metric:row.metric,target:row.target});
     }
     // Totals may drop across a season; awards never disappear and TP is never deducted.
     expect((await db.query<{points:number}>('select points from profiles where id=$1',[oldId])).rows[0].points).toBe(5000);
     await db.query('update profiles set points=0 where id=$1',[oldId]);
     expect((await refresh()).balls).toHaveLength(13);
-    const equipped={...DEFAULT_AVATAR,ball:'prism',seat:'monarch'};
+    const equipped={...DEFAULT_AVATAR,ball:'prism',seat:'monarch',hat:'wizard',face:'star',porcelain:'aurora'};
     await db.query('update profiles set avatar=$2 where id=$1',[oldId,equipped]);
     await db.query('select move_account_with_heads($1,$2)',[oldId,newId]);
     expect((await refresh(newId)).shirts).toHaveLength(13);
     expect((await refresh(newId)).balls).toHaveLength(13);
+    expect((await refresh(newId)).hats).toHaveLength(13);
+    expect((await refresh(newId)).faces).toHaveLength(13);
+    expect((await refresh(newId)).colors).toHaveLength(13);
     expect((await db.query<{avatar:unknown}>('select avatar from profiles where id=$1',[newId])).rows[0].avatar).toEqual(equipped);
     await db.exec('grant select,update on profiles to authenticated; set role authenticated;');
-    await expect(db.query("update profiles set avatar=jsonb_set(avatar,'{ball}','\"meteor\"') where id=$1",[newId])).rejects.toThrow('verify earned balls');
+    await expect(db.query("update profiles set avatar=jsonb_set(avatar,'{ball}','\"meteor\"') where id=$1",[newId])).rejects.toThrow('verify earned cosmetics');
     await expect(db.query('select refresh_avatar_collection($1)',[newId])).rejects.toThrow(/permission denied/);
     await expect(db.query("insert into avatar_gear_unlocks(user_id,slot,item_id) values($1,'ball','meteor')",[newId])).rejects.toThrow(/permission denied/);
     await db.query("update profiles set display_name='King Two' where id=$1",[newId]);

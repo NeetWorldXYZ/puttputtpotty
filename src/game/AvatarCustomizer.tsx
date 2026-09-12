@@ -10,7 +10,7 @@ const progressUnit=(metric:string)=>({points:'TP',rankedWins:'wins',places:'plac
 
 export const LOOK_CATEGORIES: readonly { key: keyof AvatarSpec; label: string; featured: readonly string[] }[] = [
   { key: 'head', label: 'Head', featured: ['classic', 'roll', 'turd', 'alien', 'dawg'] },
-  { key: 'porcelain', label: 'Skin', featured: ['white', 'mint', 'sky', 'lavender', 'gold'] },
+  { key: 'porcelain', label: 'Color', featured: ['white', 'mint', 'sky', 'lavender', 'gold'] },
   { key: 'seat', label: 'Shirt', featured: ['blue', 'ink', 'white', 'red', 'wood'] },
   { key: 'hat', label: 'Hat', featured: ['none', 'crown', 'cap', 'tophat', 'plunger'] },
   { key: 'face', label: 'Face', featured: ['happy', 'cool', 'wink', 'angry', 'sleepy'] },
@@ -63,7 +63,7 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
   const id = useId();
   const group = LOOK_CATEGORIES.find((item) => item.key === category)!;
   const options = lookOptions(avatar, category);
-  const label = category === 'porcelain' && avatar.head !== 'classic' ? 'Colour' : group.label;
+  const label = group.label;
   const ordered = [...group.featured, ...options.map(([key]) => key).filter((key) => !group.featured.includes(key))];
   const visible = ordered.flatMap(key => options.filter(([value]) => value === key));
 
@@ -103,7 +103,7 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
               const next = event.key === 'Home' ? 0 : event.key === 'End' ? LOOK_CATEGORIES.length - 1 : (index + direction + LOOK_CATEGORIES.length) % LOOK_CATEGORIES.length;
               setCategory(LOOK_CATEGORIES[next].key);
               event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
-            }}>{item.key === 'porcelain' && avatar.head !== 'classic' ? 'Colour' : item.label}</button>)}
+            }}>{item.label}</button>)}
           </div>
           <div ref={collection} className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
             {inspectedReward&&<div className="studio-unlock-detail" aria-live="polite"><div><strong>{inspectedReward.label}</strong><button onClick={()=>setInspected(null)}>Back to my look ×</button></div><p>{inspectedReward.requirement}</p><progress value={Math.min(inspectedCurrent,inspectedReward.target)} max={inspectedReward.target}/><small>{progressLoading?'Checking progress…':`${inspectedCurrent.toLocaleString()} / ${inspectedReward.target.toLocaleString()} ${progressUnit(inspectedReward.metric)}`} · Permanent unlock · No TP spent</small></div>}

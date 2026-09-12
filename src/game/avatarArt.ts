@@ -1,3 +1,4 @@
+import { extraHat, extraFace } from './extraCosmeticArt';
 import type { Avatar, BallLook } from './avatarParts';
 import { earnedHeadArt, earnedFace } from './earnedHeadArt';
 import { ballMaterialSvg } from './ballMaterials';
@@ -61,6 +62,7 @@ function faceSvg(face:string,head='classic'):string {
   if(face==='wink')art=`<g data-feature="eyes"><ellipse cx="66" cy="70" rx="3.6" ry="4.8" fill="${INK}"/><circle cx="65" cy="68" r="1" fill="#fff"/><path d="m88 70 6-3 6 3" fill="none" ${stroke} stroke-width="3.5"/></g>${smile}`;
   if(face==='angry')art=`${eyes}<path d="m58 59 15 5m29-5-15 5" fill="none" ${stroke} stroke-width="3.8"/><path data-feature="mouth" d="M70 ${mouthY+5}q10-9 20 0" fill="none" ${stroke} stroke-width="3.5"/>`;
   if(face==='sleepy')art=`${eyes}<path data-feature="mustache" d="M80 84c-9-11-14 9-23-2 0 13 14 13 23 6 9 7 23 7 23-6-9 11-14-9-23 2Z" fill="${INK}"/><path data-feature="mouth" d="M74 97q6 5 12 0" fill="none" ${stroke} stroke-width="3"/>`;
+  art=extraFace(face,head) ?? art;
   return `<g data-part="face" data-face="${face}">${earnedFace(head,face,art)}</g>`;
 }
 
@@ -71,6 +73,7 @@ function hatSvg(hat:string,id:string):string {
   if(hat==='tophat')art=`<path d="M56 2q24-7 48 0l-2 37H58Z" fill="url(#${id}-hat)" ${stroke} stroke-width="4"/><path d="M59 27h43v10H59Z" fill="#fb3e53"/><ellipse cx="80" cy="39" rx="37" ry="7" fill="url(#${id}-hat)" ${stroke} stroke-width="4"/><path d="M61 5q6-2 11-2l-1 22h-8Z" fill="#678798" opacity=".25"/>`;
   if(hat==='plunger')art=`<path d="M77 29 83 0q4-2 7 2l-6 29" fill="#d86c38" ${stroke} stroke-width="3.5"/><path d="m82 22 3-16" stroke="#ffba76" stroke-width="2"/><path d="M59 40q1-17 20-17t22 17" fill="url(#${id}-red)" ${stroke} stroke-width="4"/><ellipse cx="80" cy="41" rx="27" ry="6" fill="#dd3e33" ${stroke} stroke-width="4"/><path d="M66 34q3-7 9-7" stroke="#ffb387" stroke-width="3" fill="none" stroke-linecap="round"/>`;
   if(hat==='halo')art=`<ellipse cx="80" cy="16" rx="31" ry="9" fill="none" stroke="${INK}" stroke-width="8"/><ellipse cx="80" cy="16" rx="31" ry="9" fill="none" stroke="url(#${id}-gold)" stroke-width="5"/><path d="M58 11q19-8 35-2" fill="none" stroke="#fffac1" stroke-width="2" stroke-linecap="round"/>`;
+  art=extraHat(hat,id) ?? art;
   return `<g data-part="hat" data-hat="${hat}"${hat==='tophat' || hat==='plunger' ? ' transform="translate(0 5)"' : ''}>${art}</g>`;
 }
 
@@ -147,7 +150,7 @@ export function renderAvatarPart(av:Avatar,part:keyof Avatar,tone:Tone,shirt:str
   if(part==='seat')return {markup:base+shirtSvg(av.seat,id),viewBox:'10 96 140 76'};
   if(part==='hat') {
     const frames:Record<string,string>={none:'47 -5 66 66',crown:'37 -1 86 56',cap:'12 -2 112 65',tophat:'36 -5 88 65',plunger:'48 -4 64 62',halo:'42 -9 76 50'};
-    return {markup:base+(av.hat==='none'?`<g stroke="#e7f2e8" stroke-width="6" fill="none"><circle cx="80" cy="28" r="23"/><path d="m64 12 32 32"/></g>`:hatSvg(av.hat,id)),viewBox:frames[av.hat]};
+    return {markup:base+(av.hat==='none'?`<g stroke="#e7f2e8" stroke-width="6" fill="none"><circle cx="80" cy="28" r="23"/><path d="m64 12 32 32"/></g>`:hatSvg(av.hat,id)),viewBox:frames[av.hat] ?? '12 -4 136 66'};
   }
   if(part==='ball')return {markup:ballSvg(ball,50,50,40,id),viewBox:'0 0 100 100'};
   if(part==='face')return {markup:base+headSvg('classic',tone,id)+faceSvg(av.face),viewBox:'35 26 90 90'};

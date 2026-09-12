@@ -45,7 +45,7 @@ export function HeadGallery() {
       <div className="hg-controls">{([
         ['hat','Hat',Object.entries(HATS)],['face','Face',Object.entries(FACES)],
         ['seat','Shirt',Object.entries(SEATS).map(([k,v])=>[k,v.label])],
-        ['porcelain','Colour',Object.entries(headTones(look.head)).map(([k,v])=>[k,v.label])],
+        ['porcelain','Color',Object.entries(headTones(look.head)).map(([k,v])=>[k,v.label])],
       ] as [keyof Look,string,string[][]][]).map(([key,label,options])=><label key={key}>{label}<select value={look[key]} onChange={e=>setLook({...look,[key]:e.target.value})}>{options.map(([key,name])=><option key={key} value={key}>{name}</option>)}</select></label>)}</div>
       <div className="hg-small"><span>LEADERBOARD SIZE</span><Avatar av={look} size={32}/><Avatar av={look} size={44}/><Avatar av={look} size={60}/></div>
       <p className="hg-requirement">{item.requirement}</p><small>Preview only. This does not change your saved avatar.</small>
