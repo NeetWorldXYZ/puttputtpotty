@@ -13,17 +13,19 @@ export function placeSpectators(hole: Hole, region: Region, props: PropPlacement
     const dx = wall.b.x - wall.a.x, dy = wall.b.y - wall.a.y;
     const length = Math.hypot(dx, dy);
     if (length < 2) continue;
-    for (let step = 1.1; step < length - .6; step += 1.65) {
+    for (const offset of [1.7, 3.5]) {
+    for (let step = offset === 1.7 ? 1.1 : 1.9; step < length - .6; step += 1.65) {
       for (const side of [-1, 1]) {
-        const x = wall.a.x + dx * step / length - dy / length * 1.7 * side;
-        const y = wall.a.y + dy * step / length + dx / length * 1.7 * side;
+        const x = wall.a.x + dx * step / length - dy / length * offset * side;
+        const y = wall.a.y + dy * step / length + dx / length * offset * side;
         if (x < b.x + .8 || x > b.x + b.w - .8 || y < b.y + 1.1 || y > b.y + b.h - .8) continue;
         if (pointInRegion(region, x, y) || distToWalls(hole, x, y) < 1.4) continue;
         if (props.some(p => Math.hypot(p.x - x, p.y - y) < 3.1)) continue;
         if (out.some(p => Math.hypot(p.x - x, p.y - y) < 1.5)) continue;
         out.push({ x, y, group, variant: out.length % 12 });
-        if (out.length >= 100) return out;
+        if (out.length >= 150) return out;
       }
+    }
     }
   }
   return out;
@@ -34,13 +36,6 @@ const SHOUTS = ['GET IN!', 'FLUSH IT!', 'SEND IT!', 'OH, SHIT!', 'CROWN HIM!', '
 export function drawSpectators(ctx: CanvasRenderingContext2D, people: Spectator[], region: Region, time: number, scale: number, cheer: boolean, quiet: boolean, view: { left: number; top: number; right: number; bottom: number }): void {
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  // Rope segments connect adjacent spectators in the same row.
-  ctx.strokeStyle = '#f4ddac99'; ctx.lineWidth = .08;
-  for (let i = 1; i < people.length; i++) {
-    const p = people[i], prev = people[i-1];
-    if (p.group !== prev.group || Math.hypot(p.x-prev.x,p.y-prev.y)>2) continue;
-    ctx.beginPath();ctx.moveTo(prev.x,prev.y+.6);ctx.lineTo(p.x,p.y+.6);ctx.stroke();
-  }
   for (const p of people) {
     if (p.x < view.left - 1 || p.x > view.right + 1 || p.y < view.top - 5 || p.y > view.bottom + 5) continue;
     const bounce = Math.sin(time * (cheer ? 8 : 1.6) + p.variant * 1.9) * (cheer ? .15 : .035);
@@ -55,6 +50,15 @@ export function drawSpectators(ctx: CanvasRenderingContext2D, people: Spectator[
     else if(p.variant%3===1){ctx.fillStyle='#583c32';ctx.beginPath();ctx.arc(0,-.48,.29,Math.PI,Math.PI*2);ctx.fill();}
     ctx.fillStyle='#08283c';ctx.fillRect(-.14,-.39,.07,.08);ctx.fillRect(.07,-.39,.07,.08);
     ctx.beginPath();ctx.moveTo(-.1,-.21);ctx.quadraticCurveTo(0,-.13,.1,-.21);ctx.stroke();
+    // A few spectators carry refreshments; keep them inside the person envelope.
+    if(p.variant%4===0){
+      const yy=wave?-.32:.18;
+      ctx.fillStyle='#ffbe43';roundRectPath(ctx,.38,yy,.26,.34,.04);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#fff8df';roundRectPath(ctx,.35,yy-.06,.31,.1,.04);ctx.fill();
+    }else if(p.variant%4===1){
+      ctx.fillStyle='#f7c17a';roundRectPath(ctx,.31,.14,.38,.18,.08);ctx.fill();ctx.stroke();
+      ctx.strokeStyle='#b84738';ctx.lineWidth=.06;ctx.beginPath();ctx.moveTo(.35,.22);ctx.lineTo(.62,.22);ctx.stroke();
+    }
     ctx.restore();
   }
   // One short bubble per interval; keep all of it outside the playable floor.

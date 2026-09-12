@@ -6,6 +6,7 @@
  * before.
  */
 
+import { placeFanAreas, drawFanArea } from './fanAreas';
 import { placeSpectators, drawSpectators, type Spectator } from './spectators';
 import type { Hole } from '../sim/types';
 import { spriteRevision } from './sprites';
@@ -133,12 +134,16 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   // Out of play area + props (animated ones are drawn per frame instead).
   drawSurround(ctx, b, theme);
   const props = placeProps(hole, region, { ...theme, props: theme.props.filter(p => p !== 'crowd') });
-  const spectators = placeSpectators(hole, region, props);
+  const fanAreas = placeFanAreas(hole, region, props);
+  const reserved = fanAreas.map(p => ({kind:'crowd' as const,x:p.x,y:p.y,r:0,seed:0}));
+  const spectators = placeSpectators(hole, region, [...props,...reserved]);
   const animated: PropPlacement[] = [];
   for (const p of props) {
     if (ANIMATED_KINDS.includes(p.kind)) animated.push(p);
     else drawProp(ctx, p);
   }
+
+  for (const area of fanAreas) drawFanArea(ctx, area);
 
   // Floor inside the playable region.
   ctx.save();
