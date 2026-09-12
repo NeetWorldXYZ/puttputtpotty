@@ -1,0 +1,57 @@
+@font-face{font-family:Result Anton;src:url('/art/ranks-anton.ttf') format('truetype');font-weight:400;font-display:swap}
+.overlay.hr-overlay{--hr-accent:#58d9ec;--hr-halo:#1685ae55;align-items:center;background:#021725ba;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.hr-overlay.hr-over,.hr-overlay.hr-cap{--hr-accent:#ffbb79;--hr-halo:#af682f33}
+.hr-overlay.hr-birdie{--hr-accent:#83f0bb;--hr-halo:#19b27c55}
+.hr-overlay.hr-eagle{--hr-accent:#ffe079;--hr-halo:#d39b2355}
+.hr-overlay.hr-albatross{--hr-accent:#d6b3ff;--hr-halo:#9852f766}
+.hr-overlay.hr-ace{--hr-accent:#ffe36f;--hr-halo:#ffc52f66}
+.overlay.hr-overlay>.card.hr-card{position:relative;isolation:isolate;box-sizing:border-box;width:min(100%,410px);min-width:0;max-height:100%;overflow-y:auto;margin:auto;padding:17px 18px 19px;border:3px solid var(--hr-accent);border-radius:27px;background:radial-gradient(ellipse at 50% 20%,var(--hr-halo),transparent 58%),linear-gradient(155deg,#0b4563,#03253d 72%);box-shadow:inset 0 0 0 3px #03283d,0 6px 0 #001826,0 18px 55px #0008;color:#fff7dd;animation:hr-arrive .26s ease-out}
+.hr-card .hr-eyebrow{position:relative;display:flex;justify-content:space-between;gap:8px;color:var(--hr-accent);font:800 10px/1.3 var(--game-font);letter-spacing:1px}
+.hr-eyebrow>span{color:#c4dce7;letter-spacing:.4px}
+.hr-card .hr-medal{position:relative;width:170px;height:119px;margin:10px auto 0;filter:drop-shadow(0 5px 0 #001c3066)}
+.hr-medal svg{display:block;width:100%;height:100%}
+.hr-overlay .hr-card h2{position:relative;margin:0;color:var(--hr-accent);font:400 clamp(40px,12vw,60px)/1.12 'Result Anton',Impact,sans-serif;letter-spacing:1px;transform:skewX(-7deg);paint-order:stroke fill;-webkit-text-stroke:5px #032238;text-shadow:0 5px 0 #021928}
+.hr-overlay .hr-card h2.hr-long-title{font-size:clamp(29px,8.8vw,43px);letter-spacing:.3px}
+.hr-card .hr-tagline{position:relative;margin:9px 0 17px;color:#d1e6ec;font:600 13px/1.35 var(--game-font)}
+.hr-card .hr-score-strip{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:11px 0;border:1px solid #47829a;border-radius:15px;background:#021d32a6;box-shadow:inset 0 1px 0 #ffffff13}
+.hr-score-strip>div{display:flex;flex-direction:column;gap:4px;align-items:center}
+.hr-score-strip>div+div{border-left:1px solid #386c82}
+.hr-score-strip strong{font:400 34px/1 'Result Anton',Impact,sans-serif;color:#fff8e6}
+.hr-score-strip small{font:700 9px/1.2 var(--game-font);color:#abd0df;letter-spacing:1px}
+.hr-score-strip .hr-relative strong,.hr-score-strip .hr-relative small{color:var(--hr-accent)}
+.hr-card .hr-progress{display:flex;justify-content:center;gap:5px;margin:15px auto 5px;max-width:100%}
+.hr-progress i{flex:1;max-width:22px;height:5px;border-radius:5px;background:#1f5369}
+.hr-progress i.complete{background:#68afa9}
+.hr-progress i.current{background:var(--hr-accent);box-shadow:0 0 6px var(--hr-halo)}
+.hr-card .hr-actions{position:relative}
+.hr-overlay .hr-card .hr-actions>.sub{margin:8px 0 2px;color:#b7d5e2;font:600 11px/1.3 var(--game-font)}
+.hr-overlay .hr-card button{min-height:43px;margin-top:9px;padding:10px 12px;border:1px solid #4188a0;border-radius:12px;background:#07344d;color:#deedf4;font:700 13px/1.2 var(--game-font)}
+.hr-overlay .hr-card button.primary{min-height:51px;border:2px solid #fff0a0;border-radius:14px;background:linear-gradient(110deg,#fff199,#ffd23d);box-shadow:inset 0 -4px 0 #e4aa25,0 3px 0 #001a2c;color:#062a40;font:400 20px/1.2 'Result Anton',Impact,sans-serif;text-transform:uppercase;letter-spacing:.4px}
+.hr-overlay .hr-card button:focus-visible{outline:3px solid white;outline-offset:3px}
+.hr-card .hr-cap-note{margin:8px 0 0;color:#e9c7a6;font:500 11px/1.3 var(--game-font)}
+.hr-sparks{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;border-radius:24px}
+.hr-sparks i{position:absolute;width:5px;height:10px;background:var(--hr-accent);opacity:.5;animation:hr-spark .7s ease-out both}
+.hr-sparks i:nth-child(3n){background:#fff;width:4px;height:4px;border-radius:50%}
+@keyframes hr-arrive{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes hr-spark{from{opacity:0;translate:0 18px}to{opacity:.5;translate:0 0}}
+@media(max-height:650px){.hr-card .hr-medal{width:120px;height:84px;margin-top:5px}.hr-overlay .hr-card h2{font-size:40px}.hr-card .hr-tagline{margin:7px 0 11px}.hr-card .hr-score-strip{padding:8px 0}.hr-card .hr-progress{margin-top:11px}}
+@media(prefers-reduced-motion:reduce){.overlay.hr-overlay>.card.hr-card,.hr-sparks i{animation:none}}
+
+/* Motion stays inside the card, so the course and next-hole control remain steady. */
+.hr-medal .hr-ball{animation:hr-ball-drop .8s cubic-bezier(.2,.8,.3,1) both}
+.hr-medal .hr-flag{transform-box:fill-box;transform-origin:left center;animation:hr-flag-wave 2.8s ease-in-out infinite}
+.hr-score-strip strong{animation:hr-score-in .4s ease-out .12s both}
+.hr-score-strip>div:nth-child(2) strong{animation-delay:.2s}
+.hr-score-strip>div:nth-child(3) strong{animation-delay:.28s}
+.hr-birdie .hr-medal,.hr-eagle .hr-medal,.hr-albatross .hr-medal,.hr-ace .hr-medal{animation:hr-medal-float 3.6s ease-in-out .8s infinite}
+.hr-eagle .hr-medal:before,.hr-albatross .hr-medal:before,.hr-ace .hr-medal:before{content:'';position:absolute;z-index:-1;inset:5px 12px 14px;border-radius:50%;background:radial-gradient(ellipse,var(--hr-halo),transparent 70%);animation:hr-glow 2.8s ease-in-out infinite}
+.hr-sparks i{animation:hr-spark-float 3.4s ease-in-out infinite}
+.hr-sparks i:nth-child(2n){animation-delay:-1.2s;animation-duration:4.2s}
+.hr-sparks i:nth-child(3n){animation-delay:-2.4s}
+@keyframes hr-ball-drop{0%{transform:translate(-26px,-24px);opacity:0}35%{opacity:1}60%{transform:translate(0,0)}78%{transform:translate(0,-7px)}100%{transform:translate(0,0)}}
+@keyframes hr-flag-wave{0%,100%{transform:skewY(-2deg) scaleX(1)}50%{transform:skewY(3deg) scaleX(.92)}}
+@keyframes hr-score-in{from{opacity:0;transform:translateY(7px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes hr-medal-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes hr-glow{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.2)}}
+@keyframes hr-spark-float{0%,100%{opacity:.15;translate:0 5px}50%{opacity:.7;translate:0 -8px}}
+@media(prefers-reduced-motion:reduce){.hr-card *,.hr-card *:before{animation:none!important}}
