@@ -116,7 +116,7 @@ export function LeaderboardScreen() {
   const valueLabel = board === 'wins' ? 'Wins' : board === 'thrones' ? 'Thrones' : 'Score';
 
   return (
-    <div className={`leaders ranks-screen ranks-city-screen rk2-${board}`}>
+    <div data-scene-pending={rows === null && !error} className={`leaders ranks-screen ranks-city-screen rk2-${board}`}>
       <main className="rk2-content">
         <header className="rk2-hero">
           <img className="rk2-scene" src="/art/ranks-city-hero.webp" alt="" />

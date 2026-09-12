@@ -74,7 +74,7 @@ export function MatchLobby({ busy, error, record, recordError, onRetryRecord, on
   useEffect(() => { if (searching) setSheet(null); }, [searching]);
   const chooseLength = <fieldset className="ma-lengths"><legend>How many holes?</legend>{LENGTHS.map(n => <button key={n} type="button" aria-pressed={holes === n} onClick={() => setHoles(n)} disabled={busy}>{n}<small>holes</small></button>)}</fieldset>;
   const open = (next: Sheet) => { if (!busy && !searching) setSheet(next); };
-  return <main className={`ma-scroll mc-clean${searching ? ' ma-searching' : ''}`}>
+  return <main data-scene-pending={!record && !recordError && !error} className={`ma-scroll mc-clean${searching ? ' ma-searching' : ''}`}>
     {error && !sheet && <div className="ma-error" role="alert">{error}</div>}
     <section className="ma-arena" aria-labelledby="ma-title">
       <header className="ma-heading"><h1 id="ma-title">RANKED <span>MATCH</span></h1><p>Same 9 holes. Head to head.<br/>Fewest strokes wins.</p></header>
