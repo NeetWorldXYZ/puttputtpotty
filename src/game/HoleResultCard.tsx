@@ -23,10 +23,10 @@ export function HoleResultCard({ score, strokes, par, sunk, holeIndex, holeCount
           <circle cx="100" cy="65" r="47" fill="#104d67" stroke="#ffffff35" strokeWidth="2"/>
           <ellipse cx="101" cy="94" rx="36" ry="12" fill="#28b68a" stroke="#042438" strokeWidth="4"/>
           <ellipse cx="109" cy="94" rx="13" ry="4" fill="#032435"/>
-          <path d="M109 92V39l31 12-31 12" fill="#ff5969" stroke="#042438" strokeWidth="5" strokeLinejoin="round"/>
+          <path className="hr-flag" d="M109 92V39l31 12-31 12" fill="#ff5969" stroke="#042438" strokeWidth="5" strokeLinejoin="round"/>
           <path d="M109 41v50" stroke="#e3f6ff" strokeWidth="3"/>
-          <circle cx="83" cy="86" r="13" fill="#f5fcff" stroke="#042438" strokeWidth="3"/>
-          <path d="m77 83 3 1m6-4 2 2m-6 6 2 2m-7 1 2 1" stroke="#b6cfdf" strokeWidth="3" strokeLinecap="round"/>
+          <g className="hr-ball"><circle cx="83" cy="86" r="13" fill="#f5fcff" stroke="#042438" strokeWidth="3"/>
+          <path d="m77 83 3 1m6-4 2 2m-6 6 2 2m-7 1 2 1" stroke="#b6cfdf" strokeWidth="3" strokeLinecap="round"/></g>
           <path d="m76 27-5-19 17 8 12-14 12 14 17-8-5 19Z" fill="#ffdb51" stroke="#042438" strokeWidth="4" strokeLinejoin="round"/>
           {celebrate && <path d="m24 40 3 8 8 3-8 3-3 8-3-8-8-3 8-3Zm150-8 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="#fff0a1"/>}
         </svg>

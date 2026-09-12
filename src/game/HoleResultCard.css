@@ -36,3 +36,22 @@
 @keyframes hr-spark{from{opacity:0;translate:0 18px}to{opacity:.5;translate:0 0}}
 @media(max-height:650px){.hr-card .hr-medal{width:120px;height:84px;margin-top:5px}.hr-overlay .hr-card h2{font-size:40px}.hr-card .hr-tagline{margin:7px 0 11px}.hr-card .hr-score-strip{padding:8px 0}.hr-card .hr-progress{margin-top:11px}}
 @media(prefers-reduced-motion:reduce){.overlay.hr-overlay>.card.hr-card,.hr-sparks i{animation:none}}
+
+/* Motion stays inside the card, so the course and next-hole control remain steady. */
+.hr-medal .hr-ball{animation:hr-ball-drop .8s cubic-bezier(.2,.8,.3,1) both}
+.hr-medal .hr-flag{transform-box:fill-box;transform-origin:left center;animation:hr-flag-wave 2.8s ease-in-out infinite}
+.hr-score-strip strong{animation:hr-score-in .4s ease-out .12s both}
+.hr-score-strip>div:nth-child(2) strong{animation-delay:.2s}
+.hr-score-strip>div:nth-child(3) strong{animation-delay:.28s}
+.hr-birdie .hr-medal,.hr-eagle .hr-medal,.hr-albatross .hr-medal,.hr-ace .hr-medal{animation:hr-medal-float 3.6s ease-in-out .8s infinite}
+.hr-eagle .hr-medal:before,.hr-albatross .hr-medal:before,.hr-ace .hr-medal:before{content:'';position:absolute;z-index:-1;inset:5px 12px 14px;border-radius:50%;background:radial-gradient(ellipse,var(--hr-halo),transparent 70%);animation:hr-glow 2.8s ease-in-out infinite}
+.hr-sparks i{animation:hr-spark-float 3.4s ease-in-out infinite}
+.hr-sparks i:nth-child(2n){animation-delay:-1.2s;animation-duration:4.2s}
+.hr-sparks i:nth-child(3n){animation-delay:-2.4s}
+@keyframes hr-ball-drop{0%{transform:translate(-26px,-24px);opacity:0}35%{opacity:1}60%{transform:translate(0,0)}78%{transform:translate(0,-7px)}100%{transform:translate(0,0)}}
+@keyframes hr-flag-wave{0%,100%{transform:skewY(-2deg) scaleX(1)}50%{transform:skewY(3deg) scaleX(.92)}}
+@keyframes hr-score-in{from{opacity:0;transform:translateY(7px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes hr-medal-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes hr-glow{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.2)}}
+@keyframes hr-spark-float{0%,100%{opacity:.15;translate:0 5px}50%{opacity:.7;translate:0 -8px}}
+@media(prefers-reduced-motion:reduce){.hr-card *,.hr-card *:before{animation:none!important}}
