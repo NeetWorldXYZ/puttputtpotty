@@ -6,7 +6,8 @@
  * before.
  */
 
-import { placeFanAreas, drawFanArea } from './fanAreas';
+import { paintTour } from './tour';
+import { animateFalls, drawFallsCup, fallsForeground } from './crownFalls';
 import { placeSpectators, drawSpectators, type Spectator } from './spectators';
 import type { Hole } from '../sim/types';
 import { spriteRevision } from './sprites';
@@ -46,6 +47,7 @@ export interface AimOverlay {
 }
 
 export interface DrawOptions {
+  visualStyle?: 'classic' | 'tour';
   ballRadius: number;
   cupRadius: number;
   ball?: { x: number; y: number } | null;
@@ -100,13 +102,15 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
   return c;
 }
 
-function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number): StaticLayer {
+function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number, style: 'classic' | 'tour'): StaticLayer {
   const b = hole.bounds;
-  let ppu = ppuWanted;
+  // The custom scene already has a fixed raster resolution. Reuse one bitmap
+  // through the camera intro instead of allocating a new large layer each frame.
+  let ppu = hole.id === 'crown-falls' && style === 'tour' ? 1024 / b.w : ppuWanted;
   const maxPpu = Math.min(MAX_SIDE / b.w, MAX_SIDE / b.h);
   if (ppu > maxPpu) ppu = maxPpu;
   ppu = Math.round(ppu * 4) / 4;
-  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${spriteRevision()}`;
+  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${spriteRevision()}|${style}`;
   const hit = layerCache.get(key);
   if (hit) return hit;
   const w = Math.max(1, Math.ceil(b.w * ppu));
@@ -114,7 +118,7 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
   ctx.setTransform(ppu, 0, 0, ppu, -b.x * ppu, -b.y * ppu);
-  const { animated, region, spectators } = paintStatic(ctx, hole, cupR, ballR);
+  const { animated, region, spectators } = style === 'tour' ? paintTour(ctx, hole, cupR, ballR) : paintStatic(ctx, hole, cupR, ballR);
   const layer: StaticLayer = { canvas, ppu, key, animated, region, spectators };
   // Small LRU.
   if (layerCache.size > 6) {
@@ -134,16 +138,13 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   // Out of play area + props (animated ones are drawn per frame instead).
   drawSurround(ctx, b, theme);
   const props = placeProps(hole, region, { ...theme, props: theme.props.filter(p => p !== 'crowd') });
-  const fanAreas = placeFanAreas(hole, region, props);
-  const reserved = fanAreas.map(p => ({kind:'crowd' as const,x:p.x,y:p.y,r:0,seed:0}));
-  const spectators = placeSpectators(hole, region, [...props,...reserved]);
+  const spectators = placeSpectators(hole, region, props);
   const animated: PropPlacement[] = [];
   for (const p of props) {
     if (ANIMATED_KINDS.includes(p.kind)) animated.push(p);
     else drawProp(ctx, p);
   }
 
-  for (const area of fanAreas) drawFanArea(ctx, area);
 
   // Floor inside the playable region.
   ctx.save();
@@ -187,7 +188,7 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
 }
 
 /** Per-frame environment life: animated props, water ripples, neon flicker. */
-function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLayer, theme: Theme, t: number): void {
+function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLayer, theme: Theme, t: number, glowWalls: boolean): void {
   for (const p of layer.animated) drawPropAnimated(ctx, p, t);
   // Water hazards ripple.
   for (const h of hole.hazards) {
@@ -205,7 +206,7 @@ function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLa
     }
     ctx.restore();
   }
-  if (theme.pipe.style === 'neon') {
+  if (glowWalls && theme.pipe.style === 'neon') {
     const flick = Math.sin(t * 15) * Math.sin(t * 2.3) > 0.9 ? 0.05 : 0.16 + 0.06 * Math.sin(t * 6);
     drawWallGlow(ctx, hole.walls, theme.pipe.fill, flick);
   }
@@ -224,10 +225,10 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   const theme = themeById(hole.theme);
   const dpr = o.dpr ?? 1;
 
-  ctx.fillStyle = theme.page;
+  ctx.fillStyle = o.visualStyle === 'tour' ? '#204e3f' : theme.page;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  const layer = getStaticLayer(hole, S * dpr, o.cupRadius, o.ballRadius);
+  const layer = getStaticLayer(hole, S * dpr, o.cupRadius, o.ballRadius, o.visualStyle ?? 'classic');
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(layer.canvas as CanvasImageSource, b.x * S + cam.ox, b.y * S + cam.oy, b.w * S, b.h * S);
@@ -237,16 +238,19 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.save();
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
-  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
+  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time, o.visualStyle !== 'tour');
   drawSpectators(ctx, layer.spectators, layer.region, o.reducedMotion ? 0 : o.time ?? 0, S, o.crowdCheer ?? false, !!o.aim || !!o.reducedMotion, { left:-cam.ox/S, right:(ctx.canvas.width/dpr-cam.ox)/S, top:(120-cam.oy)/S, bottom:(ctx.canvas.height/dpr-100-cam.oy)/S });
   const clock = o.clock ?? o.time ?? 0;
+  const falls = hole.id === 'crown-falls' && o.visualStyle === 'tour';
+  if (falls) animateFalls(ctx,o.time ?? 0,o.crowdCheer ?? false,!!o.reducedMotion,!!o.aim);
   for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
   if (o.trail && o.trail.length >= 4) drawTrail(ctx, o.trail, 0.55, 0.22);
-  if (o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
+  if (o.cupFlash && o.cupFlash > 0) (falls ? drawFallsCup : drawCup)(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
   if (o.aim) drawAim(ctx, o.aim.x, o.aim.y, o.aim.dx, o.aim.dy, o.aim.lengthUnits * (0.25 + 0.75 * o.aim.power), o.aim.cancelling);
   if (o.ball) drawBall(ctx, o.ball.x, o.ball.y, o.ballRadius);
   if (o.extra) o.extra(ctx);
+  if (falls) fallsForeground(ctx);
 
   if (o.zoneLabels) {
     const label = (text: string, x: number, y: number) => {
