@@ -6,9 +6,10 @@ import { applyStroke, createSimState, holeScore, step, totalStrokes, type SimEve
 import { seedFromString } from '../sim/rng';
 import { drawHole, drawMinimap, type AimOverlay } from '../render/drawHole';
 import { fitCamera, fitScale, followCamera, type Camera } from '../render/camera';
-import { drawBall } from '../render/objects';
-import { ballLook } from './avatarParts';
-import { getSavedAvatar } from '../net/supabase';
+import { drawBall as drawOriginalBall } from '../render/objects';
+import {drawBathroomBall} from '../preview/render';
+import {bathTheme} from '../preview/themes';
+import { ballLook,DEFAULT_AVATAR,type Avatar as AvatarSpec } from './avatarParts';
 import { themeById } from '../render/themes';
 import { useTuning } from './paramsStore';
 import { DevPanel } from './DevPanel';
@@ -21,6 +22,12 @@ import { warmResultArt } from './HoleResultArt';
 
 interface Props {
   holes: Hole[];
+  previewAvatar?: AvatarSpec;
+  previewReducedMotion?:boolean;
+  previewCrowd?:boolean;
+  previewPaused?:boolean;
+  holeNumberOffset?:number;
+  previousRelative?:number;
   /** Shown as a corner button; used by the editor's test-play loop. */
   onExit?: () => void;
   exitLabel?: string;
@@ -105,7 +112,7 @@ function fmtClock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
+export function PlayView({ previewAvatar, previewReducedMotion=false, previewCrowd=true, previewPaused=false, holeNumberOffset=0, previousRelative=0, holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
   useEffect(warmResultArt, []);
   const tuning = useTuning();
   const { prefsRef } = tuning;
@@ -126,7 +133,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const [newBest, setNewBest] = useState(false);
   const hole = holes[Math.min(holeIndex, holes.length - 1)];
   const seed = useMemo(() => seedFromString(hole.id), [hole.id]);
-  const theme = themeById(hole.theme);
+  const theme = hole.theme?.startsWith('bath-')?{...themeById(bathTheme(hole.theme).legacy),name:bathTheme(hole.theme).name,page:'#092b3c'}:themeById(hole.theme);
 
   // --- simulation refs (never React state: the loop mutates them at 120Hz)
   const worldRef = useRef<World>(compileHole(hole));
@@ -144,13 +151,18 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const squashRef = useRef({ amt: 0, ang: 0 });
   const introRef = useRef({ t: INTRO_SECONDS + 1 });
   /** The player's chosen ball, from the avatar this phone saved. */
-  const ballStyleRef = useRef(ballLook(getSavedAvatar()));
+  const ballStyleRef = useRef(ballLook(previewAvatar??DEFAULT_AVATAR));
+  ballStyleRef.current=ballLook(previewAvatar??DEFAULT_AVATAR);
+  const drawBall=holes[0]?.theme?.startsWith('bath-')?drawBathroomBall:drawOriginalBall;
   /** Bottom aim bar: filled to the drag power each frame without re-rendering. */
   const aimBarRef = useRef<HTMLDivElement>(null);
   const aimFillRef = useRef<HTMLDivElement>(null);
   const sinkRef = useRef<{ t: number; x: number; y: number } | null>(null);
   const timeRef = useRef(0);
-  const reducedMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const reducedMotion = useRef(previewReducedMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  reducedMotion.current=previewReducedMotion||window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pauseRef=useRef(previewPaused);pauseRef.current=previewPaused;
+  const previewCrowdRef=useRef(previewCrowd);previewCrowdRef.current=previewCrowd;
   const holeParRef = useRef(hole.par);
   holeParRef.current = hole.par;
 
@@ -188,9 +200,9 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       introRef.current = { t: 0 };
       doneFiredRef.current = false;
       setHud({ strokes: 0, done: false, sunk: false, strokeHistory: [] });
-      setBanner({ key: Date.now(), title: `Hole ${idx + 1} · ${h.name}`, sub: `${themeById(h.theme).name} · Par ${h.par}` });
+      setBanner({ key: Date.now(), title: `Hole ${idx + 1 + holeNumberOffset} · ${h.name}`, sub: `${h.theme?.startsWith('bath-')?bathTheme(h.theme).name:themeById(h.theme).name} · Par ${h.par}` });
     },
-    [],
+    [holeNumberOffset],
   );
 
   useEffect(() => {
@@ -264,6 +276,11 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     const viewW = w - SIDE_PAD * 2;
     const viewH = Math.max(80, h - top - bottom);
     const fs = fitScale(b, viewW, viewH);
+    if(worldRef.current.hole.theme?.startsWith('bath-')){
+      const scale=Math.min(18,viewW/b.w)*scaleMul;
+      const cam=followCamera(b,viewW,viewH,scale,bx,by);
+      return{cam:{scale,ox:cam.ox+SIDE_PAD,oy:cam.oy+top},follow:b.h*scale>viewH};
+    }
     if (fs >= MIN_FIT_SCALE && scaleMul === 1) {
       const cam = fitCamera(b, viewW, viewH);
       return { cam: { scale: cam.scale, ox: cam.ox + SIDE_PAD, oy: cam.oy + top }, follow: false };
@@ -410,7 +427,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const frame = Math.min(0.1, (now - last) / 1000);
+      const frame = pauseRef.current?0:Math.min(0.1, (now - last) / 1000);
       last = now;
       timeRef.current += frame;
       const params = paramsRef.current;
@@ -471,7 +488,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       const base = computeCamera(ct.x, ct.y);
       let cam = base.cam;
       const it = introRef.current.t;
-      if (it < INTRO_SECONDS) {
+      if (it < INTRO_SECONDS && !reducedMotion.current) {
         const u = easeInOut(Math.min(1, it / INTRO_SECONDS));
         const zoom = computeCamera(world.hole.cup.x, world.hole.cup.y, 1.7).cam;
         cam = { scale: zoom.scale + (base.cam.scale - zoom.scale) * u, ox: zoom.ox + (base.cam.ox - zoom.ox) * u, oy: zoom.oy + (base.cam.oy - zoom.oy) * u };
@@ -514,6 +531,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
         dpr,
         time: timeRef.current,
         crowdCheer: s.sunk,
+        crowdEnabled:previewCrowdRef.current,
         reducedMotion: reducedMotion.current,
         clock: s.clock,
         extra: (c) => {
@@ -651,7 +669,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
 
   // --- derived UI
   const par = hole.par;
-  const finishedRel = results.reduce((acc, sc, i) => acc + sc - holes[i].par, 0);
+  const finishedRel = previousRelative + results.reduce((acc, sc, i) => acc + sc - holes[i].par, 0);
   const cur = hud.strokes;
   const dragging = dragRef.current;
   let meterPower = 0;
@@ -735,7 +753,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       <div className="hud">
         <div>
           <div className="name">
-            HOLE {holeIndex + 1}/{holes.length} · PAR {par}
+            HOLE {holeIndex + 1 + holeNumberOffset}/{holes.length + holeNumberOffset} · PAR {par}
           </div>
           <div className="hole-name">{hole.name}</div>
           <div className="env">{theme.name}</div>
@@ -789,7 +807,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       {fast && <div className="ff-badge">⏩ ×{FAST_FORWARD}</div>}
 
       {hud.done && !courseDone && (
-        <HoleResultCard score={thisScore} strokes={cur} par={par} sunk={hud.sunk} holeIndex={holeIndex} holeCount={holes.length}>
+        <HoleResultCard score={thisScore} strokes={cur} par={par} sunk={hud.sunk} holeIndex={holeIndex + holeNumberOffset} holeCount={holes.length + holeNumberOffset}>
             {renderDoneCard ? (
               renderDoneCard({ holeIndex, hole, strokes: hud.strokeHistory, score: thisScore, sunk: hud.sunk }, { next: nextHole, retry: retryHole })
             ) : (
