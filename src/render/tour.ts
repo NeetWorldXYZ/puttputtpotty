@@ -3,7 +3,7 @@ import type { Hole, Wall } from '../sim/types';
 import { isMoving } from '../sim/types';
 import { wallLoops, traceRegion, pointInRegion, distToWalls } from './region';
 import { makeRand } from './shapes';
-import { drawCup, drawTee, drawHazard, drawObstacle, drawSlopeZone, drawSurfaceZone, holeSeed } from './objects';
+import { drawCup, drawTee, drawHazard, drawObstacle, drawSlopeZone, drawSurfaceZone, hazardSeed, holeSeed } from './objects';
 import { placeSpectators, type Spectator } from './spectators';
 let turf: HTMLImageElement | undefined;
 let prepared: Promise<void> | undefined;
@@ -85,7 +85,7 @@ export function paintTour(c:CanvasRenderingContext2D,hole:Hole,cupR:number,ballR
   crest(c,hole.tee.x,hole.tee.y-5);
   hole.surfaceZones.forEach((z,i)=>drawSurfaceZone(c,z,seed+i*7));
   hole.slopeZones.forEach(z=>drawSlopeZone(c,z));
-  hole.hazards.forEach((h,i)=>drawHazard(c,h,seed+i));
+  hole.hazards.forEach((h,i)=>drawHazard(c,h,hazardSeed(h,i)));
   // Directional wall shadows and contact shading are clipped to the fairway.
   c.save();c.translate(.25,.65);c.lineWidth=1.9;c.strokeStyle='#06332e35';traceRegion(c,region);c.stroke();c.restore();
   c.lineWidth=.85;c.strokeStyle='#1a57363b';traceRegion(c,region);c.stroke();c.restore();

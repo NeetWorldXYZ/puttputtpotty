@@ -185,7 +185,7 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
 }
 
 /** Per-frame environment life: animated props, water ripples, neon flicker. */
-function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLayer, theme: Theme, t: number): void {
+function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLayer, theme: Theme, t: number, glowWalls: boolean): void {
   for (const p of layer.animated) drawPropAnimated(ctx, p, t);
   // Water hazards ripple.
   for (const h of hole.hazards) {
@@ -203,7 +203,7 @@ function drawAnimated(ctx: CanvasRenderingContext2D, hole: Hole, layer: StaticLa
     }
     ctx.restore();
   }
-  if (theme.pipe.style === 'neon') {
+  if (glowWalls && theme.pipe.style === 'neon') {
     const flick = Math.sin(t * 15) * Math.sin(t * 2.3) > 0.9 ? 0.05 : 0.16 + 0.06 * Math.sin(t * 6);
     drawWallGlow(ctx, hole.walls, theme.pipe.fill, flick);
   }
@@ -235,7 +235,7 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.save();
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
-  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
+  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time, o.visualStyle !== 'tour');
   drawSpectators(ctx, layer.spectators, layer.region, o.reducedMotion ? 0 : o.time ?? 0, S, o.crowdCheer ?? false, !!o.aim || !!o.reducedMotion, { left:-cam.ox/S, right:(ctx.canvas.width/dpr-cam.ox)/S, top:(120-cam.oy)/S, bottom:(ctx.canvas.height/dpr-100-cam.oy)/S });
   const clock = o.clock ?? o.time ?? 0;
   for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
