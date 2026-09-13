@@ -6,7 +6,7 @@
  * before.
  */
 
-import { placeFanAreas, drawFanArea } from './fanAreas';
+import { paintTour } from './tour';
 import { placeSpectators, drawSpectators, type Spectator } from './spectators';
 import type { Hole } from '../sim/types';
 import { spriteRevision } from './sprites';
@@ -46,6 +46,7 @@ export interface AimOverlay {
 }
 
 export interface DrawOptions {
+  visualStyle?: 'classic' | 'tour';
   ballRadius: number;
   cupRadius: number;
   ball?: { x: number; y: number } | null;
@@ -100,13 +101,13 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
   return c;
 }
 
-function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number): StaticLayer {
+function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number, style: 'classic' | 'tour'): StaticLayer {
   const b = hole.bounds;
   let ppu = ppuWanted;
   const maxPpu = Math.min(MAX_SIDE / b.w, MAX_SIDE / b.h);
   if (ppu > maxPpu) ppu = maxPpu;
   ppu = Math.round(ppu * 4) / 4;
-  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${spriteRevision()}`;
+  const key = `${holeKey(hole)}|${ppu}|${cupR}|${ballR}|${spriteRevision()}|${style}`;
   const hit = layerCache.get(key);
   if (hit) return hit;
   const w = Math.max(1, Math.ceil(b.w * ppu));
@@ -114,7 +115,7 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
   const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
   ctx.setTransform(ppu, 0, 0, ppu, -b.x * ppu, -b.y * ppu);
-  const { animated, region, spectators } = paintStatic(ctx, hole, cupR, ballR);
+  const { animated, region, spectators } = style === 'tour' ? paintTour(ctx, hole, cupR, ballR) : paintStatic(ctx, hole, cupR, ballR);
   const layer: StaticLayer = { canvas, ppu, key, animated, region, spectators };
   // Small LRU.
   if (layerCache.size > 6) {
@@ -134,16 +135,13 @@ function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ba
   // Out of play area + props (animated ones are drawn per frame instead).
   drawSurround(ctx, b, theme);
   const props = placeProps(hole, region, { ...theme, props: theme.props.filter(p => p !== 'crowd') });
-  const fanAreas = placeFanAreas(hole, region, props);
-  const reserved = fanAreas.map(p => ({kind:'crowd' as const,x:p.x,y:p.y,r:0,seed:0}));
-  const spectators = placeSpectators(hole, region, [...props,...reserved]);
+  const spectators = placeSpectators(hole, region, props);
   const animated: PropPlacement[] = [];
   for (const p of props) {
     if (ANIMATED_KINDS.includes(p.kind)) animated.push(p);
     else drawProp(ctx, p);
   }
 
-  for (const area of fanAreas) drawFanArea(ctx, area);
 
   // Floor inside the playable region.
   ctx.save();
@@ -224,10 +222,10 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   const theme = themeById(hole.theme);
   const dpr = o.dpr ?? 1;
 
-  ctx.fillStyle = theme.page;
+  ctx.fillStyle = o.visualStyle === 'tour' ? '#204e3f' : theme.page;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-  const layer = getStaticLayer(hole, S * dpr, o.cupRadius, o.ballRadius);
+  const layer = getStaticLayer(hole, S * dpr, o.cupRadius, o.ballRadius, o.visualStyle ?? 'classic');
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(layer.canvas as CanvasImageSource, b.x * S + cam.ox, b.y * S + cam.oy, b.w * S, b.h * S);

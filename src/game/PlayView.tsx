@@ -20,6 +20,7 @@ import { HoleResultCard } from './HoleResultCard';
 import { warmResultArt } from './HoleResultArt';
 
 interface Props {
+  visualStyle?: 'classic' | 'tour';
   holes: Hole[];
   /** Shown as a corner button; used by the editor's test-play loop. */
   onExit?: () => void;
@@ -105,7 +106,7 @@ function fmtClock(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
+export function PlayView({ visualStyle = 'classic', holes, onExit, exitLabel, courseSeed, lockedParams, onHoleDone, renderDoneCard, scorecardExtra, renderScorecard, renderScorecardButtons, noRetry, timerFrom, raceMs, raceLabel, topExtra }: Props) {
   useEffect(warmResultArt, []);
   const tuning = useTuning();
   const { prefsRef } = tuning;
@@ -144,6 +145,8 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const squashRef = useRef({ amt: 0, ang: 0 });
   const introRef = useRef({ t: INTRO_SECONDS + 1 });
   /** The player's chosen ball, from the avatar this phone saved. */
+  const visualStyleRef = useRef(visualStyle);
+  visualStyleRef.current = visualStyle;
   const ballStyleRef = useRef(ballLook(getSavedAvatar()));
   /** Bottom aim bar: filled to the drag power each frame without re-rendering. */
   const aimBarRef = useRef<HTMLDivElement>(null);
@@ -503,6 +506,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
       const sink = sinkRef.current;
       const showBall = !s.sunk || (sink !== null && sink.t < 0.75);
       drawHole(ctx, world.hole, cam, {
+        visualStyle: visualStyleRef.current,
         ballRadius: params.ballRadius,
         cupRadius: cupRadius(params),
         ball: null,
@@ -738,7 +742,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
             HOLE {holeIndex + 1}/{holes.length} · PAR {par}
           </div>
           <div className="hole-name">{hole.name}</div>
-          <div className="env">{theme.name}</div>
+          <div className="env">{visualStyle === 'tour' ? 'Crown Classic' : theme.name}</div>
         </div>
         <div className="right">
           <div className="name">STROKES</div>
