@@ -7,6 +7,7 @@
  */
 
 import { paintTour } from './tour';
+import { animateFalls, drawFallsCup, fallsForeground } from './crownFalls';
 import { placeSpectators, drawSpectators, type Spectator } from './spectators';
 import type { Hole } from '../sim/types';
 import { spriteRevision } from './sprites';
@@ -103,7 +104,9 @@ function makeCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas {
 
 function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: number, style: 'classic' | 'tour'): StaticLayer {
   const b = hole.bounds;
-  let ppu = ppuWanted;
+  // The custom scene already has a fixed raster resolution. Reuse one bitmap
+  // through the camera intro instead of allocating a new large layer each frame.
+  let ppu = hole.id === 'crown-falls' && style === 'tour' ? 1024 / b.w : ppuWanted;
   const maxPpu = Math.min(MAX_SIDE / b.w, MAX_SIDE / b.h);
   if (ppu > maxPpu) ppu = maxPpu;
   ppu = Math.round(ppu * 4) / 4;
@@ -238,13 +241,16 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time, o.visualStyle !== 'tour');
   drawSpectators(ctx, layer.spectators, layer.region, o.reducedMotion ? 0 : o.time ?? 0, S, o.crowdCheer ?? false, !!o.aim || !!o.reducedMotion, { left:-cam.ox/S, right:(ctx.canvas.width/dpr-cam.ox)/S, top:(120-cam.oy)/S, bottom:(ctx.canvas.height/dpr-100-cam.oy)/S });
   const clock = o.clock ?? o.time ?? 0;
+  const falls = hole.id === 'crown-falls' && o.visualStyle === 'tour';
+  if (falls) animateFalls(ctx,o.time ?? 0,o.crowdCheer ?? false,!!o.reducedMotion,!!o.aim);
   for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
   if (o.trail && o.trail.length >= 4) drawTrail(ctx, o.trail, 0.55, 0.22);
-  if (o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
+  if (o.cupFlash && o.cupFlash > 0) (falls ? drawFallsCup : drawCup)(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
   if (o.aim) drawAim(ctx, o.aim.x, o.aim.y, o.aim.dx, o.aim.dy, o.aim.lengthUnits * (0.25 + 0.75 * o.aim.power), o.aim.cancelling);
   if (o.ball) drawBall(ctx, o.ball.x, o.ball.y, o.ballRadius);
   if (o.extra) o.extra(ctx);
+  if (falls) fallsForeground(ctx);
 
   if (o.zoneLabels) {
     const label = (text: string, x: number, y: number) => {

@@ -11,3 +11,22 @@
 .tour-preparing{position:absolute;inset:var(--tour-top) 0 30px;display:grid;place-items:center;color:#ffe69c}
 @media(min-width:700px){.tour-preview .play{left:calc(50% - 260px);right:calc(50% - 260px);border-inline:1px solid #bbcc8a44}.tour-topbar{padding-left:calc(50% - 246px);padding-right:calc(50% - 246px)}}
 @media(max-width:360px){.tour-brand strong{font-size:15px}.tour-brand small{font-size:7px;letter-spacing:.8px}.tour-switch button{padding-inline:7px}}
+/* Crown Falls is a full custom scene, with an art-first course entrance. */
+.falls-preview{background:radial-gradient(ellipse at 50% 35%,#35533c,#071e23 75%)}
+.falls-preview .tour-brand strong{font-size:21px;letter-spacing:1px}.falls-preview .tour-brand small{font-size:7px;letter-spacing:1.1px}
+.falls-par{font-size:8px;letter-spacing:1.4px;text-align:center;color:#9cbaa8}.falls-par b{display:block;font:19px TourDisplay,sans-serif;letter-spacing:.7px;color:#f5d37d;margin-top:4px}
+.falls-intro{position:absolute;inset:var(--tour-top) 0 calc(30px + env(safe-area-inset-bottom,0px));overflow:hidden;background:#284b37}
+.falls-intro>img{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.falls-intro-copy{position:absolute;inset:auto 0 0;padding:76px 25px 24px;background:linear-gradient(transparent,#052a2bbd 27%,#062b2df5);text-align:left}
+.falls-intro-copy>span{font-size:9px;letter-spacing:2.9px;font-weight:800;color:#f5d782}
+.falls-intro h1{font:42px/1.03 TourDisplay,Impact,sans-serif;letter-spacing:.3px;color:#fff3ce;margin:9px 0;text-shadow:0 3px 0 #05292c}
+.falls-intro p{font-size:13px;color:#d6e9d5;margin:9px 0 19px}
+.falls-intro button,.tour-preparing button{width:100%;min-height:53px;background:linear-gradient(120deg,#fff2ad,#f4cd64);border:1px solid #fff2b0;border-radius:13px;box-shadow:0 4px 0 #9e782e,0 8px 19px #021e2860;color:#133536;font:21px TourDisplay,Impact,sans-serif;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;padding:12px 19px}
+.falls-intro button:active{transform:translateY(2px);box-shadow:0 2px 0 #9e782e}.falls-intro button span{font:28px sans-serif}
+.falls-preview .tour-preparing{text-align:center}.falls-loading-crown{font-size:57px;color:#f6d072;display:block;animation:falls-breathe 1.8s ease-in-out infinite}.falls-preview .tour-preparing p{font-size:14px;color:#e4e8c9}
+.falls-preview .hud>div{background:linear-gradient(135deg,#0e3534f5,#07252dec);border-color:#d2bf78a6}.falls-preview .hud .hole-name{font-size:19px}.falls-preview .corner-btn{background:#0b3539d9;border:1px solid #e2d393;border-radius:14px;box-shadow:0 3px 7px #00263055}.falls-preview .corner-btn.tr2{top:88px}
+.falls-preview .hint{background:#092d34e8;border:1px solid #e1c37b66;border-radius:12px;color:#fff0c8;padding:9px 13px;font-size:10px;max-width:270px}
+@keyframes falls-breathe{50%{transform:translateY(-5px);opacity:.65}}
+@media(min-width:700px){.falls-intro{left:calc(50% - 260px);right:calc(50% - 260px)}}
+@media(max-height:700px){.falls-intro h1{font-size:32px}.falls-intro-copy{padding:52px 22px 18px}.falls-intro p{margin-bottom:12px}}
+@media(prefers-reduced-motion:reduce){.falls-loading-crown{animation:none}}

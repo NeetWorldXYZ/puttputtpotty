@@ -5,6 +5,7 @@ import { wallLoops, traceRegion, pointInRegion, distToWalls } from './region';
 import { makeRand } from './shapes';
 import { drawCup, drawTee, drawHazard, drawObstacle, drawSlopeZone, drawSurfaceZone, hazardSeed, holeSeed } from './objects';
 import { placeSpectators, type Spectator } from './spectators';
+import { paintFalls } from './crownFalls';
 let turf: HTMLImageElement | undefined;
 let prepared: Promise<void> | undefined;
 export function prepareTourArt(): Promise<void> {
@@ -70,6 +71,7 @@ function crest(c:CanvasRenderingContext2D,x:number,y:number) {
 }
 export function paintTour(c:CanvasRenderingContext2D,hole:Hole,cupR:number,ballR:number) {
   const region=wallLoops(hole),seed=holeSeed(hole),b=hole.bounds;
+  if(hole.id==='crown-falls' && paintFalls(c,hole,cupR)) return {animated:[],region,spectators:[]};
   const spectators:Spectator[]=placeSpectators(hole,region);
   grass(c,hole,true);
   // Landscape pockets stay clear of both the playing surface and the gallery.

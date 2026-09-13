@@ -742,7 +742,7 @@ export function PlayView({ visualStyle = 'classic', holes, onExit, exitLabel, co
             HOLE {holeIndex + 1}/{holes.length} · PAR {par}
           </div>
           <div className="hole-name">{hole.name}</div>
-          <div className="env">{visualStyle === 'tour' ? 'Crown Classic' : theme.name}</div>
+          <div className="env">{visualStyle === 'tour' ? (hole.id === 'crown-falls' ? 'The Royal Gardens' : 'Crown Classic') : theme.name}</div>
         </div>
         <div className="right">
           <div className="name">STROKES</div>
