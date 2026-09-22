@@ -262,3 +262,16 @@ button.primary,button.active { color:#14213d; background:linear-gradient(#ffe995
 .scorecard > button { min-height:46px;font-size:15px;margin-top:10px; }
 .play .race-clock { max-width:calc(100% - 100px);box-sizing:border-box; }
 .play .race-target { overflow-wrap:anywhere; }
+
+/* Explicit throne outcomes: local score and saved standings are never conflated. */
+.throne-comparison,.throne-save-error { padding:18px;border:2px solid #51cfe1;border-radius:20px;background:linear-gradient(145deg,#104d68,#05283d);text-align:center;margin:14px 0;color:#fff5d9; }
+.throne-comparison h3 { font-size:22px;margin:10px 0; }
+.throne-comparison p,.throne-save-error p {font-size:14px;line-height:1.45;color:#c1dce7;}
+.throne-score-duel {display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin:16px 0;}
+.throne-score-duel span {min-width:0;overflow-wrap:anywhere;font-size:14px;}
+.throne-score-duel b {display:block;font-size:48px;line-height:1.1;color:#ffdf69;}
+.throne-score-duel i {color:#53d9e9;font-weight:900;}
+.throne-save-error {border-color:#ffce77;}
+.throne-victory {animation:throne-crown-arrival .5s ease-out both;}
+@keyframes throne-crown-arrival {from {transform:translateY(10px) scale(.97);opacity:0;}to {transform:none;opacity:1;}}
+@media(prefers-reduced-motion:reduce){.throne-victory{animation:none;}}
