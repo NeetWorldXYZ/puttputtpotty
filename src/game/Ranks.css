@@ -42,3 +42,14 @@
 @media(max-width:360px){.rk2-tabs{gap:4px}.rk2-tabs button{min-height:98px;padding-inline:2px}.rk2-friends-toggle{padding-inline:9px}.rk2-board li{grid-template-columns:41px 39px minmax(0,1fr) 53px;padding-inline:5px}.rk2-player strong{font-size:12px}.rk2-value{font-size:22px}}
 @media(min-width:500px){.rk2-tabs button{min-height:120px}.rk2-friends-toggle strong{font-size:17px}.rk2-friends-toggle small{font-size:12px}.rk2-board li{min-height:64px}.rk2-player strong{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.rk2-switch i{transition:none}}
+
+/* Keep the daily result in one compact block instead of overlapping grid items. */
+.rk2-daily .rk2-board li{grid-template-columns:42px 39px minmax(0,1fr) 92px;min-height:68px}
+.rk2-daily-score{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:5px 0 5px 7px;border-left:1px solid #39758b;}
+.rk2-par-score{display:flex;align-items:baseline;gap:5px;color:#ffdf68;font:400 29px/1 'Ranks Anton','Arial Narrow',sans-serif;white-space:nowrap;}
+.rk2-par-score>span{font:700 8px/1 var(--game-font);letter-spacing:.3px;color:#bce5eb;}
+.rk2-round-details{display:flex;flex-direction:column;gap:2px;align-items:center;color:#c4e1e9;font:500 9px/1.2 var(--game-font);white-space:nowrap;}
+.rk2-mine .rk2-daily-score{border-left-color:#d3b14e;}
+.rk2-mine .rk2-par-score{color:#08283c;}
+.rk2-mine .rk2-par-score>span,.rk2-mine .rk2-round-details{color:#315361;}
+@media(max-width:360px){.rk2-daily .rk2-board li{grid-template-columns:34px 32px minmax(0,1fr) 80px;gap:4px}.rk2-daily .rk2-board .avatar{width:32px}.rk2-par-score{font-size:26px}.rk2-daily-score{padding-left:4px}}

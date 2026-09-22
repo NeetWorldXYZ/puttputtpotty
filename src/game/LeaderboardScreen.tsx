@@ -19,6 +19,7 @@ type RankRow = {
   wins?: number;
   thrones?: number;
   total?: number;
+  par?: number;
   elapsed_ms?: number;
 };
 
@@ -91,6 +92,7 @@ export function LeaderboardScreen() {
           display_name: row.display_name,
           avatar: row.avatar,
           total: row.total,
+          par: row.par,
           elapsed_ms: row.elapsed_ms,
         }));
       }
@@ -166,8 +168,15 @@ export function LeaderboardScreen() {
                   <button className="rk2-player" onClick={() => navigate('profile', null, null, { user: row.user_id })}>
                     <strong>{row.display_name}</strong>{row.user_id === me && <small>You</small>}
                   </button>
-                  <strong className="rk2-value">{board === 'wins' ? row.wins ?? 0 : board === 'thrones' ? row.thrones ?? 0 : row.total ?? '–'}</strong>
-                  {board === 'daily' && <small className="rk2-time">{row.elapsed_ms != null ? fmtElapsed(row.elapsed_ms) : '–'}</small>}
+                  {board === 'daily' ? (
+                    <div className="rk2-daily-score">
+                      <strong className="rk2-par-score" aria-label={row.total != null && row.par != null ? `${row.total - row.par} to par` : 'Score unavailable'}>
+                        {row.total != null && row.par != null ? (row.total === row.par ? 'E' : `${row.total > row.par ? '+' : '−'}${Math.abs(row.total - row.par)}`) : '–'}
+                        <span>TO PAR</span>
+                      </strong>
+                      <small className="rk2-round-details"><span>{row.total ?? '–'} strokes</span><span>{row.elapsed_ms != null ? fmtElapsed(row.elapsed_ms) : '–'} time</span></small>
+                    </div>
+                  ) : <strong className="rk2-value">{board === 'wins' ? row.wins ?? 0 : row.thrones ?? 0}</strong>}
                 </li>
               ))}
             </ol>
