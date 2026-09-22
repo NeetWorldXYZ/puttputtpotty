@@ -162,6 +162,7 @@ export interface ChallengeBoard {
 }
 
 export interface DailyRow {
+  par: number;
   user_id: string;
   display_name: string;
   avatar: Avatar | null;
@@ -483,7 +484,7 @@ export const api = {
 
   async leaderboard(seed: string): Promise<DailyRow[]> {
     await api.syncDaily(seed);
-    const { data, error } = await supabase.rpc('course_leaderboard', { in_seed: seed, lim: 20 });
+    const { data, error } = await supabase.rpc('course_leaderboard_with_par', { in_seed: seed, lim: 20 });
     if (error) throw new Error(error.message);
     return data ?? [];
   },
