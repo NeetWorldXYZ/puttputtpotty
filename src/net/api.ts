@@ -303,8 +303,8 @@ export const api = {
   /** Starts the server-side round clock for a throne run (needs a check-in). */
   start: (locationId: string) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId }),
   /** One stroke list per hole, in order. The server replays all three. */
-  submitLocation: (locationId: string, strokes: Stroke[][], lat: number, lng: number, accuracy: number) =>
-    call<{ runId?: string; score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy }),
+  submitLocation: (locationId: string, strokes: Stroke[][], lat: number, lng: number, accuracy: number, startedAt?: string) =>
+    call<{ runId?: string; score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy, startedAt }),
   async submitDaily(courseSeed: string, holeIndex: number, strokes: Stroke[]) {
     const session = await ensureSession();
     const hole = queueDaily({ user: session.user.id, seed: courseSeed, index: holeIndex, strokes });

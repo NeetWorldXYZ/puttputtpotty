@@ -87,6 +87,7 @@ export function LocationPlay({ locationId, throne }: Props) {
   const [offline, setOffline] = useState(false);
   const [submit, setSubmit] = useState<Submit>({ state: 'idle' });
   const fixRef = useRef<Fix | null>(null);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!place) {
@@ -168,19 +169,25 @@ export function LocationPlay({ locationId, throne }: Props) {
   const onHoleDone = (info: HoleDoneInfo) => {
     strokesRef.current[info.holeIndex] = info.strokes;
     if (!throne || info.holeIndex !== HOLES_PER_COURSE - 1) return;
+    saveRound();
+  };
+
+  const saveRound = () => {
+    if (savingRef.current || submit.state === 'done') return;
     const f = fixRef.current;
     if (!f) {
       setSubmit({ state: 'error', message: 'No GPS fix. Your round was not submitted.' });
       return;
     }
     const lists = strokesRef.current.slice(0, HOLES_PER_COURSE);
-    if (lists.some((l) => !l || !l.length)) {
+    if (lists.length !== HOLES_PER_COURSE || lists.some((l) => !l || !l.length)) {
       setSubmit({ state: 'error', message: 'A hole was skipped, so the round was not submitted.' });
       return;
     }
+    savingRef.current = true;
     setSubmit({ state: 'sending' });
     api
-      .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy)
+      .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy, timerFrom === null ? undefined : new Date(timerFrom).toISOString())
       .then((r) => {
         setSubmit({ state: 'done', runId:r.runId, score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
         if (r.isKing) {
@@ -188,19 +195,20 @@ export function LocationPlay({ locationId, throne }: Props) {
           buzz([30, 40, 30, 40, 80]);
         }
       })
-      .catch((e: Error) => setSubmit({ state: 'error', message: e.message }));
+      .catch((e: Error) => setSubmit({ state: 'error', message: e.message }))
+      .finally(() => { savingRef.current = false; });
   };
 
   if (!place) return null;
 
-  if (loadError) {
+  if (loadError || startError) {
     return (
       <div className="play">
         <div className="overlay" style={{ background: 'var(--page)' }}>
           <div className="card">
             <h2>Couldn&apos;t open this bathroom</h2>
             <div className="sub">{place.name}</div>
-            <div className="err">{loadError}</div>
+            <div className="err">{loadError || startError}</div>
             <button className="primary" onClick={toMap}>
               Back to map
             </button>
@@ -210,7 +218,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     );
   }
 
-  if (!holes) {
+  if (!holes || (throne && timerFrom === null)) {
     return (
       <div className="play">
         <div className="overlay" style={{ background: 'var(--page)' }}>
@@ -227,10 +235,15 @@ export function LocationPlay({ locationId, throne }: Props) {
   const throneStatus = (
     <div className="throne-result">
       {submit.state === 'sending' && <div className="sub">Submitting to the throne room…</div>}
-      {submit.state === 'error' && <div className="err">{submit.message}</div>}
+      {submit.state === 'error' && <div className="throne-save-error" role="alert">
+        <strong>Round not saved yet</strong>
+        <p>{submit.message}</p>
+        <p>Your score above is this round. The throne room below shows previously saved records.</p>
+        <button className="primary" onClick={saveRound}>Retry saving round</button>
+      </div>}
       {submit.state === 'idle' && startError && <div className="err">Clock did not start: {startError}</div>}
       {submit.state === 'done' && submit.elapsedMs !== null && (
-        <div className={`race-result${submit.king && submit.king.elapsed_ms !== null && !submit.isKing ? (submit.elapsedMs <= submit.king.elapsed_ms ? ' ahead' : ' behind') : ''}`}>
+        <div className={`race-result${submit.king && submit.king.elapsed_ms !== null && submit.score === submit.king.score && !submit.isKing ? (submit.elapsedMs < submit.king.elapsed_ms ? ' ahead' : ' behind') : ''}`}>
           ⏱ Your round {fmtElapsed(submit.elapsedMs)}
           {submit.king && submit.king.elapsed_ms !== null && !submit.isKing ? ` · ${submit.king.display_name} ${fmtElapsed(submit.king.elapsed_ms)}` : ''}
         </div>
@@ -239,22 +252,23 @@ export function LocationPlay({ locationId, throne }: Props) {
         (submit.isKing ? (
           <div className="throne-victory">
             <span className="victory-crown" aria-hidden="true">👑</span>
-            <div className="victory-eyebrow">THE THRONE IS YOURS</div>
+            <div className="victory-eyebrow">{king?.user_id === submit.king?.user_id ? 'THRONE DEFENDED!' : 'THRONE TAKEN!'}</div>
             <h3>{place.name}</h3>
-            <p>You hold the course record.</p>
+            <p>{king && king.user_id !== submit.king?.user_id
+              ? `Your ${submit.score} ${submit.score < king.score ? `beats ${king.score}` : 'wins the time tiebreak'}. The crown is yours!`
+              : 'You rule this bathroom. Long live the putt!'}</p>
           </div>
         ) : (
-          <div className="sub">
-            {submit.king ? (
-              <>
-                <Avatar av={submit.king.avatar} size={28} className="row-avatar" />
-                <strong>{submit.king.display_name}</strong> keeps the throne with <strong>{submit.king.score}</strong>
-                {submit.king.hole_scores && ` (${submit.king.hole_scores.join('-')})`}
-                {submit.king.elapsed_ms !== null && ` in ${fmtElapsed(submit.king.elapsed_ms)}`}. Beat it next visit.
-              </>
-            ) : (
-              'Recorded. The throne stays empty until someone finishes all three holes.'
-            )}
+          <div className="throne-comparison">
+            <div className="victory-eyebrow">ROUND SAVED</div>
+            {submit.king ? <>
+              <h3>{submit.score > submit.king.score ? 'So close. The crown stays put.' : 'Tied on strokes. Time decides.'}</h3>
+              <div className="throne-score-duel"><span><b>{submit.score}</b>You</span><i>VS</i><span><b>{submit.king.score}</b>{submit.king.display_name}</span></div>
+              <p>{submit.score > submit.king.score
+                ? `Your ${submit.score} doesn’t beat ${submit.king.display_name}’s ${submit.king.score}. Finish in ${submit.king.score - 1} strokes or fewer to take the throne outright.`
+                : `${submit.king.display_name} keeps the throne on the time tiebreak. Equal scores and times favor the earlier round.`}</p>
+              <p>Your round is saved. You can try again now.</p>
+            </> : <p>Round saved. Refresh the map to see the throne standings.</p>}
           </div>
         ))}
     </div>
