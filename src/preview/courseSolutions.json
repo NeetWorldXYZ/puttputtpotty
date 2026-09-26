@@ -1,0 +1,162 @@
+[
+  {
+    "id": "bath-royal-0-gen-bathroom-rebuild-v1:0:0:0-0",
+    "strokes": [
+      {
+        "angle": -2.2660203445786027,
+        "power": 0.945960185828153,
+        "t": 2.699562701722607
+      },
+      {
+        "angle": 2.318949020140446,
+        "power": 0.6838972369208932,
+        "t": 9.36016977344814
+      }
+    ],
+    "score": 2
+  },
+  {
+    "id": "bath-royal-1-gen-bathroom-rebuild-v1:0:1:0-1",
+    "strokes": [
+      {
+        "angle": -2.316802975999078,
+        "power": 0.787029549817089
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-roadside-2-gen-bathroom-rebuild-v1:1:0:0-0",
+    "strokes": [
+      {
+        "angle": -2.276841078952773,
+        "power": 0.906451191729866
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-roadside-3-gen-bathroom-rebuild-v1:1:1:0-5",
+    "strokes": [
+      {
+        "angle": -1.0078214297374954,
+        "power": 0.7758828457677737
+      },
+      {
+        "angle": -0.7936518130134745,
+        "power": 0.8910940820467659
+      }
+    ],
+    "score": 2
+  },
+  {
+    "id": "bath-locker-4-gen-bathroom-rebuild-v1:2:0:0-0",
+    "strokes": [
+      {
+        "angle": 0.18665623955176014,
+        "power": 0.9866604312439449,
+        "t": 2.6720426543545908
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-locker-5-gen-bathroom-rebuild-v1:2:1:0-1",
+    "strokes": [
+      {
+        "angle": -1.4284214720674677,
+        "power": 0.88371027095709
+      },
+      {
+        "angle": -2.6678551322657795,
+        "power": 0.4748715936322696
+      }
+    ],
+    "score": 2
+  },
+  {
+    "id": "bath-night-6-gen-bathroom-rebuild-v1:3:0:0-0",
+    "strokes": [
+      {
+        "angle": -2.1711378271904573,
+        "power": 0.9308738945401274
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-night-7-gen-bathroom-rebuild-v1:3:1:0-2",
+    "strokes": [
+      {
+        "angle": -1.181965828477973,
+        "power": 0.9038737557944841
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-porta-8-gen-bathroom-rebuild-v1:4:0:0-0",
+    "strokes": [
+      {
+        "angle": -2.014760973498804,
+        "power": 0.949109458818566
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-porta-9-gen-bathroom-rebuild-v1:4:1:0-1",
+    "strokes": [
+      {
+        "angle": -1.820145253438518,
+        "power": 0.8280703375115991,
+        "t": 3.01048991992604
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-space-10-gen-bathroom-rebuild-v1:5:0:0-0",
+    "strokes": [
+      {
+        "angle": 5.2582716843961474,
+        "power": 0.9401354417204857
+      },
+      {
+        "angle": -1.748959368429407,
+        "power": 0.8428846995579079
+      }
+    ],
+    "score": 2
+  },
+  {
+    "id": "bath-space-11-gen-bathroom-rebuild-v1:5:1:0-2",
+    "strokes": [
+      {
+        "angle": -2.259035743188931,
+        "power": 0.6245502632460557
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-night-12-pipe-dream",
+    "strokes": [
+      {
+        "angle": -0.5019189218595868,
+        "power": 0.7627418226911686
+      }
+    ],
+    "score": 1
+  },
+  {
+    "id": "bath-royal-13-rise-and-flush",
+    "strokes": [
+      {
+        "angle": -1.5541697975855808,
+        "power": 0.6573382502305322
+      }
+    ],
+    "score": 1
+  }
+]

@@ -1,3 +1,4 @@
+import {paintBathroom,bathroomLife,drawBathroomBall} from '../preview/render';
 /**
  * Cartoon renderer. Static layers (surround, props, floor, zones,
  * obstacles, cup, walls) are painted once per hole+scale into an offscreen
@@ -62,6 +63,7 @@ export interface DrawOptions {
   /** Obstacle clock for moving obstacles (defaults to `time`, else 0). */
   clock?: number;
   crowdCheer?: boolean;
+  crowdEnabled?:boolean;
   reducedMotion?: boolean;
   /** Hide the static ball drawn by callers (e.g. during the sink animation). */
   extra?: (ctx: CanvasRenderingContext2D) => void;
@@ -126,6 +128,7 @@ function getStaticLayer(hole: Hole, ppuWanted: number, cupR: number, ballR: numb
 }
 
 function paintStatic(ctx: CanvasRenderingContext2D, hole: Hole, cupR: number, ballR: number): { animated: PropPlacement[]; region: Region; spectators: Spectator[] } {
+  if(hole.theme?.startsWith('bath-'))return paintBathroom(ctx,hole,cupR,ballR);
   const theme: Theme = themeById(hole.theme);
   const b = hole.bounds;
   const seed = holeSeed(hole);
@@ -224,7 +227,7 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   const theme = themeById(hole.theme);
   const dpr = o.dpr ?? 1;
 
-  ctx.fillStyle = theme.page;
+  ctx.fillStyle = hole.theme?.startsWith('bath-')?'#092b3c':theme.page;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   const layer = getStaticLayer(hole, S * dpr, o.cupRadius, o.ballRadius);
@@ -237,15 +240,19 @@ export function drawHole(ctx: CanvasRenderingContext2D, hole: Hole, cam: Camera,
   ctx.save();
   ctx.translate(cam.ox, cam.oy);
   ctx.scale(S, S);
-  if (o.time !== undefined) drawAnimated(ctx, hole, layer, theme, o.time);
-  drawSpectators(ctx, layer.spectators, layer.region, o.reducedMotion ? 0 : o.time ?? 0, S, o.crowdCheer ?? false, !!o.aim || !!o.reducedMotion, { left:-cam.ox/S, right:(ctx.canvas.width/dpr-cam.ox)/S, top:(120-cam.oy)/S, bottom:(ctx.canvas.height/dpr-100-cam.oy)/S });
-  const clock = o.clock ?? o.time ?? 0;
-  for (const ob of hole.obstacles) if (isMoving(ob)) drawMover(ctx, ob, clock);
+  const bathroom=hole.theme?.startsWith('bath-');
+  const view={left:-cam.ox/S,right:(ctx.canvas.width/dpr-cam.ox)/S,top:(90-cam.oy)/S,bottom:(ctx.canvas.height/dpr-70-cam.oy)/S};
+  if(bathroom)bathroomLife(ctx,hole,o.crowdEnabled===false?[]:layer.spectators,layer.region,o.time??0,!!o.crowdCheer,!!o.aim||!!o.reducedMotion,view,S,o.clock??o.time??0,!!o.reducedMotion);
+  else {
+    if(o.time!==undefined)drawAnimated(ctx,hole,layer,theme,o.time);
+    drawSpectators(ctx,layer.spectators,layer.region,o.reducedMotion?0:o.time??0,S,!!o.crowdCheer,!!o.aim||!!o.reducedMotion,view);
+    for(const ob of hole.obstacles)if(isMoving(ob))drawMover(ctx,ob,o.clock??o.time??0);
+  }
   if (o.trailOld && o.trailOld.length >= 4) drawTrail(ctx, o.trailOld, 0.25, 0.18);
   if (o.trail && o.trail.length >= 4) drawTrail(ctx, o.trail, 0.55, 0.22);
-  if (o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
+  if (!bathroom && o.cupFlash && o.cupFlash > 0) drawCup(ctx, hole.cup.x, hole.cup.y, o.cupRadius, o.cupFlash);
   if (o.aim) drawAim(ctx, o.aim.x, o.aim.y, o.aim.dx, o.aim.dy, o.aim.lengthUnits * (0.25 + 0.75 * o.aim.power), o.aim.cancelling);
-  if (o.ball) drawBall(ctx, o.ball.x, o.ball.y, o.ballRadius);
+  if (o.ball) (bathroom?drawBathroomBall:drawBall)(ctx, o.ball.x, o.ball.y, o.ballRadius);
   if (o.extra) o.extra(ctx);
 
   if (o.zoneLabels) {
