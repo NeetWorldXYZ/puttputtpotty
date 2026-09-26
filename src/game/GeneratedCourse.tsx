@@ -9,6 +9,7 @@ import { navigate } from '../router';
 import { DEFAULT_PARAMS } from '../sim/params';
 import { api } from '../net/api';
 import { getSavedName } from '../net/supabase';
+import { needsPlayerName } from '../net/playerName';
 import { DailyBoard } from './DailyBoard';
 import { NamePrompt } from './NamePrompt';
 
@@ -49,7 +50,7 @@ export function GeneratedCourse({ seed, count = 9, onOpenEditor }: Props) {
     }).catch(() => { if (live) setStatusError('Could not check your round. Please retry.'); });
     return () => { live = false; };
   }, [seed, daily, revision]);
-  const [askName, setAskName] = useState(daily && !getSavedName());
+  const [askName, setAskName] = useState(daily && needsPlayerName(getSavedName()));
   const [submitted, setSubmitted] = useState(0);
   const [submissionFailed,setSubmissionFailed]=useState(false);
 

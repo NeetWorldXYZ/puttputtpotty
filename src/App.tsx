@@ -1,7 +1,7 @@
 import { PlayView } from './game/PlayView';
 import { GeneratedCourse } from './game/GeneratedCourse';
 import { TitleScreen } from './game/TitleScreen';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { stopTheme } from './game/music';
 import { EditorView } from './editor/EditorView';
 import { COURSE } from './holes';
@@ -10,6 +10,7 @@ import { InviteBanner } from './game/InviteBanner';
 import { startPresence } from './net/presence';
 import { PageReveal, MenuLoading, preparePageArtwork } from './game/PageReveal';
 import { ProfileLoading, prepareProfileArtwork } from './game/ProfileLoading';
+import { FirstVisitNamePrompt } from './game/FirstVisitNamePrompt';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const loadMap = () => import('./game/MapScreen').then((m) => ({ default: m.MapScreen }));
@@ -36,6 +37,7 @@ function Loading() {
 
 export function App() {
   const loc = useLocation();
+  const [profileRevision, setProfileRevision] = useState(0);
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
   useEffect(() => { if (!menu) stopTheme(); }, [menu]);
   // Warm tab modules and hero art after the first menu paint.
@@ -53,8 +55,9 @@ export function App() {
   useEffect(() => { startPresence(); }, []);
   return (
     <>
-      <Screen loc={loc} />
+      <Screen key={profileRevision} loc={loc} />
       <InviteBanner />
+      <FirstVisitNamePrompt enabled={menu} onDone={() => setProfileRevision(n => n + 1)} />
     </>
   );
 }

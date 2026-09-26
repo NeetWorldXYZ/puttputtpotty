@@ -26,7 +26,19 @@
 .locker .lb-note{color:#b8cdd3;font:600 13px var(--game-font);text-align:center;padding:10px}
 /* Account tab */
 .locker-account-status{padding:16px;border-radius:16px;background:linear-gradient(120deg,#fff6dc,#fbeac4);border:1px solid #09273a;box-shadow:0 3px 0 #08263c;color:#14213d}.locker-account-status strong{display:block;font:900 24px/1.1 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;color:#14213d}.locker-account-status p{margin:6px 0 0;font:600 13px/1.5 var(--game-font);color:#5c5135;overflow-wrap:anywhere}
-.card.account.locker .acct-links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card.account.locker .acct-links button{margin:0;min-height:58px;white-space:normal;padding:8px;border:1px solid #45658b;border-radius:14px;background:#1b3456;color:#dbe8f7;font:800 14px var(--game-font);box-shadow:0 3px 0 #091a30}
+.locker .account-eyebrow{display:block;margin-bottom:8px;font:800 10px/1.3 var(--game-font);letter-spacing:.1em;text-transform:uppercase;color:#735516}
+.locker .is-saved .account-eyebrow{color:#1b6b57}
+.locker .account-help{margin-top:18px;padding:14px;border:1px solid #38657b;border-radius:14px;background:#08283c;color:#e5f0eb}
+.locker .account-help strong{font:800 14px/1.4 var(--game-font)}
+.locker .account-help p,.locker .account-transfer p{margin:6px 0 0;font:600 12px/1.6 var(--game-font);color:#b8cdd3}
+.locker .account-caption{margin:9px 0 18px;text-align:center;font:600 11px/1.4 var(--game-font);color:#b8cdd3}
+.card.account.locker .locker-body>.account-quiet{background:transparent;border:0;box-shadow:none;color:#b8cdd3;font-size:12px}
+.locker .account-transfer{margin-top:22px;padding:14px 0 0;border-top:1px solid #38657b}
+.locker .account-transfer summary{cursor:pointer;color:#b8cdd3;font:700 12px/1.5 var(--game-font);padding:8px 0}
+.locker .account-transfer summary:focus-visible{outline:3px solid #ffdf72;outline-offset:3px}
+.card.account.locker .account-transfer button{display:block;width:100%;margin:10px 0 0;padding:12px;border:1px solid #45658b;border-radius:12px;background:#1b3456;color:#dbe8f7;text-align:left}
+.locker .account-transfer button strong{display:block;font:800 13px/1.4 var(--game-font)}
+.locker .account-transfer button small{display:block;margin-top:3px;font:600 11px/1.4 var(--game-font);color:#b8cdd3}
 /* Friends tab lives here too */
 .locker .friends-panel .fr-sub{margin-top:0}
 .card.account.locker .friends-panel button{width:auto;margin:0}

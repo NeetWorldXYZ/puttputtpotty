@@ -11,6 +11,7 @@ import { navigate } from '../router';
 import { Avatar } from './Avatar';
 import { PlayView, type HoleDoneInfo } from './PlayView';
 import { NamePrompt } from './NamePrompt';
+import { needsPlayerName } from '../net/playerName';
 import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
 import { stopTheme } from './music';
@@ -325,9 +326,9 @@ export function MatchScreen({ code, matchId }: Props) {
   const start = useCallback(
     async (fn: () => Promise<MatchRow>) => {
       unlockAudio();
-      if (!getSavedName()) {
+      if (needsPlayerName(getSavedName())) {
         const p = await loadProfile();
-        if (!p?.name || /^Golfer [A-F0-9]+$/.test(p.name)) {
+        if (needsPlayerName(p?.name)) {
           setAskName(true);
           return;
         }
