@@ -634,20 +634,32 @@ export function MapScreen() {
     };
   }, []);
 
+  const [locationRequest, setLocationRequest] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const recenterOnFix = useRef(false);
+
   // --- position
   useEffect(() => {
     return watchPosition(
       (f) => {
         setFix(f);
+        setLocating(false);
         setGeoError(null);
+        if (recenterOnFix.current && mapRef.current) {
+          mapRef.current.flyTo({ center: [f.lng, f.lat], zoom: Math.max(mapRef.current.getZoom(), 16), duration: 500 });
+          recenterOnFix.current = false;
+          setMoved(false);
+          setNotice(f.accuracy > 50 ? `Location is approximate (±${fmtDistance(f.accuracy)}). Try near a window or outside.` : `Location updated (±${fmtDistance(f.accuracy)}).`);
+        }
         rememberFix(f.lat, f.lng);
       },
       (msg, code) => {
+        setLocating(false);
         setGeoError(msg);
         setGeoCode(code);
       },
     );
-  }, []);
+  }, [locationRequest]);
 
   const [osmLoading, setOsmLoading] = useState(false);
   const [, setWide] = useState(false);
@@ -1093,10 +1105,12 @@ export function MapScreen() {
   };
 
   const recentre = () => {
-    if (fix && mapRef.current) {
-      mapRef.current.flyTo({ center: [fix.lng, fix.lat], zoom: 15, duration: 500 });
-      setMoved(false);
-    }
+    recenterOnFix.current = true;
+    setLocating(true);
+    setGeoError(null);
+    setGeoDismissed(false);
+    setNotice('Finding your current location…');
+    setLocationRequest(n => n + 1);
   };
 
   const king = selected ? kings[selected.id] : undefined;
@@ -1163,8 +1177,8 @@ export function MapScreen() {
           </button>
         )}
         <button className="map-tool" onClick={() => setGarageOpen(true)}>Garage</button>
-        <button className="map-tool round" onClick={recentre} title="Recentre">
-          ◎
+        <button className="map-tool round" onClick={recentre} disabled={locating} aria-label={locating ? 'Updating location' : 'Refresh my location'} title="Refresh my location">
+          {locating ? '…' : '◎'}
         </button>
       </div>
       )}
@@ -1289,17 +1303,7 @@ export function MapScreen() {
       {geoError && !selected && !placing && !geoDismissed && (
         <GeoHelpCard
           code={geoCode}
-          onRetry={() => {
-            setGeoError(null);
-            navigator.geolocation?.getCurrentPosition(
-              (p) => setFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, at: Date.now() }),
-              (e) => {
-                setGeoError(geoHelp(e.code as GeoErrorCode).title);
-                setGeoCode(e.code as GeoErrorCode);
-              },
-              { enableHighAccuracy: true, timeout: 15000 },
-            );
-          }}
+          onRetry={recentre}
           onDismiss={() => setGeoDismissed(true)}
         />
       )}

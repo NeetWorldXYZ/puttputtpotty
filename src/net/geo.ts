@@ -22,12 +22,45 @@ export function watchPosition(onFix: (f: Fix) => void, onError: (msg: string, co
     onError('This device has no location support.', 0);
     return () => {};
   }
-  const id = navigator.geolocation.watchPosition(
-    (p) => onFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, at: Date.now() }),
-    (e) => onError(geoHelp(e.code as GeoErrorCode).title, e.code as GeoErrorCode),
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
-  );
-  return () => navigator.geolocation.clearWatch(id);
+  let disposed = false;
+  let generation = 0;
+  let id: number | undefined;
+  let lastTimestamp = 0;
+  const stop = () => {
+    generation++;
+    if (id !== undefined) navigator.geolocation.clearWatch(id);
+    id = undefined;
+  };
+  const start = () => {
+    stop();
+    if (disposed || document.visibilityState === 'hidden') return;
+    const current = generation;
+    id = navigator.geolocation.watchPosition(
+      (p) => {
+        if (disposed || current !== generation || p.timestamp < lastTimestamp) return;
+        // Preserve the sensor time; receiving cached data must not make it fresh.
+        if (Date.now() - p.timestamp > 30000) {
+          onError('Your phone returned an old location. Try again for a fresh reading.', 3);
+          return;
+        }
+        lastTimestamp = p.timestamp;
+        onFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, at: p.timestamp });
+      },
+      (e) => {
+        if (!disposed && current === generation) onError(geoHelp(e.code as GeoErrorCode).title, e.code as GeoErrorCode);
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+    );
+  };
+  start();
+  document.addEventListener('visibilitychange', start);
+  window.addEventListener('pageshow', start);
+  return () => {
+    disposed = true;
+    stop();
+    document.removeEventListener('visibilitychange', start);
+    window.removeEventListener('pageshow', start);
+  };
 }
 
 const UA = typeof navigator !== 'undefined' ? navigator.userAgent : '';
