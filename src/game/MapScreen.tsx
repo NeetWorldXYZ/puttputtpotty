@@ -1,5 +1,3 @@
-import { CartGarage } from './CartGarage';
-import { cartSvg } from './carts';
 import { MenuVolume } from './MenuControls';
 import { placeNameProblem } from '../net/wordfilter';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -446,10 +444,29 @@ function ReviewSheet({ fix, onClose, onChanged }: { fix: Fix | null; onClose: ()
 }
 
 /** You are here: a golf cart. Mirrored to face the way you last moved. */
-function cartElement(cart: string): HTMLElement {
+const CART_SVG = `<svg viewBox="0 0 64 48" aria-hidden="true">
+<ellipse cx="32" cy="44" rx="24" ry="3.5" fill="rgba(0,0,0,0.3)"/>
+<!-- bag on the back -->
+<rect x="4" y="14" width="10" height="18" rx="4" fill="#ff6f3c" stroke="#1f2a44" stroke-width="3"/>
+<path d="M6 14 l2 -6 M9 14 l1 -7 M12 14 l0 -6" stroke="#1f2a44" stroke-width="2.5" stroke-linecap="round"/>
+<!-- body -->
+<path d="M12 30 L12 22 Q12 18 16 18 L40 18 L46 26 L56 26 Q60 26 60 30 L60 34 L12 34 Z" fill="#fffaf0" stroke="#1f2a44" stroke-width="3" stroke-linejoin="round"/>
+<!-- seat -->
+<rect x="20" y="12" width="14" height="7" rx="3" fill="#4db8ff" stroke="#1f2a44" stroke-width="3"/>
+<!-- canopy + posts -->
+<rect x="14" y="2" width="36" height="6" rx="3" fill="#5fae4c" stroke="#1f2a44" stroke-width="3"/>
+<path d="M18 8 V18 M46 8 V26" stroke="#1f2a44" stroke-width="3" stroke-linecap="round"/>
+<!-- wheels -->
+<circle cx="22" cy="36" r="6.5" fill="#1f2a44"/><circle cx="22" cy="36" r="2.5" fill="#fff"/>
+<circle cx="50" cy="36" r="6.5" fill="#1f2a44"/><circle cx="50" cy="36" r="2.5" fill="#fff"/>
+<!-- headlight -->
+<circle cx="58" cy="29" r="1.8" fill="#ffd166"/>
+</svg>`;
+
+function cartElement(): HTMLElement {
   const el = document.createElement('div');
   el.className = 'you-wrap';
-  el.innerHTML = `<div class="you-ring"></div><div class="cart">${cartSvg(cart)}</div>`;
+  el.innerHTML = `<div class="you-ring"></div><div class="cart">${CART_SVG}</div>`;
   return el;
 }
 
@@ -532,10 +549,6 @@ export function MapScreen() {
   const [filter, setFilter] = useState<'all' | 'unclaimed' | 'mine'>('all');
   const [report, setReport] = useState<{ id: string; name: string } | null>(null);
   const [name, setName] = useState(getSavedName());
-  const [cart, setCart] = useState('starter');
-  const [garageOpen, setGarageOpen] = useState(false);
-  useEffect(() => { let active=true; api.cartGarage().then(g=>{if(active)setCart(g.selected)}).catch(()=>{});return()=>{active=false}; }, []);
-  useEffect(() => { const el=userRef.current?.getElement().querySelector('.cart'); if(el)el.innerHTML=cartSvg(cart); }, [cart]);
   const searchedRef = useRef(false);
   const clubhousesRef = useRef<() => void>(() => {});
 
@@ -822,7 +835,7 @@ export function MapScreen() {
     if (!fix || !mapRef.current) return;
     const map = mapRef.current;
     if (!userRef.current) {
-      userRef.current = new maplibregl.Marker({ element: cartElement(cart), anchor: 'center' }).setLngLat([fix.lng, fix.lat]).addTo(map);
+      userRef.current = new maplibregl.Marker({ element: cartElement(), anchor: 'center' }).setLngLat([fix.lng, fix.lat]).addTo(map);
     } else userRef.current.setLngLat([fix.lng, fix.lat]);
     // Face the way you're moving (side view: just mirror east/west).
     const prev = lastFixRef.current;
@@ -840,7 +853,7 @@ export function MapScreen() {
       void search(fix.lat, fix.lng);
       setMoved(false);
     }
-  }, [fix, search, mapLoaded, cart]);
+  }, [fix, search, mapLoaded]);
 
   // Markers: every bathroom is a flag coloured by throne state.
   useEffect(() => {
@@ -1162,14 +1175,12 @@ export function MapScreen() {
             🛠 Review
           </button>
         )}
-        <button className="map-tool" onClick={() => setGarageOpen(true)}>Garage</button>
         <button className="map-tool round" onClick={recentre} title="Recentre">
           ◎
         </button>
       </div>
       )}
 
-      {garageOpen && <CartGarage onClose={() => setGarageOpen(false)} onEquip={setCart} />}
       {notice && <div className="map-toast">{notice}</div>}
 
       {report && (

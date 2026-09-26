@@ -1,4 +1,3 @@
-import type { CartGarage } from '../game/carts';
 import { clearBest, getBest } from '../game/courses';
 import { queueDaily, pendingDaily, acknowledgeDaily, type PendingHole } from './dailyOutbox';
 import type { Hole, Stroke } from '../sim/types';
@@ -282,7 +281,6 @@ async function readRpc<T>(fn: string, params: Record<string, unknown>, opts: { t
 }
 
 export const api = {
-  cartGarage: (equip?: string) => call<CartGarage>({ action: 'cart-garage', equip }),
   avatarHeads: () => call<HeadProgress>({ action: 'avatar-heads' }),
   async gameplayReward(context: string): Promise<{points:number;items:{reason:string;points:number}[]}> {
     await ensureSession();

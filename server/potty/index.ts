@@ -570,14 +570,6 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = body.action as string;
 
-    if (action === 'cart-garage') {
-      await ensureProfile(user.id);
-      if (body.equip !== undefined && typeof body.equip !== 'string') return json({ error: 'Choose a cart.' }, 400);
-      const { data, error } = await admin.rpc('cart_garage', { in_user: user.id, equip: body.equip ?? null });
-      if (error) return json({ error: error.message.includes('still locked') ? 'That cart is still locked. Complete its milestone first.' : 'Could not load your garage. Please try again.' }, 400);
-      return json(data);
-    }
-
     if (action === 'avatar-heads') {
       await ensureProfile(user.id);
       const { data, error } = await admin.rpc('refresh_avatar_collection', { in_user: user.id });
