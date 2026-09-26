@@ -1,0 +1,22 @@
+.pp-loading{position:fixed;inset:0;z-index:50;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#145371 0,#062a40 45%,#031c2e 85%);color:#fff5d6;font-family:var(--game-font);display:grid;place-items:center;padding:calc(env(safe-area-inset-top,0px) + 14px) 20px calc(var(--dock-height,90px) + 22px);box-sizing:border-box}
+.pp-loading::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background-image:linear-gradient(#8edceb 1px,transparent 1px),linear-gradient(90deg,#8edceb 1px,transparent 1px);background-size:64px 64px;mask-image:linear-gradient(transparent,#000,transparent)}
+.pp-loading-content{position:relative;width:min(100%,390px);display:flex;flex-direction:column;align-items:center;text-align:center}
+.pp-loading-logo{width:min(62vw,240px);height:100px;object-fit:contain;filter:drop-shadow(0 5px 0 #001827)}
+.pp-loading-stage{position:relative;width:clamp(160px,29vh,265px);height:clamp(160px,29vh,265px);margin:12px 0 8px}
+.pp-loading-mascot{position:relative;width:100%;height:100%;object-fit:contain;border-radius:50%;mask-image:radial-gradient(ellipse,#000 61%,transparent 73%);animation:pp-mascot-bob 3s ease-in-out infinite}
+.pp-loading-orbit{position:absolute;inset:8%;border:1px solid #5bcee44d;border-radius:50%;box-shadow:0 0 0 14px #5bcee408,0 0 55px #3abbb322}
+.pp-loading-star{position:absolute;color:#ffdc5d;text-shadow:0 0 16px #ffce4780;font-size:27px;animation:pp-star-glow 2s ease-in-out infinite alternate}
+.star-one{top:16%;left:3%}.star-two{bottom:24%;right:0;font-size:18px;animation-delay:1s}
+.pp-loading-copy{min-height:116px;width:100%;animation:pp-copy-in .3s ease-out}
+.pp-loading-eyebrow{font-size:9px;font-weight:700;letter-spacing:1.7px;color:#68d9e5}
+.pp-loading-copy h1{font-family:var(--game-font);font-size:clamp(23px,6.5vw,30px);font-weight:900;line-height:1.1;color:#ffe16d;letter-spacing:-.8px;text-shadow:0 3px #00182b;margin:10px 0}
+.pp-loading-copy p{max-width:295px;margin:0 auto;color:#bddce5;font-size:13px;line-height:1.5}
+.pp-loading-track{width:160px;height:6px;background:#001b2c;border:1px solid #347388;border-radius:20px;margin:17px 0 12px;overflow:hidden}
+.pp-loading-track i{display:block;width:40%;height:100%;border-radius:20px;background:linear-gradient(90deg,#fff4b1,#ffce3b);animation:pp-putt-loading 1.5s ease-in-out infinite alternate}
+.pp-loading-status{color:#b1d2dc;font-size:11px;letter-spacing:.3px}
+@keyframes pp-putt-loading{from{transform:translateX(-100%)}to{transform:translateX(350%)}}
+@keyframes pp-mascot-bob{50%{transform:translateY(-5px)}}
+@keyframes pp-star-glow{to{opacity:.35;transform:scale(.8)}}
+@keyframes pp-copy-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media(max-height:650px){.pp-loading-logo{height:65px}.pp-loading-stage{width:150px;height:150px;margin:4px 0}.pp-loading-copy{min-height:98px}.pp-loading-copy h1{font-size:22px}.pp-loading-track{margin-top:9px}}
+@media(prefers-reduced-motion:reduce){.pp-loading *{animation:none!important}.pp-loading-track i{width:100%;opacity:.7}}

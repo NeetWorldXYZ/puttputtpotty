@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { TabBar, type Tab } from './TabBar';
+import type { Tab } from './TabBar';
+import { BrandedLoading } from './BrandedLoading';
 import './PageReveal.css';
 
 type Page = Exclude<Tab, 'profile'>;
@@ -24,7 +25,7 @@ export function preparePageArtwork(page: Page) {
   return Promise.all(assets[page].map(decode));
 }
 export function MenuLoading({ page }: { page: Page }) {
-  return <div className="menu-loading"><div role="status" aria-busy="true"><span aria-hidden="true">♛</span><p>Getting everything ready…</p></div><TabBar active={page}/></div>;
+  return <BrandedLoading page={page} />;
 }
 /** Keep layout measurable (especially MapLibre) while revealing the first scene atomically. */
 export function PageReveal({ page, children }: { page: Page; children: ReactNode }) {

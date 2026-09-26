@@ -1,4 +1,4 @@
-import { TabBar } from './TabBar';
+import { BrandedLoading } from './BrandedLoading';
 import './Profile.css';
 import './ProfilePolish.css';
 import './ProfileLoading.css';
@@ -17,11 +17,5 @@ export function prepareProfileArtwork(): Promise<void> {
 }
 
 export function ProfileLoading({ publicProfile = false }: { publicProfile?: boolean }) {
-  return <div className="pf-loading-screen">
-    <div className="pf-loading-status" role="status" aria-busy="true">
-      <span aria-hidden="true">♛</span>
-      <p>{publicProfile ? 'Loading golfer…' : 'Loading your profile…'}</p>
-    </div>
-    <TabBar active="profile"/>
-  </div>;
+  return <BrandedLoading page="profile" label={publicProfile ? 'Meeting your rival' : 'Getting your golfer ready'} />;
 }
