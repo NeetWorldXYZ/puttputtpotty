@@ -50,15 +50,6 @@ export function drawSpectators(ctx: CanvasRenderingContext2D, people: Spectator[
     else if(p.variant%3===1){ctx.fillStyle='#583c32';ctx.beginPath();ctx.arc(0,-.48,.29,Math.PI,Math.PI*2);ctx.fill();}
     ctx.fillStyle='#08283c';ctx.fillRect(-.14,-.39,.07,.08);ctx.fillRect(.07,-.39,.07,.08);
     ctx.beginPath();ctx.moveTo(-.1,-.21);ctx.quadraticCurveTo(0,-.13,.1,-.21);ctx.stroke();
-    // A few spectators carry refreshments; keep them inside the person envelope.
-    if(p.variant%4===0){
-      const yy=wave?-.32:.18;
-      ctx.fillStyle='#ffbe43';roundRectPath(ctx,.38,yy,.26,.34,.04);ctx.fill();ctx.stroke();
-      ctx.fillStyle='#fff8df';roundRectPath(ctx,.35,yy-.06,.31,.1,.04);ctx.fill();
-    }else if(p.variant%4===1){
-      ctx.fillStyle='#f7c17a';roundRectPath(ctx,.31,.14,.38,.18,.08);ctx.fill();ctx.stroke();
-      ctx.strokeStyle='#b84738';ctx.lineWidth=.06;ctx.beginPath();ctx.moveTo(.35,.22);ctx.lineTo(.62,.22);ctx.stroke();
-    }
     ctx.restore();
   }
   // One short bubble per interval; keep all of it outside the playable floor.
