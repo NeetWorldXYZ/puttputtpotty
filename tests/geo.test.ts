@@ -1,0 +1,22 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { watchPosition } from '../src/net/geo';
+afterEach(() => vi.unstubAllGlobals());
+it('requests fresh fixes, preserves sensor time, restarts on resume and ignores retired callbacks', () => {
+ const doc = new EventTarget() as EventTarget & {visibilityState:string}; doc.visibilityState='visible';
+ const win = new EventTarget();
+ const callbacks: PositionCallback[]=[];
+ const watch = vi.fn((ok:PositionCallback, _error:PositionErrorCallback, _options:PositionOptions) => {callbacks.push(ok);return callbacks.length;});
+ const clear = vi.fn();
+ vi.stubGlobal('navigator',{geolocation:{watchPosition:watch,clearWatch:clear}});
+ vi.stubGlobal('document',doc);vi.stubGlobal('window',win);
+ const fix=vi.fn(),error=vi.fn();const stop=watchPosition(fix,error);
+ expect(watch.mock.calls[0][2]).toMatchObject({enableHighAccuracy:true,maximumAge:0});
+ const timestamp=Date.now()-1000;
+ const position={timestamp,coords:{latitude:44,longitude:-85,accuracy:12}} as GeolocationPosition;
+ callbacks[0](position);expect(fix).toHaveBeenLastCalledWith({lat:44,lng:-85,accuracy:12,at:timestamp});
+ doc.visibilityState='hidden';doc.dispatchEvent(new Event('visibilitychange'));expect(clear).toHaveBeenCalledWith(1);
+ callbacks[0]({...position,timestamp:Date.now()});expect(fix).toHaveBeenCalledTimes(1);
+ doc.visibilityState='visible';doc.dispatchEvent(new Event('visibilitychange'));expect(watch).toHaveBeenCalledTimes(2);
+ callbacks[1]({...position,timestamp:Date.now()});expect(fix).toHaveBeenCalledTimes(2);
+ stop();callbacks[1](position);win.dispatchEvent(new Event('pageshow'));expect(watch).toHaveBeenCalledTimes(2);expect(fix).toHaveBeenCalledTimes(2);
+});
