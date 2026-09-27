@@ -27,7 +27,7 @@ test('39 new cosmetics render, persist and enforce their unlocks',()=>{
   }
 });
 test('new players and bots only receive starter cosmetics',()=>{
-  for(let i=0;i<100;i++)for(const av of [starterAvatar(()=>i/100),randomAvatar(()=>i/100)]){
+  for(let i=0;i<100;i++)for(const av of [starterAvatar(),randomAvatar(()=>i/100)]){
     expect(STARTER_HATS).toContain(av.hat);expect(STARTER_FACES).toContain(av.face);expect(STARTER_COLORS).toContain(av.porcelain);
   }
 });

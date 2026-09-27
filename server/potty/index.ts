@@ -3,10 +3,11 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { validThroneFinish } from './throneRules.ts';
+import { starterAvatar } from './starterAvatar.ts';
 import { lockedAvatarPart, needsUnlockCheck, normalizeAvatarChoice } from './avatarUnlocks.ts';
 // The engine (sim + solver + generator) is imported from a pinned commit of the public repo;
 // bump the commit when server/potty/engine.js changes (npm run build:engine).
-import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, placeNameProblem, sloganProblem, normalizeAvatar, starterAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/26fcf4621098b49d7aa759981df2665deb16ea61/server/potty/engine.js';
+import { generateHole, generateSlot, courseSlots, replay, holeScore, DEFAULT_PARAMS, nameProblem, placeNameProblem, sloganProblem, normalizeAvatar, solveHole } from 'https://raw.githubusercontent.com/NeetWorldXYZ/puttputtpotty/26fcf4621098b49d7aa759981df2665deb16ea61/server/potty/engine.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -370,8 +371,8 @@ async function ensureProfile(userId: string, displayName?: string): Promise<void
     // Default names are unique by construction: Golfer + a slice of the id.
     for (const len of [4, 6, 8, 12]) {
       const fallback = `Golfer ${userId.replace(/-/g, '').slice(0, len).toUpperCase()}`;
-      // A first look of their own: one of the five starter heads, ready to customise.
-      const { error } = await admin.from('profiles').insert({ id: userId, display_name: displayName?.slice(0, 24) || fallback, avatar: starterAvatar(Math.random) });
+      // Apply the basic look only at creation. Existing players keep their saved customization.
+      const { error } = await admin.from('profiles').insert({ id: userId, display_name: displayName?.slice(0, 24) || fallback, avatar: starterAvatar() });
       if (!error) return;
       if (displayName) throw new Error(error.message);
     }

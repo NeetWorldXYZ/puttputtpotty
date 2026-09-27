@@ -1,5 +1,7 @@
 /** Modular golfer portraits. Storage keys stay compatible with the deployed server. */
 import { renderAvatarArt, renderAvatarPart, renderProfileAvatarArt, renderResultAvatarArt } from './avatarArt';
+import { starterAvatar } from '../../server/potty/starterAvatar';
+export { starterAvatar } from '../../server/potty/starterAvatar';
 import { EARNABLE_HEADS, STARTER_HEADS, earnedHeadTones } from './earnedHeads';
 import { EARNABLE_BALLS, EARNABLE_SHIRTS, EARNABLE_HATS, EARNABLE_FACES, EARNABLE_COLORS, STARTER_HATS, STARTER_FACES, STARTER_COLORS, STARTER_BALLS, STARTER_SHIRTS, type EarnedBall } from '../../server/potty/cosmeticCatalog';
 
@@ -115,7 +117,7 @@ export const BALLS: Record<string, BallLook> = {
   ...Object.fromEntries(Object.entries(EARNABLE_BALLS).map(([material,item]) => [material,{...item,pattern:'plain' as const,material:material as EarnedBall}])),
 };
 
-export const DEFAULT_AVATAR: Avatar = { porcelain: 'white', seat: 'white', hat: 'none', face: 'happy', ball: 'white', head: 'classic' };
+export const DEFAULT_AVATAR: Avatar = starterAvatar();
 
 /** Any input (server rows, old caches, user payloads) -> a valid avatar. Unknown parts fall back. */
 export function normalizeAvatar(input: unknown): Avatar {
@@ -158,20 +160,6 @@ export function avatarPartSvg(input: Avatar, part: keyof Avatar, id: string): {m
   const av = normalizeAvatar(input);
   const tone = part === 'face' ? PORCELAIN.white : headTones(av.head)[av.porcelain];
   return renderAvatarPart(av, part, tone, SEATS[av.seat].color, ballLook(av), id);
-}
-
-/** A new player's first look: any of the five heads in any colour, the rest kept plain so the editor has somewhere to go. */
-export function starterAvatar(r: () => number): Avatar {
-  const pick = (keys: string[]) => keys[Math.floor(r() * keys.length) % keys.length];
-  const head = pick([...STARTER_HEADS]);
-  return {
-    head,
-    porcelain: pick([...STARTER_COLORS]),
-    seat: pick([...STARTER_SHIRTS]),
-    hat: head === 'turd' || head === 'alien' || head === 'dawg' ? 'crown' : 'none',
-    face: 'happy',
-    ball: 'white',
-  };
 }
 
 /** A random look, from a 0..1 source: bots and previews. */

@@ -27,7 +27,7 @@ test('all gear has distinct art, survives saved profiles, and stays out of start
       expect(gearUnlocked(slot,key,awards)).toBe(true);
     }
   }
-  for(let i=0;i<100;i++)for(const av of [starterAvatar(()=>i/100),randomAvatar(()=>i/100)]){
+  for(let i=0;i<100;i++)for(const av of [starterAvatar(),randomAvatar(()=>i/100)]){
     expect(STARTER_SHIRTS).toContain(av.seat);expect(STARTER_BALLS).toContain(av.ball);
   }
   expect(JSON.stringify(DEFAULT_AVATAR)).toBe(base);

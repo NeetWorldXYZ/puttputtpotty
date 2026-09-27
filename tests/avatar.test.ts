@@ -119,15 +119,16 @@ describe('avatars', () => {
     expect(avatarSvg({ ...DEFAULT_AVATAR, head: 'roll' }, 'r')).not.toContain('<circle cx="80" cy="73" r="36"');
   });
 
-  it('starter looks cover every head and always normalize clean', () => {
-    const seen = new Set<string>();
-    for (let i = 0; i < STARTER_HEADS.length; i++) {
-      const av = starterAvatar(() => (i + 0.1) / STARTER_HEADS.length);
-      seen.add(av.head);
-      expect(normalizeAvatar(av)).toEqual(av);
-      expect(av.face).toBe('happy');
-    }
-    expect([...seen].sort()).toEqual([...STARTER_HEADS].sort());
+  it('starts every player with the basic look until they customize it', () => {
+    const first = starterAvatar(), second = starterAvatar();
+    expect(first).toEqual({ head: 'classic', porcelain: 'white', seat: 'white', hat: 'none', face: 'happy', ball: 'white' });
+    expect(first).toEqual(second);
+    expect(normalizeAvatar(first)).toEqual(first);
+    expect(serverNormalizeAvatar(first)).toEqual(first);
+    first.hat = 'cap'; first.seat = 'blue';
+    expect(normalizeAvatar(first)).toEqual(first);
+    expect(second).toEqual(DEFAULT_AVATAR);
+    expect(starterAvatar()).toEqual(DEFAULT_AVATAR);
   });
 
   it('adds thirteen distinct, visible earned portraits without granting them to starters', () => {
