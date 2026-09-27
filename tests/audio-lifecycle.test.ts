@@ -4,11 +4,15 @@ vi.mock('../src/game/music', () => ({ stinger: vi.fn(), primeTheme: vi.fn() }));
 class FakeContext {
   static last: FakeContext;
   static created = 0;
+  static sessionAtCreation: string | undefined;
   state = 'running'; currentTime = 0; destination = {};
   gain = { value: .8, cancelScheduledValues: vi.fn() };
   suspend = vi.fn(async () => { this.state = 'suspended'; });
   resume = vi.fn(async () => { this.state = 'running'; });
-  constructor() { FakeContext.last = this; FakeContext.created++; }
+  constructor() {
+    FakeContext.last = this; FakeContext.created++;
+    FakeContext.sessionAtCreation = (navigator as unknown as {audioSession?:{type:string}}).audioSession?.type;
+  }
   createGain() { return { gain: this.gain, connect: vi.fn() }; }
 }
 let win: EventTarget; let doc: EventTarget & { hidden: boolean; visibilityState: string };
@@ -60,14 +64,16 @@ describe('foreground-only game audio', () => {
   });
 });
 
-describe('audio alongside CarPlay and other media', () => {
-  it('requests mixable audio once and never plays a silent media clip',async () => {
+describe('iPhone media playback and system audio lifecycle', () => {
+  it('selects Silent-mode-compatible playback before creating audio and avoids route churn',async () => {
     let type='auto';
     Object.defineProperty(session,'type',{configurable:true,get:()=>type,set:(value:string)=>{type=value;}});
     const setType=vi.spyOn(session,'type','set');
     const audio=await import('../src/game/sound');
+    expect(session.type).toBe('auto');expect(FakeContext.created).toBe(0);
     for(const event of inputs)win.dispatchEvent(new Event(event));
-    expect(audio.getAudio()).not.toBeNull();expect(session.type).toBe('ambient');
+    expect(audio.getAudio()).not.toBeNull();expect(session.type).toBe('playback');
+    expect(FakeContext.sessionAtCreation).toBe('playback');
     expect(setType).toHaveBeenCalledOnce();expect(Audio).not.toHaveBeenCalled();expect(FakeContext.created).toBe(1);
     hidden(true);hidden(false);await settled();expect(setType).toHaveBeenCalledOnce();
   });
@@ -75,7 +81,7 @@ describe('audio alongside CarPlay and other media', () => {
     saved.set('ppp.mute.v1','1');const audio=await import('../src/game/sound');
     for(const event of inputs)win.dispatchEvent(new Event(event));
     expect(audio.getAudio()).toBeNull();expect(FakeContext.created).toBe(0);expect(session.type).toBe('auto');expect(Audio).not.toHaveBeenCalled();
-    audio.setMuted(false);expect(FakeContext.created).toBe(1);expect(session.type).toBe('ambient');
+    audio.setMuted(false);expect(FakeContext.created).toBe(1);expect(session.type).toBe('playback');
   });
   it('keeps muted audio suspended through further taps and app switches',async () => {
     const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;audio.setMuted(true);await settled();
