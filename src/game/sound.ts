@@ -21,9 +21,10 @@ function configureGameAudio(): void {
   const session = audioSession();
   if (!session) return;
   try {
-    // Game audio should mix with the car's music, not take exclusive playback.
-    // Keep this stable across taps and app switches to avoid route churn.
-    if (session.type !== 'ambient') session.type = 'ambient';
+    // iPhone's Silent switch mutes ambient Web Audio. Use media playback when
+    // game sound is enabled, and keep the category stable across input events.
+    // The shared context still suspends on mute/background and yields to interruptions.
+    if (session.type !== 'playback') session.type = 'playback';
     if (observedSession !== session) {
       session.addEventListener?.('statechange', syncAudioVisibility);
       observedSession = session;
