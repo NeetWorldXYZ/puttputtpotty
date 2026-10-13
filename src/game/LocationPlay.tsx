@@ -30,7 +30,7 @@ const RAMP: Record<string, ('easy' | 'medium' | 'hard')[]> = {
 
 const toMap = () => navigate('map');
 
-/** Best round per player at this bathroom this season. */
+/** Best round per player at this bathroom across all time. */
 function LocationBoard({ locationId, refreshKey }: { locationId: string; refreshKey: number }) {
   const [rows, setRows] = useState<LocationRow[] | null>(null);
   const [me, setMe] = useState<string | null>(null);

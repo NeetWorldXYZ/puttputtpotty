@@ -30,7 +30,6 @@ const SAME_PLACE_M = 25;
 const LINK_CODE_TTL_MIN = 10;
 /** Light solver settings for a bot's hole: well inside the edge CPU budget. */
 const BOT_SOLVE = { randomShots: 40, randomCone: (75 * Math.PI) / 180, randomPlays: 10, runs: 6, candidatesPerStroke: 10, strongRuns: 1, strongCandidates: 24, trapProbeShots: 6 };
-const EPOCH = Date.UTC(2026, 8, 1); // 2026-09-01
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -43,7 +42,8 @@ function json(body: unknown, status = 200): Response {
 }
 
 function currentSeason(): number {
-  return Math.floor((Date.now() - EPOCH) / (6 * 7 * 24 * 3600 * 1000)) + 1;
+  // Compatibility bucket shared with public.current_season(): competition never resets.
+  return 1;
 }
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {

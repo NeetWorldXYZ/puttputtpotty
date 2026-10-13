@@ -1,5 +1,5 @@
 /**
- * Royal ranks (from thrones held this season) and levels (from Throne
+ * Royal ranks (from thrones currently held) and levels (from Throne
  * Points, which only ever go up). The app remembers the last rank and level
  * it showed you, so a promotion or a level-up gets a moment of its own.
  */
