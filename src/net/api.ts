@@ -382,7 +382,7 @@ export const api = {
   /** Six digits another phone can enter to take over this account. */
   linkCode: () => call<{ code: string; expiresAt: string }>({ action: 'link-code' }),
   linkClaim: (code: string) => call<{ ok: true; displayName: string }>({ action: 'link-claim', code }),
-  /** A player's public page: identity, season stats and thrones held. */
+  /** A player's public page: identity, ongoing stats and thrones held. */
   /** Today's and this week's challenges with your progress, plus challenge TP and streak. */
   async challenges(): Promise<ChallengeBoard | null> {
     await ensureSession();
