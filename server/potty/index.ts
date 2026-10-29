@@ -706,14 +706,28 @@ Deno.serve(async (req: Request) => {
       if (typeof locationId !== 'string') return json({ error: 'bad start' }, 400);
       const { data: ci } = await admin.from('checkins').select('at,started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
       if (!ci || Date.now() - new Date(ci.at).getTime() > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'Check in at this bathroom again before playing.' }, 400);
-      if (ci.started_at) return json({ ok: true, startedAt: ci.started_at });
+      if (ci.started_at && body.fresh !== true) return json({ ok: true, startedAt: ci.started_at });
       const startedAt = new Date().toISOString();
-      const { error } = await admin.from('checkins').update({ started_at: startedAt }).eq('user_id', user.id).eq('location_id', locationId).is('started_at', null);
+      let startQuery = admin.from('checkins').update({ started_at: startedAt }).eq('user_id', user.id).eq('location_id', locationId);
+      // Compare-and-set: concurrent starts or late concedes cannot replace this attempt.
+      startQuery = ci.started_at ? startQuery.eq('started_at', ci.started_at) : startQuery.is('started_at', null);
+      const { error } = await startQuery;
       if (error) throw error;
       const { data: clock, error: clockError } = await admin.from('checkins').select('started_at').eq('user_id', user.id).eq('location_id', locationId).single();
       if (clockError) throw clockError;
       if (!clock.started_at) return json({ error: 'Check-in changed. Please return to the map and try again.' }, 409);
+      if (body.fresh === true && Date.parse(clock.started_at) !== Date.parse(startedAt)) return json({ error: 'Another round started. Please return to the map and try again.' }, 409);
       return json({ ok: true, startedAt: clock.started_at });
+    }
+
+    if (action === 'concede-throne') {
+      const { locationId, startedAt } = body;
+      if (typeof locationId !== 'string' || typeof startedAt !== 'string' || !Number.isFinite(Date.parse(startedAt))) return json({ error: 'Invalid round.' }, 400);
+      // Only this player's matching unfinished clock. Saved scores remain intact.
+      const { error } = await admin.from('checkins').update({ started_at: null })
+        .eq('user_id', user.id).eq('location_id', locationId).eq('started_at', startedAt);
+      if (error) throw error;
+      return json({ ok: true });
     }
 
     if (action === 'course-hole') {

@@ -40,6 +40,19 @@ describe('atomic throne round saving', () => {
       const b = await save({...run,score:7,hole_scores:[3,2,2]},next);
       expect(b.rows[0].r.score).toBe(7);
       expect((await db.query('select * from runs')).rows).toHaveLength(2);
+      // Conceding clears only that clock, leaves saved scores alone, and makes
+      // a later submission from the abandoned round invalid.
+      const abandoned = new Date(Date.now()-500).toISOString();
+      await db.query('update checkins set started_at=$1',[abandoned]);
+      const concede = (clock:string) => db.query('update checkins set started_at=null where user_id=$1 and location_id=$2 and started_at=$3',[user,'test',clock]);
+      await concede(abandoned);
+      await expect(save(run,abandoned)).rejects.toThrow('Round is no longer active');
+      const fresh = new Date(Date.now()-100).toISOString();
+      await db.query('update checkins set started_at=$1',[fresh]);
+      await concede(abandoned); // delayed duplicate must not clear the new attempt
+      expect((await db.query('select * from checkins where started_at is not null')).rows).toHaveLength(1);
+      expect((await save({...run,score:6,hole_scores:[2,2,2]},fresh)).rows[0].r.score).toBe(6);
+      expect((await db.query('select * from runs')).rows).toHaveLength(3);
       await expect(save(run,new Date().toISOString())).rejects.toThrow('Round is no longer active');
       const permissions = await db.query<{allowed:boolean}>("select has_function_privilege('authenticated','public.save_throne_round(jsonb,timestamptz)','execute') allowed");
       expect(permissions.rows[0].allowed).toBe(false);

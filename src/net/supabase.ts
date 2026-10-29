@@ -1,6 +1,7 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config';
 import { normalizeAvatar, type Avatar } from '../game/avatarParts';
+import { emailLoginToken } from './emailLogin';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 
@@ -114,6 +115,20 @@ export async function linkEmail(email: string): Promise<void> {
 export async function signInWithEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin } });
   if (error) throw new Error(/signups not allowed|not found/i.test(error.message) ? 'No account uses that email yet. Save your account first on the phone that has it.' : error.message);
+}
+
+/** Finish email login in the browser/PWA that the player actually uses. */
+export async function signInWithEmailLink(link: string): Promise<void> {
+  const token_hash = emailLoginToken(link, SUPABASE_URL);
+  // Do not consume a one-use link if this browser cannot persist the login.
+  try {
+    localStorage.setItem('ppp.storage-check', '1');
+    localStorage.removeItem('ppp.storage-check');
+  } catch { throw new Error('Allow website storage or open the game outside private browsing, then try again.'); }
+  const { data, error } = await supabase.auth.verifyOtp({ token_hash, type: 'email' });
+  if (error || !data.session) throw new Error(error?.message ?? 'That link could not sign you in. Request a fresh email and copy its link.');
+  localStorage.removeItem(NAME_KEY);
+  localStorage.removeItem(AVATAR_KEY);
 }
 
 export async function signOut(): Promise<void> {

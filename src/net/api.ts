@@ -304,7 +304,8 @@ export const api = {
   /** A hole of a seeded course; a match hole answers `building` while the server is still laying it out. */
   courseHole: (seed: string, index: number) => call<{ hole?: Hole; building?: boolean }>({ action: 'course-hole', seed, index }),
   /** Starts the server-side round clock for a throne run (needs a check-in). */
-  start: (locationId: string) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId }),
+  start: (locationId: string, fresh = false) => call<{ ok: true; startedAt: string }>({ action: 'start', locationId, fresh }),
+  concedeLocation: (locationId: string, startedAt: string) => call<{ ok: true }>({ action: 'concede-throne', locationId, startedAt }),
   /** One stroke list per hole, in order. The server replays all three. */
   submitLocation: (locationId: string, strokes: Stroke[][], lat: number, lng: number, accuracy: number, startedAt?: string) =>
     call<{ runId?: string; score: number; par: number; sunk: boolean; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean }>({ action: 'submit', locationId, strokes, lat, lng, accuracy, startedAt }),
