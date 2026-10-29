@@ -1,15 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/game/music', () => ({ stinger: vi.fn(), primeTheme: vi.fn() }));
 
-class FakeContext {
+class FakeContext extends EventTarget {
   static last: FakeContext;
   static created = 0;
   static sessionAtCreation: string | undefined;
   state = 'running'; currentTime = 0; destination = {};
   gain = { value: .8, cancelScheduledValues: vi.fn() };
-  suspend = vi.fn(async () => { this.state = 'suspended'; });
-  resume = vi.fn(async () => { this.state = 'running'; });
+  suspend = vi.fn(async () => { this.state = 'suspended'; this.dispatchEvent(new Event('statechange')); });
+  resume = vi.fn(async () => { this.state = 'running'; this.dispatchEvent(new Event('statechange')); });
   constructor() {
+    super();
     FakeContext.last = this; FakeContext.created++;
     FakeContext.sessionAtCreation = (navigator as unknown as {audioSession?:{type:string}}).audioSession?.type;
   }
@@ -75,7 +76,8 @@ describe('iPhone media playback and system audio lifecycle', () => {
     expect(audio.getAudio()).not.toBeNull();expect(session.type).toBe('playback');
     expect(FakeContext.sessionAtCreation).toBe('playback');
     expect(setType).toHaveBeenCalledOnce();expect(Audio).not.toHaveBeenCalled();expect(FakeContext.created).toBe(1);
-    hidden(true);hidden(false);await settled();expect(setType).toHaveBeenCalledOnce();
+    hidden(true);expect(session.type).toBe('auto');
+    hidden(false);await settled();expect(session.type).toBe('playback');expect(setType).toHaveBeenCalledTimes(3);
   });
   it('does not acquire audio on any input when the saved setting is muted',async () => {
     saved.set('ppp.mute.v1','1');const audio=await import('../src/game/sound');
@@ -96,13 +98,63 @@ describe('iPhone media playback and system audio lifecycle', () => {
     hidden(false);for(const event of inputs)win.dispatchEvent(new Event(event));
     expect(ctx.resume).toHaveBeenCalledOnce();finish();await settled();expect(ctx.state).toBe('running');
   });
-  it('yields to a system interruption and resumes after the session recovers',async () => {
+  it('yields to a system interruption until the player explicitly enables sound',async () => {
     const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
     session.state='interrupted';ctx.state='interrupted';session.dispatchEvent(new Event('statechange'));
     for(const event of inputs)win.dispatchEvent(new Event(event));
     expect(ctx.resume).not.toHaveBeenCalled();
     session.state='active';session.dispatchEvent(new Event('statechange'));await settled();
-    expect(ctx.resume).toHaveBeenCalledOnce();expect(ctx.state).toBe('running');
+    expect(ctx.resume).not.toHaveBeenCalled();expect(audio.isMuted()).toBe(true);expect(session.type).toBe('auto');
+    hidden(true);hidden(false);await settled();
+    expect(ctx.resume).not.toHaveBeenCalled();
+    audio.setMuted(false);await settled();
+    expect(ctx.resume).toHaveBeenCalledOnce();expect(ctx.state).toBe('running');expect(session.type).toBe('playback');
+  });
+  it('handles Safari context interruptions when audioSession.state is unavailable',async () => {
+    vi.stubGlobal('navigator',{});
+    const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
+    const notice=vi.fn();win.addEventListener('ppp:mutechange',notice);
+    ctx.state='interrupted';ctx.dispatchEvent(new Event('statechange'));await settled();
+    for(let i=0;i<5;i++)for(const event of inputs)win.dispatchEvent(new Event(event));
+    expect(ctx.resume).not.toHaveBeenCalled();expect(ctx.gain.value).toBe(0);expect(audio.isMuted()).toBe(true);
+    expect(notice).toHaveBeenCalledOnce();expect(saved.has('ppp.mute.v1')).toBe(false);
+    audio.setMuted(false);await settled();expect(ctx.resume).toHaveBeenCalledOnce();
+  });
+  it('does not reclaim audio on taps or inactive/active session notifications',async () => {
+    const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
+    // Some Safari versions expose suspended without an audioSession interruption.
+    ctx.state='suspended';
+    for(const event of inputs)win.dispatchEvent(new Event(event));
+    for(const state of ['inactive','active','inactive','active']){
+      session.state=state;session.dispatchEvent(new Event('statechange'));
+    }
+    expect(ctx.resume).not.toHaveBeenCalled();
+    ctx.dispatchEvent(new Event('statechange'));await settled();
+    expect(audio.isMuted()).toBe(true);expect(session.type).toBe('auto');
+  });
+  it('releases playback on manual mute and handles Safari unexpectedly restarting while quiet',async () => {
+    const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
+    audio.setMuted(true);await settled();expect(session.type).toBe('auto');
+    ctx.state='running';ctx.dispatchEvent(new Event('statechange'));await settled();
+    expect(ctx.state).toBe('suspended');expect(ctx.gain.value).toBe(0);expect(session.type).toBe('auto');
+  });
+  it('does not retry a rejected resume on ordinary inputs',async () => {
+    const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
+    audio.setMuted(true);await settled();ctx.resume.mockRejectedValueOnce(new Error('route unavailable'));
+    audio.setMuted(false);await settled();
+    for(const event of inputs)win.dispatchEvent(new Event(event));
+    expect(ctx.resume).toHaveBeenCalledOnce();expect(audio.isMuted()).toBe(true);expect(session.type).toBe('auto');
+    audio.setMuted(false);await settled();expect(ctx.resume).toHaveBeenCalledTimes(2);expect(audio.isMuted()).toBe(false);
+  });
+  it('stays quiet if an interruption arrives while resume is pending',async () => {
+    const audio=await import('../src/game/sound');audio.unlockAudio();const ctx=FakeContext.last;
+    audio.setMuted(true);await settled();
+    let finish!:()=>void;ctx.resume.mockImplementation(()=>new Promise<void>(resolve=>{finish=()=>{ctx.state='running';resolve();};}));
+    audio.setMuted(false);
+    session.state='interrupted';session.dispatchEvent(new Event('statechange'));
+    finish();await settled();
+    expect(ctx.state).toBe('suspended');expect(ctx.gain.value).toBe(0);expect(session.type).toBe('auto');
+    expect(audio.isMuted()).toBe(true);expect(ctx.resume).toHaveBeenCalledOnce();
   });
   it.each(['absent','unsupported'])('still plays when the optional audio session API is %s',async mode => {
     if(mode==='absent')vi.stubGlobal('navigator',{});
