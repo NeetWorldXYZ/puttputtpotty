@@ -5,13 +5,22 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|share-preview-v1\\.jpg|icon\\.svg|manifest\\.webmanifest).*)",
+      "source": "/((?!assets/|audio/|share-preview-v1\\.jpg|icon\\.svg|manifest\\.webmanifest).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/audio/(.*)",
       "headers": [
         {
           "key": "Cache-Control",

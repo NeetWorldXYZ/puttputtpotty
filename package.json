@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "solve": "vite-node scripts/solve.ts",
     "generate": "vite-node scripts/generate.ts",
-    "build:engine": "esbuild server/entry.ts --bundle --format=esm --platform=neutral --target=es2022 --minify --outfile=server/potty/engine.js"
+    "build:engine": "esbuild server/entry.ts --bundle --format=esm --platform=neutral --target=es2022 --minify --outfile=server/potty/engine.js",
+    "render:theme": "vite-node scripts/render-theme.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",
@@ -27,6 +28,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "web-audio-engine": "0.13.4"
   }
 }
