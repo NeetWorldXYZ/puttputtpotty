@@ -1,13 +1,31 @@
 import { useEffect, useState } from 'react';
-import { acquireMenuMusic, isMuted, setMuted } from './sound';
+import { getAudio, isMuted, setMuted } from './sound';
+import { startTheme, stopTheme } from './music';
 import { getSavedAvatar, getSavedName, loadProfile } from '../net/supabase';
 import { Avatar } from './Avatar';
 import { AccountSheet } from './AccountSheet';
 import './MenuControls.css';
 
-/** Menus share one native player. Tab swaps keep the tune; gameplay releases it. */
+/** Menu mounts share one idempotent music player. Unmounting a menu never restarts it. */
 export function useMenuMusic() {
-  useEffect(acquireMenuMusic, []);
+  useEffect(() => {
+    const sync = () => {
+      if (isMuted()) { stopTheme(); return; }
+      const audio = getAudio();
+      if (audio && !document.hidden) startTheme(audio.ctx, audio.master, .45);
+    };
+    sync();
+    window.addEventListener('pointerdown', sync);
+    window.addEventListener('keydown', sync);
+    window.addEventListener('ppp:mutechange', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('pointerdown', sync);
+      window.removeEventListener('keydown', sync);
+      window.removeEventListener('ppp:mutechange', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, []);
 }
 
 export function MenuVolume() {

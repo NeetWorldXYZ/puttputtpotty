@@ -14,6 +14,7 @@ import { NamePrompt } from './NamePrompt';
 import { needsPlayerName } from '../net/playerName';
 import { sfx, unlockAudio } from './sound';
 import { buzz } from './haptics';
+import { stopTheme } from './music';
 import { MatchLobby } from './MatchLobby';
 import { MatchResultModal } from './MatchResultModal';
 import { loadRankedRecord, type RankedRecord } from '../net/rankedRecord';
@@ -58,6 +59,7 @@ const SEARCH_LINES = ['Looking for players near you…', 'Checking who’s on th
  */
 export function MatchScreen({ code, matchId }: Props) {
   const [phase, setPhase] = useState<Phase>(matchId ? 'loading' : code ? 'loading' : 'lobby');
+  useEffect(() => { if (phase === 'playing') stopTheme(); }, [phase]);
   const [match, setMatch] = useState<MatchRow | null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [holes, setHoles] = useState<Hole[] | null>(null);

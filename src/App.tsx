@@ -2,6 +2,7 @@ import { PlayView } from './game/PlayView';
 import { GeneratedCourse } from './game/GeneratedCourse';
 import { TitleScreen } from './game/TitleScreen';
 import { Suspense, lazy, useEffect, useState } from 'react';
+import { stopTheme } from './game/music';
 import { EditorView } from './editor/EditorView';
 import { COURSE } from './holes';
 import { navigate, useLocation } from './router';
@@ -39,6 +40,7 @@ export function App() {
   const loc = useLocation();
   const [profileRevision, setProfileRevision] = useState(0);
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
+  useEffect(() => { if (!menu) stopTheme(); }, [menu]);
   // Warm tab modules and hero art after the first menu paint.
   useEffect(() => {
     if (!menu) return;

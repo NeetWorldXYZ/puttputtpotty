@@ -1,6 +1,9 @@
-/** Sound effects use a lazy Web Audio context; menu music is native media. */
-import { stinger, type StingerLevel } from './music';
-import { createThemePlayer } from './themePlayer';
+/**
+ * Synthesised sound effects with the Web Audio API. No asset files. The
+ * context is created on the first user gesture (browser autoplay rules).
+ */
+
+import { primeTheme, stinger, type StingerLevel } from './music';
 
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
@@ -8,17 +11,6 @@ let backgrounded = typeof document !== 'undefined' && document.hidden;
 let audioTransition = false;
 let interrupted = false;
 let hasRun = false;
-let unlocked = false;
-let menuOwners = 0;
-let effectsActive = false;
-let effectsUntil = 0;
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
-const stopSources = new Set<() => void>();
-let muted = false;
-const MUTE_KEY = 'ppp.mute.v1';
-try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch { /* unavailable storage */ }
-
-const theme = createThemePlayer(yieldAudio);
 type GameAudioSession = { type: string; state?: string; addEventListener?: (event: string, listener: () => void) => void };
 let observedSession: GameAudioSession | undefined;
 
@@ -31,16 +23,18 @@ function configureGameAudio(): void {
   const session = audioSession();
   if (!session) return;
   try {
-    // Effects-only gameplay needs playback to work with iPhone Silent mode.
-    // Native menu music already establishes its own media session via 'auto'.
+    // iPhone's Silent switch mutes ambient Web Audio. Use media playback when
+    // game sound is enabled. Release this override when quiet so other apps
+    // can keep their Bluetooth/USB route without the game claiming playback.
     if (session.type !== 'playback') session.type = 'playback';
     if (observedSession !== session) {
       session.addEventListener?.('statechange', () => {
         if (session.state === 'interrupted') yieldAudio();
+        // Recovery is the player's choice, never an automatic resume loop.
       });
       observedSession = session;
     }
-  } catch { /* Optional Safari API. */ }
+  } catch { /* Optional Safari API; Web Audio is still usable without it. */ }
 }
 
 function releaseGameAudio(): void {
@@ -49,30 +43,15 @@ function releaseGameAudio(): void {
   } catch { /* Optional Safari API. */ }
 }
 
-function isBackgrounded(): boolean {
-  return backgrounded || (typeof document !== 'undefined' && document.hidden);
-}
-export function isMuted(): boolean { return muted || interrupted; }
-function musicWanted(): boolean { return menuOwners > 0 && unlocked && !isMuted() && !isBackgrounded(); }
-function effectsWanted(): boolean { return effectsActive && !isMuted() && !isBackgrounded(); }
 function notifyMuteChange(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
 }
 
-function clearEffects(): void {
-  clearTimeout(idleTimer);
-  effectsUntil = 0;
-  effectsActive = false;
-  for (const stop of stopSources) stop();
-  stopSources.clear();
-}
-
-/** Temporary system interruptions never overwrite the saved mute preference. */
+/** Pause for this visit without overwriting the player's saved sound preference. */
 function yieldAudio(): void {
   if (interrupted || muted) return;
   interrupted = true;
-  clearEffects();
-  syncAudio();
+  syncAudioVisibility();
   notifyMuteChange();
 }
 
@@ -81,129 +60,44 @@ function contextStateChanged(): void {
   const state = String(ctx.state); // Safari also exposes "interrupted".
   if (state === 'running') {
     hasRun = true;
-    if (!effectsWanted()) syncAudio();
+    if (isBackgrounded() || isMuted()) syncAudioVisibility();
   } else if (state === 'interrupted' ||
-      (state === 'suspended' && hasRun && !audioTransition && effectsWanted())) {
+      (state === 'suspended' && hasRun && !audioTransition && !isBackgrounded() && !isMuted())) {
     yieldAudio();
   }
 }
 
-function syncAudio(): void {
-  theme.setPlaying(musicWanted());
-  const quiet = !effectsWanted();
+function isBackgrounded(): boolean {
+  return backgrounded || (typeof document !== 'undefined' && document.hidden);
+}
+
+function syncAudioVisibility(): void {
+  const quiet = isBackgrounded() || isMuted();
   if (master) {
     master.gain.cancelScheduledValues(ctx?.currentTime ?? 0);
     master.gain.value = quiet ? 0 : 0.8;
   }
-  if (quiet || musicWanted()) releaseGameAudio();
-  if (!ctx || audioTransition || ctx.state === 'closed') return;
-  const live = ctx as AudioContext;
-  if (!quiet && !musicWanted()) configureGameAudio();
+  if (quiet) releaseGameAudio();
+  if (!(ctx instanceof AudioContext) || audioTransition || ctx.state === 'closed') return;
+  const live = ctx;
+  if (!quiet) configureGameAudio();
   if (quiet ? live.state === 'suspended' : live.state === 'running') return;
-  // Mark before calling: statechange can fire before the promise settles.
+  // Mark before invoking the native method: statechange can fire before its
+  // promise settles, and our own suspend must not look like an interruption.
   audioTransition = true;
   const failed = () => {
     audioTransition = false;
-    if (!quiet) yieldAudio();
+    if (!quiet) yieldAudio(); // A failed resume needs another explicit sound tap.
   };
   try {
     const operation = quiet ? live.suspend() : live.resume();
     void operation.then(() => {
       audioTransition = false;
       if (live.state === 'running') hasRun = true;
-      if (quiet !== !effectsWanted()) syncAudio();
+      // Mute or app visibility may change while the native operation is pending.
+      if (quiet !== (isBackgrounded() || isMuted())) syncAudioVisibility();
     }).catch(failed);
   } catch { failed(); }
-}
-
-/** One music owner per mounted menu; sibling tab swaps don't restart the song. */
-export function acquireMenuMusic(): () => void {
-  menuOwners++;
-  syncAudio();
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    menuOwners--;
-    // React unmounts one tab before mounting the next in the same effect flush.
-    queueMicrotask(syncAudio);
-  };
-}
-
-/** The effects bus, if an actual sound has needed it. Music never uses it. */
-export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
-  return ctx && master && ctx instanceof AudioContext ? { ctx, master } : null;
-}
-
-export function setMuted(m: boolean): void {
-  muted = m;
-  if (!m) { interrupted = false; unlocked = true; }
-  else clearEffects();
-  try { localStorage.setItem(MUTE_KEY, m ? '1' : '0'); } catch { /* unavailable storage */ }
-  syncAudio();
-  notifyMuteChange();
-}
-
-/** A gesture permits audio, but does NOT allocate or resume an effects context. */
-export function unlockAudio(): void {
-  if (isBackgrounded() || isMuted() || unlocked) return;
-  unlocked = true;
-  syncAudio();
-}
-
-/** Wake only for a real effect, and sleep after its scheduled tail has ended. */
-function ensureEffects(seconds: number): boolean {
-  if (typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext) return true;
-  if (!unlocked || isMuted() || isBackgrounded()) return false;
-  if (String(ctx?.state) === 'interrupted' || audioSession()?.state === 'interrupted' ||
-      (hasRun && effectsActive && ctx?.state === 'suspended' && !audioTransition)) {
-    yieldAudio();
-    return false;
-  }
-  try {
-    if (!ctx) {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return false;
-      if (!musicWanted()) configureGameAudio();
-      ctx = new AC();
-      hasRun = ctx.state === 'running';
-      ctx.addEventListener('statechange', contextStateChanged);
-      master = ctx.createGain();
-      master.gain.value = .8;
-      master.connect(ctx.destination);
-      loadCheerSamples();
-    }
-    effectsActive = true;
-    effectsUntil = Math.max(effectsUntil, Date.now() + seconds * 1000 + 1500);
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { clearEffects(); syncAudio(); }, effectsUntil - Date.now());
-    syncAudio();
-    return !isMuted();
-  } catch {
-    yieldAudio();
-    return false;
-  }
-}
-
-function trackSource(source: AudioScheduledSourceNode, output: AudioNode): void {
-  const stop = () => {
-    try { source.stop(); } catch { /* ended */ }
-    source.disconnect();
-    output.disconnect();
-    stopSources.delete(stop);
-  };
-  stopSources.add(stop);
-  source.addEventListener('ended', stop, { once: true });
-}
-
-if (typeof window !== 'undefined') {
-  for (const event of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) {
-    window.addEventListener(event, unlockAudio, { passive: true, capture: true });
-  }
-  const visibility = () => { if (isBackgrounded()) clearEffects(); syncAudio(); };
-  window.addEventListener('pagehide', () => { backgrounded = true; visibility(); });
-  window.addEventListener('pageshow', () => { backgrounded = document.hidden; visibility(); });
-  document.addEventListener('visibilitychange', () => { backgrounded = document.hidden; visibility(); });
 }
 
 /**
@@ -230,6 +124,84 @@ export function loadCheerSamples(): void {
   }
 }
 
+/** The live context and master bus, once unlocked (music hangs off the same bus). */
+export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
+  return ctx && master && ctx instanceof AudioContext ? { ctx, master } : null;
+}
+let muted = false;
+
+const MUTE_KEY = 'ppp.mute.v1';
+try {
+  muted = localStorage.getItem(MUTE_KEY) === '1';
+} catch {
+  /* ignore */
+}
+
+/** Effective silence includes a temporary system interruption, not just saved mute. */
+export function isMuted(): boolean {
+  return muted || interrupted;
+}
+
+export function setMuted(m: boolean): void {
+  muted = m;
+  if (!m) interrupted = false;
+  try {
+    localStorage.setItem(MUTE_KEY, m ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+  if (m || ctx) syncAudioVisibility();
+  else unlockAudio();
+  notifyMuteChange();
+}
+
+/** Call from a pointer/touch handler so the context is allowed to start. */
+export function unlockAudio(): void {
+  if (isBackgrounded() || isMuted()) return;
+  if (ctx) {
+    // Ordinary taps only unlock the FIRST context. Never reclaim audio from
+    // another app while putting, navigating menus, or handling synthetic clicks.
+    if (String(ctx.state) === 'interrupted' || audioSession()?.state === 'interrupted') yieldAudio();
+    return;
+  }
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    configureGameAudio();
+    ctx = new AC();
+    hasRun = ctx.state === 'running';
+    ctx.addEventListener('statechange', contextStateChanged);
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 0.8;
+    master.connect(ctx.destination);
+    loadCheerSamples();
+    // Render the theme loop now, during the tap, so it starts without a pause and never depends on timers.
+    try {
+      primeTheme(ctx.sampleRate);
+    } catch {
+      /* the theme falls back to its timer scheduler */
+    }
+    // iOS creates the context suspended even inside a gesture; resume it now, while the gesture is live.
+    syncAudioVisibility();
+  } catch {
+    ctx = null;
+    releaseGameAudio();
+  }
+}
+
+// Any first touch anywhere counts; iOS only honours resume() inside these.
+if (typeof window !== 'undefined') {
+  for (const ev of ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'click', 'keydown'] as const) window.addEventListener(ev, unlockAudio, { passive: true, capture: true });
+  window.addEventListener('pagehide', () => { backgrounded = true; syncAudioVisibility(); });
+  window.addEventListener('pageshow', () => { backgrounded = document.hidden; syncAudioVisibility(); });
+  // Focus can briefly change for system UI while the page remains visible.
+  // Only actual page visibility/lifecycle events should pause game audio.
+  document.addEventListener('visibilitychange', () => {
+    backgrounded = document.hidden;
+    syncAudioVisibility();
+  });
+}
+
 function now(): number {
   return ctx ? ctx.currentTime : 0;
 }
@@ -244,7 +216,7 @@ function noiseBuffer(seconds: number): AudioBuffer | null {
 }
 
 function tone(freq: number, dur: number, opts: { type?: OscillatorType; gain?: number; to?: number; attack?: number; delay?: number } = {}): void {
-  if (!ensureEffects(dur + (opts.delay ?? 0) + .05) || !ctx || !master) return;
+  if (!ctx || !master || isMuted() || isBackgrounded()) return;
   const t0 = now() + (opts.delay ?? 0);
   const o = ctx.createOscillator();
   const g = ctx.createGain();
@@ -259,11 +231,10 @@ function tone(freq: number, dur: number, opts: { type?: OscillatorType; gain?: n
   g.connect(master);
   o.start(t0);
   o.stop(t0 + dur + 0.02);
-  trackSource(o, g);
 }
 
 function noise(dur: number, opts: { gain?: number; filter?: number; to?: number; q?: number; delay?: number; attack?: number } = {}): void {
-  if (!ensureEffects(dur + (opts.delay ?? 0) + .05) || !ctx || !master) return;
+  if (!ctx || !master || isMuted() || isBackgrounded()) return;
   const buf = noiseBuffer(dur + 0.05);
   if (!buf) return;
   const t0 = now() + (opts.delay ?? 0);
@@ -283,7 +254,6 @@ function noise(dur: number, opts: { gain?: number; filter?: number; to?: number;
   g.connect(master);
   src.start(t0);
   src.stop(t0 + dur + 0.05);
-  trackSource(src, g);
 }
 
 export const sfx = {
@@ -351,13 +321,12 @@ export const sfx = {
    * bigger ones (see loadCheerSamples).
    */
   stinger(level: StingerLevel): void {
-    const sample = level === 'ace' ? samples.big : level === 'great' ? samples.small : null;
-    if (!ensureEffects(Math.max(3.2, (sample?.duration ?? 0) + .15)) || !ctx || !master) return;
+    if (!ctx || !master || isMuted() || isBackgrounded()) return;
     const bus = ctx.createGain();
     bus.gain.value = 0.9;
     bus.connect(master);
     stinger({ ctx, out: bus }, level, now());
-    stopSources.add(() => bus.disconnect());
+    const sample = level === 'ace' ? samples.big : level === 'great' ? samples.small : null;
     if (sample && ctx instanceof AudioContext) {
       const src = ctx.createBufferSource();
       const g = ctx.createGain();
@@ -366,7 +335,6 @@ export const sfx = {
       src.connect(g);
       g.connect(master);
       src.start(now() + 0.15);
-      trackSource(src, g);
     }
   },
   whoosh(): void {
@@ -402,8 +370,7 @@ export async function renderSfx(name: keyof typeof sfx, seconds = 3, arg?: unkno
   const g = off.createGain();
   g.gain.value = 0.8;
   g.connect(off.destination);
-  const saved = { ctx, master, muted, interrupted, stops: new Set(stopSources) };
-  stopSources.clear();
+  const saved = { ctx, master, muted, interrupted };
   ctx = off;
   master = g;
   muted = false;
@@ -415,8 +382,6 @@ export async function renderSfx(name: keyof typeof sfx, seconds = 3, arg?: unkno
     master = saved.master;
     muted = saved.muted;
     interrupted = saved.interrupted;
-    stopSources.clear();
-    for (const stop of saved.stops) stopSources.add(stop);
   }
   return await off.startRendering();
 }
