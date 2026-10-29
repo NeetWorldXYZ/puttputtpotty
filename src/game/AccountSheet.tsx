@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './AccountSheet.css';
 import { FriendsPanel } from './FriendsSheet';
 import { api } from '../net/api';
-import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signOut } from '../net/supabase';
+import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signInWithEmailLink, signOut } from '../net/supabase';
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
 import { getSavedAvatar, saveAvatar } from '../net/supabase';
 import { Avatar } from './Avatar';
@@ -31,6 +31,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const lookEdited = useRef(false);
   const [name, setName] = useState(getSavedName() ?? '');
   const [email, setEmail] = useState('');
+  const [emailLink, setEmailLink] = useState('');
   const [current, setCurrent] = useState<{ name: string | null; email: string | null; anonymous: boolean } | null>(null);
   const [accountLoading, setAccountLoading] = useState(true);
   const [accountError, setAccountError] = useState(false);
@@ -117,7 +118,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
   const doSignIn = () =>
     run(async () => {
       await signInWithEmail(email.trim());
-      setNote(`Check ${email.trim()} and tap the link. Come back here afterwards.`);
+      setNote(`Email sent to ${email.trim()}. To sign in inside this game, copy the sign-in link from the email and paste it below.`);
     });
   const avatarDirty = JSON.stringify(avatar) !== JSON.stringify(savedAvatar);
   const saveLook = () =>
@@ -252,7 +253,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
               <div className="sub">
                 {mode === 'save'
                   ? 'Your name and thrones follow this email to any phone. No password, just a link.'
-                  : 'Already saved an account? We email you a link that signs this phone in.'}
+                  : 'Sign in to your saved golfer. Your login stays saved in the app or browser where you finish signing in.'}
               </div>
               <input aria-label="Email address" className="name-input" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               {error && <div className="err">{error}</div>}
@@ -260,6 +261,17 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
               <button className="primary" disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) || busy} onClick={() => void (mode === 'save' ? doLink() : doSignIn())}>
                 {busy ? 'Sending…' : 'Email me the link'}
               </button>
+              {mode === 'signin' && <div className="account-help">
+                <strong>Stay signed in to this game</strong>
+                <p>Email links can open Safari instead of your Home Screen app. Long-press the sign-in button in your email, choose Copy Link, then paste it here without opening it.</p>
+                <input aria-label="Email sign-in link" className="name-input" type="password" autoComplete="off" placeholder="Paste sign-in link" value={emailLink} onChange={e => setEmailLink(e.target.value)} />
+                <button className="primary" disabled={busy || !emailLink.trim()} onClick={() => void run(async () => {
+                  await signInWithEmailLink(emailLink);
+                  setEmailLink('');
+                  window.location.replace(window.location.pathname);
+                })}>{busy ? 'Signing in…' : 'Sign in here & remember me'}</button>
+                <p>Already opened the link? Request a new email above. Use the same app or browser next time.</p>
+              </div>}
               <button onClick={() => openMode('account')}>Back to Account</button>
             </>
           )}

@@ -7,6 +7,7 @@ import { currentUserId } from '../net/supabase';
 import { watchPosition, type Fix } from '../net/geo';
 import { bandFor, recallPlace } from '../net/places';
 import { loadCourse } from '../net/course';
+import { ThroneAttempt } from '../net/throneAttempt';
 import { navigate } from '../router';
 import { Avatar } from './Avatar';
 import { EarnedTP } from './EarnedTP';
@@ -75,7 +76,12 @@ function LocationBoard({ locationId, refreshKey }: { locationId: string; refresh
  * locally when the backend is unreachable. A throne run submits all three
  * stroke lists at the end and the server replays them.
  */
-export function LocationPlay({ locationId, throne }: Props) {
+export function LocationPlay(props: Props) {
+  const [attempt, setAttempt] = useState(0);
+  return <LocationRound key={attempt} {...props} onAgain={() => setAttempt(n => n + 1)} />;
+}
+
+function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () => void }) {
   const place = recallPlace(locationId);
   const [holes, setHoles] = useState<Hole[] | null>(null);
   const [king, setKing] = useState<King | null>(null);
@@ -88,6 +94,49 @@ export function LocationPlay({ locationId, throne }: Props) {
   const [submit, setSubmit] = useState<Submit>({ state: 'idle' });
   const fixRef = useRef<Fix | null>(null);
   const savingRef = useRef(false);
+  const abandoningRef = useRef(false);
+  const [confirmConcede, setConfirmConcede] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [attempt] = useState(() => new ThroneAttempt(
+    () => api.start(locationId, true), clock => api.concedeLocation(locationId, clock),
+  ));
+  useEffect(() => {
+    attempt.mount();
+    return () => attempt.dispose();
+  }, [attempt]);
+
+  const concede = async () => {
+    if (leaving || savingRef.current) return;
+    abandoningRef.current = true;
+    setLeaving(true); setLeaveError(null);
+    try {
+      await attempt.concede();
+      strokesRef.current = [];
+      setTimerFrom(null);
+      toMap();
+    } catch {
+      setLeaveError('Could not confirm the concession. Try again.');
+    } finally { setLeaving(false); }
+  };
+  const exitRound = () => {
+    if (savingRef.current) return;
+    if (throne && submit.state !== 'done') setConfirmConcede(true);
+    else toMap();
+  };
+  const challengeAgain = async () => {
+    if (retrying || submit.state !== 'done') return;
+    setRetrying(true); setRetryError(null);
+    try {
+      const f = fixRef.current;
+      if (!f || Date.now() - f.at > 60_000) throw new Error('Waiting for a current location. Please try again.');
+      await api.checkin(locationId, f.lat, f.lng, f.accuracy);
+      onAgain();
+    } catch (e) { setRetryError((e as Error).message); }
+    finally { setRetrying(false); }
+  };
 
   useEffect(() => {
     if (!place) {
@@ -143,8 +192,8 @@ export function LocationPlay({ locationId, throne }: Props) {
   useEffect(() => {
     if (!throne || !holes) return;
     let cancelled = false;
-    api
-      .start(locationId)
+    attempt
+      .start()
       .then((r) => {
         if (!cancelled) setTimerFrom(new Date(r.startedAt).getTime());
       })
@@ -154,7 +203,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [throne, holes, locationId]);
+  }, [throne, holes, locationId, attempt]);
 
   useEffect(() => {
     if (!throne) return;
@@ -167,13 +216,14 @@ export function LocationPlay({ locationId, throne }: Props) {
   }, [throne]);
 
   const onHoleDone = (info: HoleDoneInfo) => {
+    if (abandoningRef.current) return;
     strokesRef.current[info.holeIndex] = info.strokes;
     if (!throne || info.holeIndex !== HOLES_PER_COURSE - 1) return;
     saveRound();
   };
 
   const saveRound = () => {
-    if (savingRef.current || submit.state === 'done') return;
+    if (abandoningRef.current || savingRef.current || submit.state === 'done') return;
     const f = fixRef.current;
     if (!f) {
       setSubmit({ state: 'error', message: 'No GPS fix. Your round was not submitted.' });
@@ -189,6 +239,7 @@ export function LocationPlay({ locationId, throne }: Props) {
     api
       .submitLocation(locationId, lists, f.lat, f.lng, f.accuracy, timerFrom === null ? undefined : new Date(timerFrom).toISOString())
       .then((r) => {
+        attempt.finish();
         setSubmit({ state: 'done', runId:r.runId, score: r.score, holeScores: r.holeScores, elapsedMs: r.elapsedMs, king: r.king, isKing: r.isKing });
         if (r.isKing) {
           sfx.fanfare('ace');
@@ -200,16 +251,24 @@ export function LocationPlay({ locationId, throne }: Props) {
   };
 
   if (!place) return null;
+  const concession = confirmConcede ? <div className="overlay" style={{ zIndex: 10000 }}><div className="card pop" role="dialog" aria-modal="true" aria-label="Concede round">
+    <h2>Concede this round?</h2>
+    <div className="sub">This attempt will be discarded. Your saved scores and thrones stay yours.</div>
+    {leaveError && <div className="err" role="alert">{leaveError}</div>}
+    <button className="primary" disabled={leaving} onClick={() => void concede()}>{leaving ? 'Conceding…' : 'Concede & return to map'}</button>
+    {!leaveError && <button disabled={leaving} onClick={() => setConfirmConcede(false)}>Keep playing</button>}
+  </div></div> : null;
 
   if (loadError || startError) {
     return (
       <div className="play">
+        {concession}
         <div className="overlay" style={{ background: 'var(--page)' }}>
           <div className="card">
             <h2>Couldn&apos;t open this bathroom</h2>
             <div className="sub">{place.name}</div>
             <div className="err">{loadError || startError}</div>
-            <button className="primary" onClick={toMap}>
+            <button className="primary" onClick={exitRound}>
               Back to map
             </button>
           </div>
@@ -221,11 +280,12 @@ export function LocationPlay({ locationId, throne }: Props) {
   if (!holes || (throne && timerFrom === null)) {
     return (
       <div className="play">
+        {concession}
         <div className="overlay" style={{ background: 'var(--page)' }}>
           <div className="card">
             <h2>{building ? `Building hole ${building} of ${HOLES_PER_COURSE}` : 'Opening the stall'}</h2>
             <div className="sub">{place.name}{building ? ' · first visit, the course is being laid out' : ''}</div>
-            <button onClick={toMap}>Back to map</button>
+            <button onClick={exitRound}>Back to map</button>
           </div>
         </div>
       </div>
@@ -275,18 +335,25 @@ export function LocationPlay({ locationId, throne }: Props) {
   );
 
   return (
+    <>
     <PlayView
       key={holes[0].id}
       holes={holes}
       courseSeed={null}
-      onExit={toMap}
-      exitLabel="Map"
+      onExit={exitRound}
+      exitLabel={throne && submit.state !== 'done' ? 'Concede round' : 'Map'}
       lockedParams={DEFAULT_PARAMS}
       noRetry={throne}
       timerFrom={timerFrom}
       raceMs={throne ? (king?.elapsed_ms ?? null) : null}
       raceLabel={king?.display_name ?? null}
       onHoleDone={onHoleDone}
+      renderScorecardButtons={throne ? ({ share, shared }) => <>
+        {retryError && <div className="err" role="alert">{retryError}</div>}
+        <button className="primary" disabled={submit.state !== 'done' || retrying} onClick={() => void challengeAgain()}>{retrying ? 'Checking in…' : 'Challenge again'}</button>
+        <button onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
+        <button disabled={submit.state === 'sending' || retrying} onClick={exitRound}>Map</button>
+      </> : undefined}
       scorecardExtra={
         throne ? (
           <>
@@ -320,9 +387,11 @@ export function LocationPlay({ locationId, throne }: Props) {
             {info.holeIndex + 1 < HOLES_PER_COURSE ? 'Next hole →' : 'See scorecard'}
           </button>
           {!throne && <button onClick={actions.retry}>Retry hole</button>}
-          {!throne && <button onClick={toMap}>Back to map</button>}
+          {!throne && <button onClick={exitRound}>Back to map</button>}
         </>
       )}
     />
+    {concession}
+    </>
   );
 }

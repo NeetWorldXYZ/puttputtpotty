@@ -11,6 +11,7 @@ import { startPresence } from './net/presence';
 import { PageReveal, MenuLoading, preparePageArtwork } from './game/PageReveal';
 import { ProfileLoading, prepareProfileArtwork } from './game/ProfileLoading';
 import { FirstVisitNamePrompt } from './game/FirstVisitNamePrompt';
+import { supabase, saveAvatar } from './net/supabase';
 
 // The map (Leaflet) and location play load on demand so the game shell stays small.
 const loadMap = () => import('./game/MapScreen').then((m) => ({ default: m.MapScreen }));
@@ -53,6 +54,21 @@ export function App() {
   }, [menu]);
   // Friends see you online, and their invites reach you, on every screen.
   useEffect(() => { startPresence(); }, []);
+  // A magic link or another tab can change the player while the game is open.
+  // Reload player screens AND presence subscriptions, but never for token refreshes.
+  useEffect(() => {
+    let lastUser: string | null | undefined;
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const next = session?.user.id ?? null;
+      if (lastUser && lastUser !== next) {
+        saveAvatar(null);
+        try { localStorage.removeItem('ppp.name.v1'); } catch { /* unavailable storage */ }
+        window.setTimeout(() => window.location.reload(), 0);
+      }
+      lastUser = next;
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
   return (
     <>
       <Screen key={profileRevision} loc={loc} />
