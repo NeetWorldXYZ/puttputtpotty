@@ -8,7 +8,9 @@ import { primeTheme, stinger, type StingerLevel } from './music';
 let ctx: BaseAudioContext | null = null;
 let master: GainNode | null = null;
 let backgrounded = typeof document !== 'undefined' && document.hidden;
-let audioTransition: Promise<void> | null = null;
+let audioTransition = false;
+let interrupted = false;
+let hasRun = false;
 type GameAudioSession = { type: string; state?: string; addEventListener?: (event: string, listener: () => void) => void };
 let observedSession: GameAudioSession | undefined;
 
@@ -22,14 +24,47 @@ function configureGameAudio(): void {
   if (!session) return;
   try {
     // iPhone's Silent switch mutes ambient Web Audio. Use media playback when
-    // game sound is enabled, and keep the category stable across input events.
-    // The shared context still suspends on mute/background and yields to interruptions.
+    // game sound is enabled. Release this override when quiet so other apps
+    // can keep their Bluetooth/USB route without the game claiming playback.
     if (session.type !== 'playback') session.type = 'playback';
     if (observedSession !== session) {
-      session.addEventListener?.('statechange', syncAudioVisibility);
+      session.addEventListener?.('statechange', () => {
+        if (session.state === 'interrupted') yieldAudio();
+        // Recovery is the player's choice, never an automatic resume loop.
+      });
       observedSession = session;
     }
   } catch { /* Optional Safari API; Web Audio is still usable without it. */ }
+}
+
+function releaseGameAudio(): void {
+  try {
+    if (observedSession?.type === 'playback') observedSession.type = 'auto';
+  } catch { /* Optional Safari API. */ }
+}
+
+function notifyMuteChange(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
+}
+
+/** Pause for this visit without overwriting the player's saved sound preference. */
+function yieldAudio(): void {
+  if (interrupted || muted) return;
+  interrupted = true;
+  syncAudioVisibility();
+  notifyMuteChange();
+}
+
+function contextStateChanged(): void {
+  if (!ctx) return;
+  const state = String(ctx.state); // Safari also exposes "interrupted".
+  if (state === 'running') {
+    hasRun = true;
+    if (isBackgrounded() || isMuted()) syncAudioVisibility();
+  } else if (state === 'interrupted' ||
+      (state === 'suspended' && hasRun && !audioTransition && !isBackgrounded() && !isMuted())) {
+    yieldAudio();
+  }
 }
 
 function isBackgrounded(): boolean {
@@ -37,23 +72,32 @@ function isBackgrounded(): boolean {
 }
 
 function syncAudioVisibility(): void {
-  const quiet = isBackgrounded() || muted;
+  const quiet = isBackgrounded() || isMuted();
   if (master) {
     master.gain.cancelScheduledValues(ctx?.currentTime ?? 0);
     master.gain.value = quiet ? 0 : 0.8;
   }
+  if (quiet) releaseGameAudio();
   if (!(ctx instanceof AudioContext) || audioTransition || ctx.state === 'closed') return;
   const live = ctx;
-  // Let Safari finish Siri/navigation/route interruptions instead of fighting
-  // its audio session with a resume attempt on every input event.
-  if (!quiet && audioSession()?.state === 'interrupted') return;
+  if (!quiet) configureGameAudio();
   if (quiet ? live.state === 'suspended' : live.state === 'running') return;
-  audioTransition = quiet ? live.suspend() : live.resume();
-  void audioTransition.then(() => {
-    audioTransition = null;
-    // Mute or app visibility may change while the native operation is pending.
-    if (quiet !== (isBackgrounded() || muted)) syncAudioVisibility();
-  }).catch(() => { audioTransition = null; });
+  // Mark before invoking the native method: statechange can fire before its
+  // promise settles, and our own suspend must not look like an interruption.
+  audioTransition = true;
+  const failed = () => {
+    audioTransition = false;
+    if (!quiet) yieldAudio(); // A failed resume needs another explicit sound tap.
+  };
+  try {
+    const operation = quiet ? live.suspend() : live.resume();
+    void operation.then(() => {
+      audioTransition = false;
+      if (live.state === 'running') hasRun = true;
+      // Mute or app visibility may change while the native operation is pending.
+      if (quiet !== (isBackgrounded() || isMuted())) syncAudioVisibility();
+    }).catch(failed);
+  } catch { failed(); }
 }
 
 /**
@@ -93,34 +137,40 @@ try {
   /* ignore */
 }
 
+/** Effective silence includes a temporary system interruption, not just saved mute. */
 export function isMuted(): boolean {
-  return muted;
+  return muted || interrupted;
 }
 
 export function setMuted(m: boolean): void {
   muted = m;
+  if (!m) interrupted = false;
   try {
     localStorage.setItem(MUTE_KEY, m ? '1' : '0');
   } catch {
     /* ignore */
   }
-  if (m) syncAudioVisibility();
+  if (m || ctx) syncAudioVisibility();
   else unlockAudio();
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('ppp:mutechange'));
+  notifyMuteChange();
 }
 
 /** Call from a pointer/touch handler so the context is allowed to start. */
 export function unlockAudio(): void {
-  if (isBackgrounded() || muted) return;
-  configureGameAudio();
+  if (isBackgrounded() || isMuted()) return;
   if (ctx) {
-    syncAudioVisibility();
+    // Ordinary taps only unlock the FIRST context. Never reclaim audio from
+    // another app while putting, navigating menus, or handling synthetic clicks.
+    if (String(ctx.state) === 'interrupted' || audioSession()?.state === 'interrupted') yieldAudio();
     return;
   }
   try {
     const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
+    configureGameAudio();
     ctx = new AC();
+    hasRun = ctx.state === 'running';
+    ctx.addEventListener('statechange', contextStateChanged);
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.8;
     master.connect(ctx.destination);
@@ -135,6 +185,7 @@ export function unlockAudio(): void {
     syncAudioVisibility();
   } catch {
     ctx = null;
+    releaseGameAudio();
   }
 }
 
@@ -165,7 +216,7 @@ function noiseBuffer(seconds: number): AudioBuffer | null {
 }
 
 function tone(freq: number, dur: number, opts: { type?: OscillatorType; gain?: number; to?: number; attack?: number; delay?: number } = {}): void {
-  if (!ctx || !master || muted) return;
+  if (!ctx || !master || isMuted() || isBackgrounded()) return;
   const t0 = now() + (opts.delay ?? 0);
   const o = ctx.createOscillator();
   const g = ctx.createGain();
@@ -183,7 +234,7 @@ function tone(freq: number, dur: number, opts: { type?: OscillatorType; gain?: n
 }
 
 function noise(dur: number, opts: { gain?: number; filter?: number; to?: number; q?: number; delay?: number; attack?: number } = {}): void {
-  if (!ctx || !master || muted) return;
+  if (!ctx || !master || isMuted() || isBackgrounded()) return;
   const buf = noiseBuffer(dur + 0.05);
   if (!buf) return;
   const t0 = now() + (opts.delay ?? 0);
@@ -270,7 +321,7 @@ export const sfx = {
    * bigger ones (see loadCheerSamples).
    */
   stinger(level: StingerLevel): void {
-    if (!ctx || !master || muted) return;
+    if (!ctx || !master || isMuted() || isBackgrounded()) return;
     const bus = ctx.createGain();
     bus.gain.value = 0.9;
     bus.connect(master);
@@ -319,16 +370,18 @@ export async function renderSfx(name: keyof typeof sfx, seconds = 3, arg?: unkno
   const g = off.createGain();
   g.gain.value = 0.8;
   g.connect(off.destination);
-  const saved = { ctx, master, muted };
+  const saved = { ctx, master, muted, interrupted };
   ctx = off;
   master = g;
   muted = false;
+  interrupted = false;
   try {
     (sfx[name] as (a?: unknown) => void)(arg);
   } finally {
     ctx = saved.ctx;
     master = saved.master;
     muted = saved.muted;
+    interrupted = saved.interrupted;
   }
   return await off.startRendering();
 }

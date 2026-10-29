@@ -121,6 +121,11 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
   const [devOpen, setDevOpen] = useState(false);
   const [courseDone, setCourseDone] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
+  useEffect(() => {
+    const sync = () => setMutedState(isMuted());
+    window.addEventListener('ppp:mutechange', sync);
+    return () => window.removeEventListener('ppp:mutechange', sync);
+  }, []);
   const [banner, setBanner] = useState<{ key: number; title: string; sub: string } | null>(null);
   const [shared, setShared] = useState(false);
   const [newBest, setNewBest] = useState(false);
@@ -704,9 +709,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
     }
   };
   const toggleMute = () => {
-    unlockAudio();
-    setMuted(!muted);
-    setMutedState(!muted);
+    setMuted(!isMuted());
   };
 
   return (
@@ -768,7 +771,7 @@ export function PlayView({ holes, onExit, exitLabel, courseSeed, lockedParams, o
           ⚙
         </button>
       )}
-      <button className="corner-btn tr2" onClick={toggleMute} title={muted ? 'Sound off' : 'Sound on'}>
+      <button className="corner-btn tr2" onClick={toggleMute} title={muted ? 'Turn sound on' : 'Mute sound'} aria-label={muted ? 'Turn sound on' : 'Mute sound'} aria-pressed={muted}>
         {muted ? '🔇' : '🔊'}
       </button>
 
