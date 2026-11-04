@@ -1405,7 +1405,7 @@ export function MapScreen() {
                     <span className="rank">{r.rank === 1 ? '👑' : r.rank}</span>
                     <span className="who">
                       <Avatar av={r.avatar} size={22} className="row-avatar" />
-                      {r.display_name}
+                      <span className="sheet-player-name">{r.display_name}</span>
                     </span>
                     <strong className="stat">{r.score}</strong>
                     <span className="when">{r.elapsed_ms !== null ? fmtElapsed(r.elapsed_ms) : ''}</span>
