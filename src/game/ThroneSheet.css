@@ -1,14 +1,24 @@
 /* The throne sheet on the map, in the Clubhouse look: display-face name, an illustrated throne card,
    a cream distance strip and the yellow action bar. Presentation only. */
 .map-sheet.ts{padding:14px 14px 12px;display:flex;flex-direction:column;gap:9px}
+/* Scroll the sheet at its height limit instead of crushing the cards inside it. */
+.map-sheet.ts>*{flex-shrink:0}
 .ts-head{display:flex;align-items:center;gap:12px;min-height:52px;padding-right:40px}
 .ts-icon{display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;border-radius:15px;font-size:28px;background:linear-gradient(145deg,#f7fbff,#dcecff);border:2px solid #08263c;box-shadow:inset 0 0 0 2px #fff,0 3px 0 #08263c}
-.ts-head-text{min-width:0}
-.ts-name{margin:0;font:900 clamp(20px,5.6vw,26px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;color:#fff8dc;text-transform:uppercase;paint-order:stroke fill;-webkit-text-stroke:4px #08263c;text-shadow:0 3px 0 #08263c;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ts-head-text{min-width:0;flex:1}
+.ts-name{margin:0;padding:3px 5px 5px 2px;font:900 clamp(20px,5.6vw,26px)/1.18 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;color:#fff8dc;text-transform:uppercase;paint-order:stroke fill;-webkit-text-stroke:4px #08263c;text-shadow:0 3px 0 #08263c;white-space:normal;overflow-wrap:anywhere}
 .ts-sub{margin-top:3px;font:700 11px/1.35 var(--game-font);color:#afc9e4}
-.ts-throne{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:20px;border:3px solid #08263c;overflow:hidden}
+.ts-throne{position:relative;display:flex;align-items:center;gap:12px;padding:16px 14px;border-radius:20px;border:3px solid #08263c;overflow:hidden}
 .ts-throne.vacant{background:linear-gradient(140deg,#15495b,#06253c);box-shadow:inset 0 0 0 2px #fff0be,0 4px 0 #08263c;color:#fff8dc}
 .ts-throne.held{background:linear-gradient(120deg,#fff6dc,#ffe089 60%,#ffcb3d);box-shadow:inset 0 0 0 2px #fff7d0,0 4px 0 #08263c;color:#08263c}
+/* Give the name/score the full space below the report button. */
+.ts-throne.held{display:grid;grid-template-columns:72px minmax(0,1fr) 34px;gap:2px 12px}
+.ts-throne.held .ts-king-avatar{grid-column:1;grid-row:1 / 4}
+.ts-throne.held .ts-king-text{display:contents}
+.ts-throne.held .ts-eyebrow{grid-column:2;grid-row:1;align-self:center}
+.ts-throne.held .ts-king-name{grid-column:2 / -1;grid-row:2;min-width:0}
+.ts-throne.held .ts-king-line{grid-column:2 / -1;grid-row:3;min-width:0}
+.ts-throne.held .ts-flag{grid-column:3;grid-row:1}
 .ts-throne.held.mine{box-shadow:inset 0 0 0 2px #fff7d0,0 0 0 4px #ffd34c40,0 0 22px #ffd34c80,0 4px 0 #08263c}
 .ts-shine{display:none}
 .ts-throne.held.mine .ts-shine{display:block;position:absolute;inset:-40% -20%;background:linear-gradient(100deg,transparent 40%,#ffffff70 50%,transparent 60%);animation:ts-shine 3.2s ease-in-out infinite;pointer-events:none}
@@ -24,9 +34,9 @@
 .ts-king-text{min-width:0;flex:1;text-align:left}
 .ts-eyebrow{font:800 10px/1.2 var(--game-font);letter-spacing:.14em;text-transform:uppercase;opacity:.85}
 .ts-throne.vacant .ts-eyebrow{color:#ffe17d}
-.ts-king-name{display:block;margin:2px 0 0;padding:0;border:0;background:none;color:inherit;text-align:left;font:900 clamp(20px,5.6vw,26px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;letter-spacing:.3px;text-decoration:underline dotted;text-underline-offset:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ts-king-name{display:block;width:100%;max-width:100%;box-sizing:border-box;margin:2px 0 0;padding:2px 6px 4px 1px;border:0;background:none;color:inherit;text-align:left;font:900 clamp(20px,5.6vw,26px)/1.18 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;letter-spacing:.3px;text-decoration:underline dotted;text-underline-offset:4px;white-space:normal;overflow-wrap:anywhere}
 .ts-king-line{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 7px;margin-top:2px;font:700 12px/1.3 var(--game-font)}
-.ts-king-line b{font:900 26px/1 Impact,'Arial Narrow',sans-serif;font-style:italic}
+.ts-king-line b{padding-right:2px;font:900 26px/1.15 Impact,'Arial Narrow',sans-serif;font-style:italic}
 .ts-king-line span{opacity:.8}
 .ts-flag{flex:none;align-self:flex-start;width:34px;height:34px;border-radius:10px;border:2px solid #08263c;background:#fff8dc;color:#08263c;font-size:15px;box-shadow:0 2px 0 #08263c}
 .ts-empty-title{margin-top:2px;font:900 clamp(19px,5.2vw,24px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;text-transform:uppercase;letter-spacing:.3px;color:#fff8dc;text-shadow:0 2px 0 #08263c}
@@ -44,6 +54,9 @@
 .ts-dist.here>span:last-child{border-left-color:#1a7a4a}
 .map-sheet.ts .sheet-section-title{font:800 10px/1.2 var(--game-font);letter-spacing:.14em;text-transform:uppercase;color:#ffe17d;margin:0 0 4px}
 .map-sheet.ts .sheet-leaders{margin:0}
+.map-sheet.ts .sheet-board li{grid-template-columns:28px minmax(0,1fr) auto 44px}
+.map-sheet.ts .sheet-board .who{white-space:normal;overflow:visible;line-height:1.3}
+.map-sheet.ts .sheet-player-name{min-width:0;overflow-wrap:anywhere}
 .ts-actions{margin-top:2px;gap:8px}
 .map-sheet.ts .sheet-actions button.ts-cta{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:8px 14px;border-radius:20px;border:2px solid #fff0ac;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);box-shadow:inset 0 -5px 0 #eaa519,0 3px 0 #071f35;color:#08263c;font:900 clamp(16px,4.8vw,21px)/1.05 Impact,'Arial Narrow',sans-serif;font-style:italic;letter-spacing:.3px;text-transform:uppercase;text-align:center}
 .map-sheet.ts .sheet-actions button.ts-cta span{font-family:system-ui,sans-serif;font-style:normal}
