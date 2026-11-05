@@ -3,6 +3,7 @@ import { Avatar } from './Avatar';
 import { BALLS, FACES, HATS, HEADS, SEATS, avatarPartSvg, headTones, type Avatar as AvatarSpec } from './avatarParts';
 import './AvatarCustomizer.css';
 import { EARNABLE_HEADS, headUnlocked, isEarnableHead, type HeadProgress } from './earnedHeads';
+import {premiumProduct} from '../../server/potty/premium';
 import { gearReward, gearUnlocked } from '../../server/potty/cosmeticCatalog';
 
 const rewardFor=(part:string,value:string)=>part==='head'&&isEarnableHead(value)?EARNABLE_HEADS[value]:gearReward(part,value);
@@ -108,7 +109,7 @@ export function AvatarCustomizer({ avatar, busy, error, onChange, onSave, onClos
           <div ref={collection} className="studio-collection" id={`${id}-choices`} role="tabpanel" aria-labelledby={`${id}-tab-${category}`}>
             {inspectedReward&&<div className="studio-unlock-detail" aria-live="polite"><div><strong>{inspectedReward.label}</strong><button onClick={()=>setInspected(null)}>Back to my look ×</button></div><p>{inspectedReward.requirement}</p><progress value={Math.min(inspectedCurrent,inspectedReward.target)} max={inspectedReward.target}/><small>{progressLoading?'Checking progress…':`${inspectedCurrent.toLocaleString()} / ${inspectedReward.target.toLocaleString()} ${progressUnit(inspectedReward.metric)}`} · Permanent unlock · No TP spent</small></div>}
             <div className="studio-options" data-expanded="true" aria-label={`Choose ${label.toLowerCase()}`}>
-              {visible.map(([value, title]) => {
+              {visible.filter(([v])=>!premiumProduct(v)||headProgress?.products?.includes(premiumProduct(v)!)).map(([value, title]) => {
                 const locked=category==='head' ? !headUnlocked(value,headProgress) : !gearUnlocked(category,value,headProgress);
                 const reward=rewardFor(category,value);
                 const current=reward ? headProgress?.stats[reward.metric] ?? 0 : 0;

@@ -1,0 +1,12 @@
+{
+  "name": "OG game",
+  "preservedOn": "2026-11-05",
+  "commit": "be79b2141106c5b86c607a12bff7a1df0266434e",
+  "branch": "OG-game",
+  "production": "https://puttputtpotty.vercel.app",
+  "deployment": "https://vercel.com/koryhershock25-gmailcoms-projects/puttputtpotty/FHvVuREQksUHx3RhhrzqGuxBzL8J",
+  "productionDatabase": "uzzjudrpppnohpocttjn",
+  "previewDatabase": "xapmfidxhutwlvmdjdao",
+  "databaseBackup": "Not exported or restore-tested; production database is untouched. A separate empty schema clone is used for development.",
+  "storageObjectsAtInspection": 0
+}

@@ -13,7 +13,8 @@ import { loadProfile } from '../net/supabase';
 import { fetchBathrooms, type OsmPlace } from '../net/overpass';
 import { fmtDistance, geoHelp, haversine, watchPosition, type Fix, type GeoErrorCode } from '../net/geo';
 import { CLAIM_RADIUS_M } from '../net/config';
-import { POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
+import { defenseText } from "./throneDefense";
+import { recallPlace, POI_ICON, POI_LABEL, bandFor, checkinAt, recallFix, recordCheckin, rememberFix, rememberPlace } from '../net/places';
 import { getSavedName } from '../net/supabase';
 import { loadCourse } from '../net/course';
 import { navigate } from '../router';
@@ -178,7 +179,7 @@ const FOUND_TYPES: [string, string][] = [
 ];
 
 /** "Found a bathroom here": name it, say what it is, and it goes on the map at your feet (or where you drop the pin). */
-type FoundDraft = { name: string; type: string };
+type FoundDraft = { name: string; type: string; access?: 'public'|'customers' };
 
 function FoundSheet({
   fix,
@@ -213,7 +214,7 @@ function FoundSheet({
     setBusy(true);
     setError(null);
     try {
-      const { location, status } = await api.found(trimmed, draft.type, fix.lat, fix.lng, fix.accuracy, pin);
+      const { location, status } = await api.found(trimmed, draft.type, fix.lat, fix.lng, fix.accuracy, pin, draft.access);
       sfx.jingle();
       onFound(location, status);
     } catch (e) {
@@ -228,9 +229,10 @@ function FoundSheet({
         <h2>Found a bathroom?</h2>
         <div className="sub">
           {pin ? `The pin is set, ${fmtDistance(pinDist)} from you.` : `It goes where you're standing${gpsBad ? ` (GPS is ${Math.round(fix.accuracy)} m off, get outside first)` : ''}. Somewhere else? Drop a pin on the map.`}
-          {!isAdmin && ' New places show up for everyone once they are approved.'}
+          {' An admin reviews every new place. For homes, create a private Friend Course instead.'}
         </div>
         <input className="name-input" maxLength={40} placeholder="What's it called?" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
+        <label>Bathroom access <select value={draft.access??'public'} onChange={e=>setDraft({...draft,access:e.target.value==='customers'?'customers':'public'})}><option value="public">Open to the public</option><option value="customers">Customers only</option></select></label>
         <div className="found-types">
           {FOUND_TYPES.map(([id, label]) => (
             <button key={id} className={`chip${draft.type === id ? ' active' : ''}`} onClick={() => setDraft({ ...draft, type: id })}>
@@ -240,7 +242,7 @@ function FoundSheet({
         </div>
         {error && <div className="err">{error}</div>}
         <button className="primary" disabled={trimmed.length < 2 || busy || gpsBad} onClick={() => void submit()}>
-          {busy ? 'Adding…' : 'Put it on the map'}
+          {busy ? 'Adding…' : 'Submit for review'}
         </button>
         <button onClick={onDropPin}>{pin ? '📍 Move the pin' : '📍 Drop a pin on the map'}</button>
         <button onClick={onClose}>Cancel</button>
@@ -501,7 +503,7 @@ export function MapScreen() {
   const [thronesSettled, setThronesSettled] = useState(false);
   const retryRef = useRef(0);
   useEffect(() => () => window.clearTimeout(retryRef.current), []);
-  const [selected, setSelected] = useState<OsmPlace | null>(null);
+  const [selected, setSelected] = useState<OsmPlace | null>(() => recallPlace(new URLSearchParams(window.location.search).get("loc") ?? ""));
   const [preview, setPreview] = useState<{ id: string; par: number; king: King | null } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [board, setBoard] = useState<{ id: string; rows: LocationRow[] } | null>(null);
@@ -1366,11 +1368,12 @@ export function MapScreen() {
             </div>
           )}
 
+          {king?.king_since && king.king_score != null && <div className="ts-target"><strong>Capture target</strong> {defenseText(king.king_score,king.king_since,king.king_elapsed_ms)}</div>}
           {(king?.king_score !== null && king?.king_score !== undefined) || myBest !== null || (king?.run_count ?? 0) > 0 ? (
             <div className="ts-facts">
-              {king?.king_score !== null && king?.king_score !== undefined && (
+              {board?.id === selected.id && board.rows.length > 0 && (
                 <span className="ts-fact">
-                  <b>{king.king_score}</b> record
+                  <b>{board.rows[0].score}</b> all-time record
                 </span>
               )}
               {myBest !== null && (

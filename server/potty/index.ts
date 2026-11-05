@@ -2,6 +2,7 @@
 // daily-course holes, and verifies submitted runs by re-simulating them.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { launchAction } from './launch.ts';
 import { validThroneFinish } from './throneRules.ts';
 import { starterAvatar } from './starterAvatar.ts';
 import { lockedAvatarPart, needsUnlockCheck, normalizeAvatarChoice } from './avatarUnlocks.ts';
@@ -344,13 +345,13 @@ function validStrokes(v: unknown): v is Stroke[] {
   return v.every((s) => s && typeof s.angle === 'number' && Number.isFinite(s.angle) && typeof s.power === 'number' && s.power >= 0 && s.power <= 1 && (s.t === undefined || (typeof s.t === 'number' && Number.isFinite(s.t))));
 }
 
-async function userFrom(req: Request): Promise<{ id: string } | null> {
+async function userFrom(req: Request): Promise<{ id: string; is_anonymous: boolean } | null> {
   const auth = req.headers.get('Authorization') ?? '';
   const token = auth.replace(/^Bearer\s+/i, '');
   if (!token) return null;
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) return null;
-  return { id: data.user.id };
+  return { id: data.user.id, is_anonymous: !!data.user.is_anonymous };
 }
 
 const NAME_RE = /^[A-Za-z0-9 _.'\-]{2,24}$/;
@@ -566,11 +567,30 @@ function pickBotLine(report: { bestRun: { solution: Stroke[]; strokes: number | 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
+    if(new URL(req.url).pathname.endsWith('/deliver-push')){
+      const key=Deno.env.get('PUSH_SCHEDULER_SECRET');
+      if(!key || req.headers.get('Authorization')!=='Bearer '+key)return json({error:'Unauthorized'},401);
+      return json(await (await import('./pushDelivery.ts')).deliverPush(admin));
+    }
+    if(new URL(req.url).pathname.endsWith('/apple-notifications')){
+      const {signedPayload}=await req.json();
+      const {appleNotification}=await import('./store.ts');
+      return json(await appleNotification(signedPayload,admin));
+    }
     const user = await userFrom(req);
     if (!user) return json({ error: 'not signed in' }, 401);
     const body = await req.json();
     const action = body.action as string;
 
+    if (['launch-state','activity-read','notification-preferences','push-register','weekly-passes','remote-start','my-submissions','launch-review-queue','private-list','private-create','private-invite','private-remove','private-course','private-submit','store-verify'].includes(action)) {
+      await ensureProfile(user.id);
+      try { return json(await launchAction(body,user,admin,{courseSlots,generateSlot,replay,holeScore,DEFAULT_PARAMS,placeNameProblem,validStrokes})); }
+      catch(err){const message=(err as Error).message;
+        if(/Admins only|invite-only|Only the course owner|Save your account before purchasing|another account/.test(message))return json({error:message},403);
+        if(/Private course not found/.test(message))return json({error:message},404);
+        if(/You need a teleport pass|per day|in person first|active round|attempt has ended|this week|not ready|finish all|Finish |Invalid |Enter your friend|Add this player|Choose a suitable/.test(message))return json({error:message},409);
+        throw err;}
+    }
     if (action === 'cart-garage') {
       await ensureProfile(user.id);
       if (body.equip !== undefined && typeof body.equip !== 'string') return json({ error: 'Choose a cart.' }, 400);
@@ -583,7 +603,9 @@ Deno.serve(async (req: Request) => {
       await ensureProfile(user.id);
       const { data, error } = await admin.rpc('refresh_avatar_collection', { in_user: user.id });
       if (error) throw new Error('Your collection could not be loaded. Please try again.');
-      return json(data);
+      const {data:owned,error:storeError}=await admin.from('store_entitlements').select('product_id').eq('user_id',user.id);
+      if(storeError)throw storeError;
+      return json({...data,products:owned.map(x=>x.product_id)});
     }
 
     if (action === 'profile') {
@@ -666,8 +688,19 @@ Deno.serve(async (req: Request) => {
       if (!loc || typeof loc.id !== 'string' || !/^(osm:(node|way|relation):\d+|ppp:[a-f0-9]{12})$/.test(loc.id) || typeof loc.lat !== 'number' || typeof loc.lng !== 'number')
         return json({ error: 'bad location' }, 400);
       await ensureProfile(user.id);
+      const {data:known}=await admin.from('locations').select('id').eq('id',loc.id).maybeSingle();
+      if (!known) {
+        const {data:imported}=await admin.from('osm_places').select('id,name,poi_type,lat,lng').eq('id',loc.id).maybeSingle();
+        if (imported) Object.assign(loc,{name:imported.name,poiType:imported.poi_type,lat:imported.lat,lng:imported.lng});
+        else {
+          const source=loc.id.startsWith('osm:') && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && Math.abs(loc.lat)<=90 && Math.abs(loc.lng)<=180
+            ? (await bathrooms(loc.lat,loc.lng,600)).places.find(p=>p.id===loc.id) : undefined;
+          if (!source) return json({error:'Suggest this potty and wait for approval first.'},403);
+          Object.assign(loc,{name:source.name,poiType:source.poiType,lat:source.lat,lng:source.lng});
+        }
+      }
       let row = await ensureLocation({ id: loc.id, name: String(loc.name ?? 'Bathroom'), poiType: String(loc.poiType ?? 'toilets'), lat: loc.lat, lng: loc.lng }, user.id);
-      if (row.status === 'hidden') return json({ error: 'this place is off the map' }, 410);
+      if (row.status !== 'live') return json({ error: 'This potty needs approval before it can be played.' }, 403);
       const have = Array.isArray(row.holes) ? row.holes.length : 0;
       if (have < HOLES_PER_COURSE) row = await buildNextHole(row);
       const holes = Array.isArray(row.holes) ? row.holes : [];
@@ -688,15 +721,17 @@ Deno.serve(async (req: Request) => {
     if (action === 'checkin') {
       const { locationId, lat, lng, accuracy } = body;
       if (typeof locationId !== 'string' || typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'bad checkin' }, 400);
-      const { data: loc } = await admin.from('locations').select('lat,lng').eq('id', locationId).maybeSingle();
-      if (!loc) return json({ error: 'unknown location' }, 404);
+      const { data: loc } = await admin.from('locations').select('lat,lng,status').eq('id', locationId).maybeSingle();
+      if (!loc || loc.status !== 'live') return json({ error: 'This potty is not approved for play.' }, 403);
       const dist = haversine(lat, lng, loc.lat, loc.lng);
       const acc = typeof accuracy === 'number' ? accuracy : 999;
       if (!Number.isFinite(acc) || acc < 0 || acc > MAX_ACCURACY_M) return json({ error: `GPS accuracy too low (${Math.round(acc)} m)` }, 400);
       if (dist > CLAIM_RADIUS_M + Math.min(acc, CLAIM_RADIUS_M)) return json({ error: `too far away (${Math.round(dist)} m)`, distance: dist }, 400);
       await ensureProfile(user.id);
-      const { error } = await admin.from('checkins').upsert({ user_id: user.id, location_id: locationId, lat, lng, accuracy: acc, at: new Date().toISOString(), started_at: null });
+      const { error } = await admin.from('checkins').upsert({ user_id: user.id, location_id: locationId, lat, lng, accuracy: acc, at: new Date().toISOString(), started_at: null, remote: false });
       if (error) throw error;
+      const {error:visitError}=await admin.from('location_visits').upsert({user_id:user.id,location_id:locationId,visited_at:new Date().toISOString()});
+      if(visitError)throw visitError;
       return json({ ok: true, distance: dist });
     }
 
@@ -704,8 +739,9 @@ Deno.serve(async (req: Request) => {
       // Starts the throne-run clock. Needs a live check-in at this bathroom.
       const { locationId } = body;
       if (typeof locationId !== 'string') return json({ error: 'bad start' }, 400);
-      const { data: ci } = await admin.from('checkins').select('at,started_at').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+      const { data: ci } = await admin.from('checkins').select('at,started_at,remote').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
       if (!ci || Date.now() - new Date(ci.at).getTime() > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'Check in at this bathroom again before playing.' }, 400);
+      if(ci.remote) return json({error:'Start a remote challenge using a teleport pass.'},403);
       if (ci.started_at && body.fresh !== true) return json({ ok: true, startedAt: ci.started_at });
       const startedAt = new Date().toISOString();
       let startQuery = admin.from('checkins').update({ started_at: startedAt }).eq('user_id', user.id).eq('location_id', locationId);
@@ -788,7 +824,7 @@ Deno.serve(async (req: Request) => {
         if (!Array.isArray(strokes) || strokes.length !== HOLES_PER_COURSE || !strokes.every(validStrokes)) return json({ error: 'bad strokes' }, 400);
         strokeLists = strokes as Stroke[][];
         const { data: loc } = await admin.from('locations').select('*').eq('id', locationId).maybeSingle();
-        if (!loc || !Array.isArray(loc.holes) || loc.holes.length !== HOLES_PER_COURSE) return json({ error: 'unknown location' }, 404);
+        if (!loc || loc.status !== 'live' || !Array.isArray(loc.holes) || loc.holes.length !== HOLES_PER_COURSE) return json({ error: 'unknown location' }, 404);
         holes = loc.holes;
         par = loc.par;
         // A retry after a lost response returns the already verified round.
@@ -802,25 +838,27 @@ Deno.serve(async (req: Request) => {
             return json({ runId: saved.id, score: saved.score, par: saved.par, holeScores: saved.hole_scores, elapsedMs: saved.elapsed_ms, king, isKing: king?.user_id === user.id });
           }
         }
+        const { data: ci, error: ciError } = await admin.from('checkins').select('at,started_at,lat,lng,accuracy,remote').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
+        if (ciError) throw ciError;
+        if (!ci || Date.now() - new Date(ci.at).getTime() > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'Your check-in expired. Return to the map and check in again.' }, 400);
+        if (!ci.remote) {
         if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return json({ error: 'Waiting for your location. Keep this scorecard open and retry.' }, 400);
         const acc = typeof accuracy === 'number' ? accuracy : 999;
         if (!Number.isFinite(acc) || acc < 0 || acc > MAX_ACCURACY_M) return json({ error: 'GPS is uncertain. Wait for a better signal, then retry saving this round.' }, 400);
-        const { data: ci, error: ciError } = await admin.from('checkins').select('at,started_at,lat,lng,accuracy').eq('user_id', user.id).eq('location_id', locationId).maybeSingle();
-        if (ciError) throw ciError;
-        if (!ci || Date.now() - new Date(ci.at).getTime() > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'Your check-in expired. Return to the map and check in again.' }, 400);
         // Validate the original check-in, then tolerate up to 75m of indoor GPS drift.
         // This does not expand the radius required to check in or permit remote play.
         const checkedDistance = haversine(ci.lat, ci.lng, loc.lat, loc.lng);
         if (checkedDistance > CLAIM_RADIUS_M + Math.min(ci.accuracy, CLAIM_RADIUS_M)) return json({ error: 'Please check in at this bathroom again.' }, 400);
         const drift = haversine(lat, lng, ci.lat, ci.lng);
         if (!validThroneFinish(checkedDistance, ci.accuracy, drift, acc)) return json({ error: 'Your GPS moved away from your check-in. Stay at the bathroom and retry saving this round.' }, 400);
+        }
         if (!ci.started_at || (body.startedAt && new Date(body.startedAt).getTime() !== new Date(ci.started_at).getTime())) return json({ error: 'This round is no longer active. Please start a new round from the map.' }, 400);
         roundStartedAt = ci.started_at;
         elapsedMs = Date.now() - new Date(ci.started_at).getTime();
         if (elapsedMs < 0 || elapsedMs > CHECKIN_MAX_AGE_S * 1000) return json({ error: 'Round expired. Please start again from the map.' }, 400);
         // Impossible travel vs the user's previous located run.
         const { data: prev } = await admin.from('runs').select('lat,lng,created_at').eq('user_id', user.id).not('lat', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        if (prev && prev.lat !== null) {
+        if (!ci.remote && prev && prev.lat !== null) {
           const d = haversine(lat, lng, prev.lat, prev.lng);
           const dt = (Date.now() - new Date(prev.created_at).getTime()) / 1000;
           if (d > 150 && dt > 0 && d / dt > MAX_SPEED_MPS) return json({ error: 'moved too fast between bathrooms' }, 400);
@@ -851,6 +889,8 @@ Deno.serve(async (req: Request) => {
       if (elapsedMs === null && typeof locationId !== 'string') elapsedMs = simMs;
       const score = holeScores.reduce((a, b) => a + b, 0);
       const isLocation = typeof locationId === 'string';
+      const {data:submitCheckin}=isLocation ? await admin.from('checkins').select('remote').eq('user_id',user.id).eq('location_id',locationId).maybeSingle() : {data:null};
+      const remoteRun=submitCheckin?.remote===true;
       const run = {
         user_id: user.id,
         location_id: isLocation ? locationId : null,
@@ -862,8 +902,8 @@ Deno.serve(async (req: Request) => {
         score,
         par,
         season: currentSeason(),
-        lat: typeof lat === 'number' ? lat : null,
-        lng: typeof lng === 'number' ? lng : null,
+        lat: !remoteRun && typeof lat === 'number' ? lat : null,
+        lng: !remoteRun && typeof lng === 'number' ? lng : null,
         accuracy: typeof accuracy === 'number' ? accuracy : null,
       };
       const { data: savedRun, error } = isLocation
@@ -916,8 +956,9 @@ Deno.serve(async (req: Request) => {
         if (sameName(ip.name, cleanName)) return json({ error: `${ip.name} is already here`, existing: ip }, 409);
       }
       const id = `ppp:${Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
-      const status = adminUser ? 'live' : 'pending';
+      const status = 'pending';
       const row = await ensureLocation({ id, name: cleanName, poiType: type, lat: placeLat, lng: placeLng }, user.id, status);
+      await admin.from('locations').update({access_type:body.accessType==='customers'?'customers':'public'}).eq('id',id);
       return json({ location: { id: row.id, name: row.name, poiType: row.poi_type, lat: row.lat, lng: row.lng }, status });
     }
 
@@ -936,7 +977,8 @@ Deno.serve(async (req: Request) => {
       const day = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const { count: mine } = await admin.from('place_reports').select('id', { count: 'exact', head: true }).eq('reporter', user.id).gte('created_at', day);
       if ((mine ?? 0) >= REPORTS_PER_DAY && !adminUser) return json({ error: 'enough reports for today' }, 429);
-      const row = await ensureLocation({ id: place.id, name: String(place.name ?? 'Bathroom'), poiType: String(place.poiType ?? 'toilets'), lat: place.lat, lng: place.lng }, user.id);
+      const {data:row}=await admin.from('locations').select('*').eq('id',place.id).maybeSingle();
+      if(!row) return json({error:'Unknown potty'},404);
       if (row.status === 'hidden') return json({ ok: true, applied: true, hidden: true });
       if (reason === 'renamed' && sameSpelling(row.name, details)) return json({ ok: true, applied: true, name: row.name });
       const window = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
@@ -946,7 +988,7 @@ Deno.serve(async (req: Request) => {
       const { data: rows } = await admin.from('place_reports').select('reporter, reason, details').eq('location_id', row.id).gte('created_at', window);
       const agree = (rows ?? []).filter((r) => r.reason === reason && (reason !== 'renamed' || sameSpelling(String(r.details ?? ''), details)));
       const distinct = new Set(agree.map((r) => r.reporter)).size;
-      const apply = adminUser || distinct >= PLACE_REPORTS_TO_APPLY;
+      const apply = adminUser;
       if (apply) {
         const patch = reason === 'renamed' ? { name: details } : { status: 'hidden' };
         const { error } = await admin.from('locations').update(patch).eq('id', row.id);
@@ -1009,9 +1051,11 @@ Deno.serve(async (req: Request) => {
         patch = { name };
       } else if (decision !== 'dismiss') return json({ error: 'bad request' }, 400);
       if (patch) {
+        Object.assign(patch,{reviewed_by:user.id,reviewed_at:new Date().toISOString(),review_note:String(body.note??'').trim().slice(0,300)||null});
         const { error } = await admin.from('locations').update(patch).eq('id', locationId);
         if (error) return json({ error: error.message }, 500);
       }
+      await admin.from('place_review_history').insert({location_id:locationId,admin_id:user.id,decision,note:String(body.note??'').slice(0,300)});
       // Any decision settles the open reports on this place.
       await admin.from('place_reports').delete().eq('location_id', locationId);
       const { data: row } = await admin.from('locations').select('name, status').eq('id', locationId).maybeSingle();

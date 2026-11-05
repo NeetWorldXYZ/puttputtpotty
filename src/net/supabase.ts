@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+const authRedirect=()=>Capacitor.isNativePlatform()?'puttputtpotty://auth/callback':window.location.origin;
 import { createClient, type Session } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config';
 import { normalizeAvatar, type Avatar } from '../game/avatarParts';
@@ -107,13 +109,13 @@ export async function loadProfile(): Promise<{ id: string; name: string | null; 
 /** Attach an email to the current (anonymous) account so it can be recovered on any phone. Sends a confirmation link. */
 export async function linkEmail(email: string): Promise<void> {
   await ensureSession();
-  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: window.location.origin });
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: authRedirect() });
   if (error) throw new Error(error.message);
 }
 
 /** Sign in to an existing account by magic link. */
 export async function signInWithEmail(email: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin } });
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: authRedirect() } });
   if (error) throw new Error(/signups not allowed|not found/i.test(error.message) ? 'No account uses that email yet. Save your account first on the phone that has it.' : error.message);
 }
 

@@ -80,3 +80,4 @@
 .geo-help-actions button{flex:1;min-height:42px;border-radius:14px;font:800 14px var(--game-font);border:1px solid #45658b;background:#1b3456;color:#dbe8f7;box-shadow:0 3px 0 #091a30}
 .geo-help-actions button.primary{border:1px solid #ffe9a0;background:linear-gradient(135deg,#ffed95,#ffd12b 65%);color:#14213d;box-shadow:inset 0 -4px 0 #eaa519,0 3px 0 #a97718}
 .map-tools .geo-again{background:linear-gradient(135deg,#ffed95,#ffd12b 65%);color:#14213d;border-color:#ffe9a0}
+.ts-target{border-left:3px solid #ffd457;padding:.45em .75em;background:#163957;color:#dcecf4;border-radius:6px;font-size:.85rem;line-height:1.4}.ts-target strong{display:block;color:#ffe88e}

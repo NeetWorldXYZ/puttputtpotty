@@ -1,4 +1,5 @@
 /** Cosmetic-only adapter for the pinned gameplay engine's avatar normalizer. */
+import {premiumProduct} from './premium.ts';
 import { gearReward, gearUnlocked, type GearAwards } from './cosmeticCatalog.ts';
 export const EARNED_HEAD_IDS = [
   'bubble','robot','swamp','vampire','shark','ghost','raccoon',
@@ -13,7 +14,7 @@ export function normalizeAvatarChoice<T extends { head: string; seat:string; bal
   const o = input && typeof input === 'object' ? input as Record<string,unknown> : {};
   if(typeof o.head==='string' && (EARNED_HEAD_IDS as readonly string[]).includes(o.head))value.head=o.head;
   for(const slot of ['seat','ball','hat','face','porcelain'] as const){
-    const key=o[slot];if(typeof key==='string' && gearReward(slot,key))value[slot]=key;
+    const key=o[slot];if(typeof key==='string' && (gearReward(slot,key)||(['ball','hat','seat'].includes(slot)&&premiumProduct(key))))value[slot]=key;
   }
   return value;
 }

@@ -13,7 +13,7 @@ it('grants earned carts permanently, rejects locked equips and isolates player g
  const garage=async(user:string,equip:string|null=null)=>(await db.query<{g:{unlocked:string[];selected:string}}>('select cart_garage($1,$2) g',[user,equip])).rows[0].g;
  expect((await garage(a)).unlocked).toEqual(['starter']);
  await expect(garage(a,'gold')).rejects.toThrow('still locked');
- for(const c of CARTS.slice(1)){
+ for(const c of CARTS.filter(c=>c.id!=='starter' && c.metric!=='royalStyle')){
   await db.query('update profiles set stats=$2 where id=$1',[a,JSON.stringify({[c.metric]:c.target})]);
   expect((await garage(a,c.id)).selected).toBe(c.id);
  }
@@ -26,6 +26,6 @@ it('grants earned carts permanently, rejects locked equips and isolates player g
  }finally{await db.close()}
 },20000);
 it('provides unique cart art with a safe fallback',()=>{
- expect(new Set(CARTS.map(c=>cartSvg(c.id))).size).toBe(7);
+ expect(new Set(CARTS.map(c=>cartSvg(c.id))).size).toBe(8);
  expect(cartSvg('<script>')).toBe(cartSvg('starter'));
 });

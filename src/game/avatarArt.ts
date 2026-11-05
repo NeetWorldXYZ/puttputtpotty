@@ -27,6 +27,7 @@ function shirtSvg(key:string,id:string):string {
     <clipPath id="${id}-garment"><path d="${outline}"/></clipPath>
     <path d="${outline}" fill="url(#${id}-shirt)" ${stroke} stroke-width="6"/>
     ${pizza?`<g clip-path="url(#${id}-garment)" fill="#ef4736" stroke="#d42b30" stroke-width="1.3">${[[36,121,7],[61,114,6],[91,112,7],[121,130,6],[54,144,7],[84,156,6],[110,148,7],[26,147,5],[80,130,5]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`:''}
+    ${key==='welcomeTour'||key==='regaliaTour'?'<g clip-path="url(#'+id+'-garment)"><path d="M29 116l99 44M41 112l100 45" fill="none" stroke="#ffda79" stroke-width="3"/><path d="M50 105l29 31 29-31" fill="none" stroke="#fff4c9" stroke-width="5"/></g>':''}
     ${shirtMaterial(key,id)}
     <path d="${outline}" fill="none" ${stroke} stroke-width="6"/>
     <path d="M111 112l14 16 10 15-10 4-12-18 1 25q-34 8-68 0l-1 4q35 10 73 0l-3-22 9 16 18-8-13-21Z" fill="${INK}" opacity=".17"/>
@@ -73,6 +74,8 @@ function hatSvg(hat:string,id:string):string {
   if(hat==='tophat')art=`<path d="M56 2q24-7 48 0l-2 37H58Z" fill="url(#${id}-hat)" ${stroke} stroke-width="4"/><path d="M59 27h43v10H59Z" fill="#fb3e53"/><ellipse cx="80" cy="39" rx="37" ry="7" fill="url(#${id}-hat)" ${stroke} stroke-width="4"/><path d="M61 5q6-2 11-2l-1 22h-8Z" fill="#678798" opacity=".25"/>`;
   if(hat==='plunger')art=`<path d="M77 29 83 0q4-2 7 2l-6 29" fill="#d86c38" ${stroke} stroke-width="3.5"/><path d="m82 22 3-16" stroke="#ffba76" stroke-width="2"/><path d="M59 40q1-17 20-17t22 17" fill="url(#${id}-red)" ${stroke} stroke-width="4"/><ellipse cx="80" cy="41" rx="27" ry="6" fill="#dd3e33" ${stroke} stroke-width="4"/><path d="M66 34q3-7 9-7" stroke="#ffb387" stroke-width="3" fill="none" stroke-linecap="round"/>`;
   if(hat==='halo')art=`<ellipse cx="80" cy="16" rx="31" ry="9" fill="none" stroke="${INK}" stroke-width="8"/><ellipse cx="80" cy="16" rx="31" ry="9" fill="none" stroke="url(#${id}-gold)" stroke-width="5"/><path d="M58 11q19-8 35-2" fill="none" stroke="#fffac1" stroke-width="2" stroke-linecap="round"/>`;
+  if(hat==='welcomeTour')art='<path d="M42 32q38-26 76 0l2 13H45q-16 6-24-1z" fill="#118c83" stroke="#062837" stroke-width="4"/><path d="M46 37q37-10 70 0" fill="none" stroke="#ffe9a0" stroke-width="5"/>';
+  if(hat==='regaliaTour')art='<path d="M44 21l17 9 19-25 19 25 18-9-7 25H51z" fill="#ffc449" stroke="#102c40" stroke-width="4"/><path d="M56 39h49" stroke="#fff3ac" stroke-width="4"/><path d="m80 16 7 9-7 9-7-9z" fill="#a46bf1" stroke="#573575" stroke-width="2"/>';
   art=extraHat(hat,id) ?? art;
   return `<g data-part="hat" data-hat="${hat}"${hat==='tophat' || hat==='plunger' ? ' transform="translate(0 5)"' : ''}>${art}</g>`;
 }
