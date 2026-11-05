@@ -87,10 +87,11 @@ export const SEATS: Record<string, { color: string; label: string }> = {
   blue: { color: '#4db8ff', label: 'Blue' },
   wood: { color: '#ffc943', label: 'Pizza' },
   gold: { color: '#ffd447', label: 'Gold' },
+  welcomeTour:{color:'#177a79',label:'Clubhouse blazer'}, regaliaTour:{color:'#613ba8',label:'Velvet regalia'},
   ...EARNABLE_SHIRTS,
 };
 
-export const HATS: Record<string, string> = { none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo', ...Object.fromEntries(Object.entries(EARNABLE_HATS).map(([k,v]) => [k,v.label])) };
+export const HATS: Record<string, string> = { welcomeTour:'Clubhouse visor', regaliaTour:'Jeweled coronet', none: 'None', crown: 'Crown', cap: 'Cap', tophat: 'Top Hat', plunger: 'Plunger', halo: 'Halo', ...Object.fromEntries(Object.entries(EARNABLE_HATS).map(([k,v]) => [k,v.label])) };
 // The old sleepy slot becomes the moustache design; other face choices retain their identity.
 export const FACES: Record<string, string> = { happy: 'Default', cool: 'Cool', wink: 'Wink', angry: 'Angry', sleepy: 'Mustache', ...Object.fromEntries(Object.entries(EARNABLE_FACES).map(([k,v]) => [k,v.label])) };
 
@@ -103,6 +104,7 @@ export interface BallLook {
   material?: EarnedBall;
 }
 export const BALLS: Record<string, BallLook> = {
+  welcomeTour:{color:'#fff5cc',pattern:'stripe',accent:'#159c95',label:'Clubhouse pearl'}, regaliaTour:{color:'#4d2980',pattern:'dots',accent:'#ffe781',label:'Crown jewel'},
   white: { color: '#ffffff', pattern: 'plain', accent: '#c4cfdb', label: 'Classic' },
   tomato: { color: '#ff6f3c', pattern: 'plain', accent: '#ffcf51', label: 'Fire', motif: 'fire' },
   lemon: { color: '#ffd447', pattern: 'plain', accent: '#fff0a8', label: 'Gold', motif: 'gold' },

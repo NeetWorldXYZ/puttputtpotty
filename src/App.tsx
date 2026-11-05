@@ -1,3 +1,5 @@
+import { LaunchHub } from './game/LaunchHub';
+import { initializeNative } from './net/native';
 import { PlayView } from './game/PlayView';
 import { GeneratedCourse } from './game/GeneratedCourse';
 import { TitleScreen } from './game/TitleScreen';
@@ -38,6 +40,7 @@ function Loading() {
 
 export function App() {
   const loc = useLocation();
+  useEffect(() => { void initializeNative().catch(() => {}); }, []);
   const [profileRevision, setProfileRevision] = useState(0);
   const menu = ['map', 'match', 'profile', 'leaders'].includes(loc.route) || (loc.route !== 'editor' && !loc.loc && !loc.seed && loc.course !== 'handmade');
   useEffect(() => { if (!menu) stopTheme(); }, [menu]);
@@ -73,6 +76,7 @@ export function App() {
     <>
       <Screen key={profileRevision} loc={loc} />
       <InviteBanner />
+      <LaunchHub enabled={menu && (loc.route==='play'||(loc.route==='profile'&&!loc.user))} />
       <FirstVisitNamePrompt enabled={menu} onDone={() => setProfileRevision(n => n + 1)} />
     </>
   );
@@ -107,7 +111,7 @@ function Screen({ loc }: { loc: ReturnType<typeof useLocation> }) {
   if (loc.loc)
     return (
       <Suspense fallback={<Loading />}>
-        <LocationPlay key={`${loc.loc}:${loc.mode}`} locationId={loc.loc} throne={loc.mode === 'throne'} />
+        <LocationPlay key={`${loc.loc}:${loc.mode}`} locationId={loc.loc} throne={loc.mode === 'throne' || loc.mode === 'remote'} remote={loc.mode === 'remote'} />
       </Suspense>
     );
   if (loc.seed) return <GeneratedCourse key={`${loc.seed}:${loc.n ?? 9}`} seed={loc.seed} count={loc.n ?? 9} onOpenEditor={() => navigate('editor')} />;

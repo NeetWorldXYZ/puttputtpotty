@@ -222,7 +222,7 @@ function sendDaily(hole: PendingHole): Promise<{ score: number; par: number; sun
 
 const CALL_TIMEOUT_MS = 30000;
 
-async function call<T>(body: Record<string, unknown>): Promise<T> {
+export async function call<T>(body: Record<string, unknown>): Promise<T> {
   const token = (await quickToken(2000)) ?? (await ensureSession()).access_token;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), CALL_TIMEOUT_MS);
@@ -368,8 +368,8 @@ export const api = {
     return (data ?? []) as LocationRow[];
   },
   /** A bathroom the map doesn't know about: at your feet, or where you drop the pin. Players' finds wait for approval. */
-  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number, pin?: { lat: number; lng: number } | null) =>
-    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number }; status: 'live' | 'pending' }>({ action: 'found', name, poiType, lat, lng, accuracy, pin: pin ?? undefined }),
+  found: (name: string, poiType: string, lat: number, lng: number, accuracy: number, pin?: { lat: number; lng: number } | null, accessType: "public"|"customers"="public") =>
+    call<{ location: { id: string; name: string; poiType: string; lat: number; lng: number }; status: 'live' | 'pending' }>({ action: 'found', name, poiType,accessType, lat, lng, accuracy, pin: pin ?? undefined }),
   /** Closed, renamed (details = the new name) or wrong. Three players agreeing make it so; an admin does it alone. */
   reportPlace: (place: { id: string; name: string; poiType: string; lat: number; lng: number }, reason: PlaceReason, details?: string) =>
     call<{ ok: true; applied: boolean; hidden?: boolean; name?: string; reports?: number; needed?: number }>({ action: 'report-place', place, reason, details }),

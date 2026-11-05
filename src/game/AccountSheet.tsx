@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './AccountSheet.css';
 import { FriendsPanel } from './FriendsSheet';
 import { api } from '../net/api';
+import {isNative,appleAccount} from '../net/native';
 import { getSavedName, linkEmail, loadProfile, saveName, signInWithEmail, signInWithEmailLink, signOut } from '../net/supabase';
 import { SLOGAN_MAX, nameProblem, sloganProblem } from '../net/wordfilter';
 import { getSavedAvatar, saveAvatar } from '../net/supabase';
@@ -207,6 +208,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
               </> : <>
                 <div className="locker-account-status"><span className="account-eyebrow">Guest golfer</span><strong>Keep your crown</strong><p>Your progress is tied to this browser. Connect an email so you can recover it on any phone.</p></div>
                 <button className="primary" onClick={() => openMode('save')}>Save progress with email</button>
+                {isNative&&<button disabled={busy} onClick={()=>{setBusy(true);void appleAccount(true).then(()=>setAccountRetry(v=>v+1)).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}>Save this golfer with Apple</button>}
                 <p className="account-caption">No password. Just a link in your inbox.</p>
                 <button onClick={() => openMode('signin')}>Already have an account? Sign in</button>
                 <details className="account-transfer"><summary>Transfer without email</summary>
@@ -261,6 +263,7 @@ export function AccountSheet({ onClose, initialMode = 'name', addCode = null }: 
               <button className="primary" disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) || busy} onClick={() => void (mode === 'save' ? doLink() : doSignIn())}>
                 {busy ? 'Sending…' : 'Email me the link'}
               </button>
+              {mode === 'signin' && isNative && <button disabled={busy} onClick={()=>{setBusy(true);void appleAccount(false).then(()=>onClose(null)).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}>Sign in with Apple</button>}
               {mode === 'signin' && <div className="account-help">
                 <strong>Stay signed in to this game</strong>
                 <p>Email links can open Safari instead of your Home Screen app. Long-press the sign-in button in your email, choose Copy Link, then paste it here without opening it.</p>

@@ -1,3 +1,5 @@
+import { launch } from '../net/launch';
+import { defenseText } from './throneDefense';
 import { useEffect, useRef, useState } from 'react';
 import type { Hole, Stroke } from '../sim/types';
 import { DEFAULT_PARAMS } from '../sim/params';
@@ -19,6 +21,7 @@ interface Props {
   locationId: string;
   /** Submit the run for the throne (needs GPS + check-in); otherwise practice. */
   throne: boolean;
+  remote?: boolean;
 }
 
 type Submit = { state: 'idle' } | { state: 'sending' } | { state: 'done'; runId?:string; score: number; holeScores: number[]; elapsedMs: number | null; king: King | null; isKing: boolean } | { state: 'error'; message: string };
@@ -49,7 +52,7 @@ function LocationBoard({ locationId, refreshKey }: { locationId: string; refresh
   if (!rows || !rows.length) return null;
   return (
     <div className="lb">
-      <div className="lb-title">Throne room</div>
+      <div className="lb-title">All-time course records</div>
       <ol className="sheet-board dark">
         {rows.map((r) => (
           <li key={r.user_id} className={r.user_id === me ? 'me' : ''}>
@@ -81,7 +84,7 @@ export function LocationPlay(props: Props) {
   return <LocationRound key={attempt} {...props} onAgain={() => setAttempt(n => n + 1)} />;
 }
 
-function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () => void }) {
+function LocationRound({ locationId, throne, remote = false, onAgain }: Props & { onAgain: () => void }) {
   const place = recallPlace(locationId);
   const [holes, setHoles] = useState<Hole[] | null>(null);
   const [king, setKing] = useState<King | null>(null);
@@ -100,8 +103,9 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [requestId] = useState(() => crypto.randomUUID());
   const [attempt] = useState(() => new ThroneAttempt(
-    () => api.start(locationId, true), clock => api.concedeLocation(locationId, clock),
+    () => remote ? launch.remote(locationId,requestId) : api.start(locationId, true), clock => api.concedeLocation(locationId, clock),
   ));
   useEffect(() => {
     attempt.mount();
@@ -130,6 +134,7 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
     if (retrying || submit.state !== 'done') return;
     setRetrying(true); setRetryError(null);
     try {
+      if(remote){onAgain();return;}
       const f = fixRef.current;
       if (!f || Date.now() - f.at > 60_000) throw new Error('Waiting for a current location. Please try again.');
       await api.checkin(locationId, f.lat, f.lng, f.accuracy);
@@ -206,7 +211,7 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
   }, [throne, holes, locationId, attempt]);
 
   useEffect(() => {
-    if (!throne) return;
+    if (!throne || remote) return;
     return watchPosition(
       (f) => {
         fixRef.current = f;
@@ -224,7 +229,7 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
 
   const saveRound = () => {
     if (abandoningRef.current || savingRef.current || submit.state === 'done') return;
-    const f = fixRef.current;
+    const f = remote ? {lat:0,lng:0,accuracy:0} : fixRef.current;
     if (!f) {
       setSubmit({ state: 'error', message: 'No GPS fix. Your round was not submitted.' });
       return;
@@ -315,18 +320,16 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
             <div className="victory-eyebrow">{king?.user_id === submit.king?.user_id ? 'THRONE DEFENDED!' : 'THRONE TAKEN!'}</div>
             <h3>{place.name}</h3>
             <p>{king && king.user_id !== submit.king?.user_id
-              ? `Your ${submit.score} ${submit.score < king.score ? `beats ${king.score}` : 'wins the time tiebreak'}. The crown is yours!`
+              ? `Your ${submit.score} ${submit.score < king.score ? `beats ${king.score}` : 'meets the current capture target'}. The crown is yours!`
               : 'You rule this bathroom. Long live the putt!'}</p>
           </div>
         ) : (
           <div className="throne-comparison">
             <div className="victory-eyebrow">ROUND SAVED</div>
             {submit.king ? <>
-              <h3>{submit.score > submit.king.score ? 'So close. The crown stays put.' : 'Tied on strokes. Time decides.'}</h3>
+              <h3>{submit.score > submit.king.score ? 'So close. The crown stays put.' : 'Your challenge is complete.'}</h3>
               <div className="throne-score-duel"><span><b>{submit.score}</b>You</span><i>VS</i><span><b>{submit.king.score}</b>{submit.king.display_name}</span></div>
-              <p>{submit.score > submit.king.score
-                ? `Your ${submit.score} doesn’t beat ${submit.king.display_name}’s ${submit.king.score}. Finish in ${submit.king.score - 1} strokes or fewer to take the throne outright.`
-                : `${submit.king.display_name} keeps the throne on the time tiebreak. Equal scores and times favor the earlier round.`}</p>
+              <p>{submit.king.display_name} keeps the throne. {defenseText(submit.king.score,submit.king.created_at,submit.king.elapsed_ms)}</p>
               <p>Your round is saved. You can try again now.</p>
             </> : <p>Round saved. Refresh the map to see the throne standings.</p>}
           </div>
@@ -350,7 +353,7 @@ function LocationRound({ locationId, throne, onAgain }: Props & { onAgain: () =>
       onHoleDone={onHoleDone}
       renderScorecardButtons={throne ? ({ share, shared }) => <>
         {retryError && <div className="err" role="alert">{retryError}</div>}
-        <button className="primary" disabled={submit.state !== 'done' || retrying} onClick={() => void challengeAgain()}>{retrying ? 'Checking in…' : 'Challenge again'}</button>
+        <button className="primary" disabled={submit.state !== 'done' || retrying} onClick={() => void challengeAgain()}>{retrying ? 'Checking in…' : remote ? 'Challenge again · 1 pass' : 'Challenge again'}</button>
         <button onClick={share}>{shared ? 'Shared!' : 'Share score'}</button>
         <button disabled={submit.state === 'sending' || retrying} onClick={exitRound}>Map</button>
       </> : undefined}
