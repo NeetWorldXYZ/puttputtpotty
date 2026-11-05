@@ -33,18 +33,35 @@ export async function appleAccount(link:boolean){
  if(r.error)throw new Error(r.error.message);
 }
 export async function nativeRestore(){if(!isNative)throw new Error('Open the iPhone app to restore purchases.');const r=await store.restore();for(const t of r.transactions)await deliver(t);}
-let registered=false;
+let listeners:Promise<void>|null=null;
+const deviceKey='ppp.preview.pushDevice';
+function attachPush(){
+ return listeners??=(async()=>{
+  await PushNotifications.addListener('registration',t=>{
+   void call({action:'push-register',token:t.value}).then(()=>localStorage.setItem(deviceKey,t.value)).catch(()=>{});
+  });
+  await PushNotifications.addListener('pushNotificationActionPerformed',()=>window.dispatchEvent(new CustomEvent('potty-open-activity')));
+ })();
+}
+export async function forgetNativePush(){
+ if(!isNative)return;
+ const token=localStorage.getItem(deviceKey);
+ if(token)await call({action:'push-unregister',token});
+ await PushNotifications.unregister();
+ localStorage.removeItem(deviceKey);
+}
 export async function enablePush(){
- if(!isNative)throw new Error('Push alerts will be available in the iPhone build. Your in-app inbox already works.');
- if(!registered){
- await PushNotifications.addListener('registration',t=>{void call({action:'push-register',token:t.value}).catch(()=>{});});
- await PushNotifications.addListener('pushNotificationActionPerformed',()=>{window.dispatchEvent(new CustomEvent('potty-open-activity'));});registered=true;
- }
+ if(!isNative)throw new Error('Push alerts are available in the iPhone build. Your in-app inbox works here.');
+ await attachPush();
  const permission=await PushNotifications.requestPermissions();if(permission.receive!=='granted')throw new Error('Notifications are off. You can enable them in iPhone Settings.');
  await PushNotifications.register();
 }
-export async function initializeNative(){
+let initialized:Promise<void>|null=null;
+export function initializeNative(){return initialized??=bootNative();}
+async function bootNative(){
  if(!isNative)return;
+ await attachPush();
+ if(localStorage.getItem(deviceKey) && (await PushNotifications.checkPermissions()).receive==='granted')await PushNotifications.register();
  const handle=async(url:string)=>{
   const u=new URL(url);if(u.protocol!=='puttputtpotty:' || u.host!=='auth' || u.pathname!=='/callback')return;
   const hash=new URLSearchParams(u.hash.slice(1));const access_token=hash.get('access_token'),refresh_token=hash.get('refresh_token');

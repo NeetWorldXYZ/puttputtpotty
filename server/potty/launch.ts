@@ -32,6 +32,10 @@ export async function launchAction(body: any, user: any, db: any, engine: any): 
   if(typeof body.timezone==='string'){new Intl.DateTimeFormat('en',{timeZone:body.timezone});patch.timezone=body.timezone;}
   check(await db.from('notification_preferences').upsert(patch));return {ok:true};
  }
+ if(action==='push-unregister'){
+  if(typeof body.token==='string')check(await db.from('push_devices').delete().eq('user_id',uid).eq('token',body.token));
+  return {ok:true};
+ }
  if(action==='push-register'){
   if(!/^[a-fA-F0-9]{64}$/.test(body.token??''))throw new Error('Invalid push token');
   // Environment is a server deployment setting, never a client-controlled routing choice.

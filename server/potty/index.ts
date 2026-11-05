@@ -582,7 +582,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = body.action as string;
 
-    if (['launch-state','activity-read','notification-preferences','push-register','weekly-passes','remote-start','my-submissions','launch-review-queue','private-list','private-create','private-invite','private-remove','private-course','private-submit','store-verify'].includes(action)) {
+    if (['launch-state','activity-read','notification-preferences','push-register','push-unregister','weekly-passes','remote-start','my-submissions','launch-review-queue','private-list','private-create','private-invite','private-remove','private-course','private-submit','store-verify'].includes(action)) {
       await ensureProfile(user.id);
       try { return json(await launchAction(body,user,admin,{courseSlots,generateSlot,replay,holeScore,DEFAULT_PARAMS,placeNameProblem,validStrokes})); }
       catch(err){const message=(err as Error).message;

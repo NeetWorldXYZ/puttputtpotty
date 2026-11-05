@@ -25,7 +25,7 @@ export function LaunchHub({enabled}:{enabled:boolean}) {
  const [prefs,setPrefs]=useState<Preferences>(defaults),[courses,setCourses]=useState<PrivateCourse[]>([]),[submissions,setSubmissions]=useState<Submission[]>([]);
  const [name,setName]=useState(''),[theme,setTheme]=useState('grandma'),[selected,setSelected]=useState<PrivateCourse|null>(null),[rows,setRows]=useState<PrivateBoardRow[]>([]),[friend,setFriend]=useState(''),[me,setMe]=useState<string|null>(null);
  const [playing,setPlaying]=useState(false),[roundId,setRoundId]=useState(''),[strokes,setStrokes]=useState<Stroke[][]>([]),[score,setScore]=useState<number|null>(null),[reviewNote,setReviewNote]=useState('');
- const refresh=async()=>{const s=await launch.state();setState(s);setPrefs(s.preferences??defaults);};
+ const refresh=async()=>{const s=await launch.state();setMe(await currentUserId());setState(s);setPrefs(s.preferences??defaults);};
  const run=async(fn:()=>Promise<void>)=>{if(busy)return;setBusy(true);setError('');setNote('');try{await fn();}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
  useEffect(()=>{if(!enabled)return;let live=true;const update=()=>{if(document.visibilityState==='hidden')return;void launch.state().then(s=>{if(live){setState(s);if(!tab)setPrefs(s.preferences??defaults);}}).catch(()=>{});};update();const t=setInterval(update,30000);return()=>{live=false;clearInterval(t);};},[enabled,tab]);
  useEffect(()=>{void currentUserId().then(setMe);const handler=()=>open('activity');window.addEventListener('potty-open-activity',handler);return()=>window.removeEventListener('potty-open-activity',handler);},[]);

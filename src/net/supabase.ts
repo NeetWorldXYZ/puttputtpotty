@@ -134,6 +134,7 @@ export async function signInWithEmailLink(link: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  if(Capacitor.isNativePlatform())await (await import('./native')).forgetNativePush();
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) throw new Error(error.message);
   try {
